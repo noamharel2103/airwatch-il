@@ -1,0 +1,119 @@
+# ============================================================
+#  NuvioMC — שלב 2: הרשאות שחקנים (Member / VIP / VIP+ / MVP)
+#  הרץ אחרי קובץ 01.
+#  אם פלאגין מסוים לא מותקן אצלך — פשוט דלג על הבלוק שלו.
+#  הרשאה לפלאגין שלא קיים לא שוברת כלום, היא רק יושבת בלי שימוש.
+# ============================================================
+
+# ============================================================
+#  DEFAULT — כל מי שנכנס לשרת
+# ============================================================
+
+# בסיס
+lp group default permission set essentials.help true
+lp group default permission set essentials.list true
+lp group default permission set essentials.motd true
+lp group default permission set essentials.rules true
+lp group default permission set essentials.spawn true
+lp group default permission set essentials.afk true
+lp group default permission set essentials.suicide true
+
+# תקשורת
+lp group default permission set essentials.msg true
+lp group default permission set essentials.ignore true
+lp group default permission set essentials.mail true
+lp group default permission set essentials.mail.send true
+
+# טלפורטים בין שחקנים
+lp group default permission set essentials.tpa true
+lp group default permission set essentials.tpaccept true
+lp group default permission set essentials.tpdeny true
+lp group default permission set essentials.tpahere true
+lp group default permission set essentials.tptoggle true
+
+# בתים — בית אחד. המספר עצמו נקבע ב-Essentials config.yml
+# תחת sethome-multiple, לא כאן.
+lp group default permission set essentials.home true
+lp group default permission set essentials.sethome true
+lp group default permission set essentials.delhome true
+lp group default permission set essentials.sethome.multiple.default true
+
+# כלכלה
+lp group default permission set essentials.balance true
+lp group default permission set essentials.pay true
+lp group default permission set essentials.baltop true
+
+# וורפים ציבוריים
+lp group default permission set essentials.warp true
+lp group default permission set essentials.warp.list true
+
+# הצבעה — /vote זמין לכולם.
+# VotingPlugin נותן את זה בברירת מחדל, השורה כאן היא ביטוח.
+lp group default permission set votingplugin.player true
+
+# ============================================================
+#  VIP
+# ============================================================
+lp group vip permission set essentials.back true
+lp group vip permission set essentials.back.ondeath true
+lp group vip permission set essentials.hat true
+lp group vip permission set essentials.workbench true
+lp group vip permission set essentials.sethome.multiple.vip true
+lp group vip permission set essentials.kits.vip true
+lp group vip permission set essentials.kit true
+
+# צבעים בצ'אט. שים לב: זה כולל &k (מגנטי) שמייצר טקסט
+# מרצד ובלתי קריא ומשמש להטרלה. השורה השנייה חוסמת אותו.
+lp group vip permission set essentials.chat.color true
+lp group vip permission set essentials.chat.magic false
+
+# ============================================================
+#  VIP+
+# ============================================================
+lp group vipplus permission set essentials.enderchest true
+lp group vipplus permission set essentials.repair true
+lp group vipplus permission set essentials.near true
+lp group vipplus permission set essentials.sethome.multiple.vipplus true
+lp group vipplus permission set essentials.kits.vipplus true
+
+# /feed — לא מסוכן כמו /heal, אבל בקרב PvP הוא כן יתרון.
+# אם יש PvP רציני בשרת, החלף את true ל-false ותן אותו רק בלובי:
+#   lp group vipplus permission set essentials.feed true world=lobby
+lp group vipplus permission set essentials.feed true
+
+# ============================================================
+#  MVP
+# ============================================================
+lp group mvp permission set essentials.ptime true
+lp group mvp permission set essentials.sethome.multiple.mvp true
+lp group mvp permission set essentials.kits.mvp true
+lp group mvp permission set essentials.nick true
+lp group mvp permission set essentials.nick.color true
+
+# ---------- /fly — רק בלובי ----------
+# תעופה חופשית בעולם השרידה הורגת את המשחק ופותחת ניצול
+# בקרבות. ה-world=lobby בסוף השורה הוא context של LuckPerms:
+# ההרשאה קיימת אך ורק בעולם הזה.
+# החלף "lobby" בשם התיקייה האמיתית של עולם הלובי אצלך.
+lp group mvp permission set essentials.fly true world=lobby
+
+# אם הלובי הוא שרת נפרד מאחורי פרוקסי (Velocity/Bungee),
+# אז world= לא יעבוד — צריך server= במקום, וזה דורש
+# server: lobby בקובץ plugins/LuckPerms/config.yml של אותו שרת:
+#   lp group mvp permission set essentials.fly true server=lobby
+
+# ============================================================
+#  מה בכוונה לא נמצא כאן
+# ============================================================
+# essentials.heal    — ריפוי מיידי באמצע קרב. שובר PvP לגמרי.
+# essentials.god     — אלמוות. אין סיבה שדונייטור יקבל את זה.
+# essentials.tp      — טלפורט לשחקן בלי אישור. פוגע בפרטיות
+#                      ומשמש למעקב אחרי שחקנים. זה כלי צוות.
+# essentials.invsee  — צפייה בתיק של אחרים. כלי צוות בלבד.
+# essentials.give    — כסף/פריטים אינסופיים. שובר את הכלכלה.
+#
+# ---------- אזהרת /nick ----------
+# שחקן עם /nick יכול לקרוא לעצמו בשם של איש צוות ולהתחזות.
+# ב-plugins/Essentials/config.yml הגדר:
+#   nickname-prefix: '~'
+# זה מוסיף ~ לכל כינוי, ואז אי אפשר להתחזות לשם אמיתי.

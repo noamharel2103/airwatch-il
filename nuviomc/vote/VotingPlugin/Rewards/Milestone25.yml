@@ -1,0 +1,50 @@
+# ============================================================
+#  NuvioMC — פרס אבן דרך: 25 הצבעות
+#  יעד: plugins/VotingPlugin/Rewards/Milestone25.yml
+#
+#  ניתן פעם אחת, כשהשחקן מגיע ל-25 הצבעות מצטברות.
+#  החיבור בין המספר 25 לקובץ הזה נעשה ב-config.yml
+#  תחת Milestones — ראה config-changes.md.
+#
+#  פרסים מצטברים הם מה שמחזיק שחקנים מצביעים אחרי
+#  השבוע הראשון. בלעדיהם ההתלהבות נגמרת תוך כמה ימים.
+# ============================================================
+
+Messages:
+  Player: '&6&lאבן דרך! &f25 הצבעות. תודה על התמיכה. 💙'
+  Title:
+    Enabled: true
+    Title: '&6&l25 הצבעות'
+    SubTitle: '&7תודה שאתה איתנו'
+    FadeIn: 10
+    ShowTime: 60
+    FadeOut: 20
+
+BroadcastMessage: '&b&lNuvio &8» &f%player% &7הגיע ל-&6&l25 הצבעות&7!'
+
+Money: 5000
+EXP: 250
+
+Items:
+  MilestoneKey:
+    Material: TRIPWIRE_HOOK
+    Amount: 5
+    Name: '&6&lמפתח אבן דרך'
+    Lore:
+    - '&725 הצבעות ל-&bNuvioMC'
+
+Commands: []
+# רעיון: לתת כאן דרגה זמנית כתודה על תמיכה מתמשכת —
+# Commands:
+# - 'lp user %player% parent addtemp vip 7d'
+
+Sound:
+  Sound: UI_TOAST_CHALLENGE_COMPLETE
+  Volume: 1
+  Pitch: 1
+
+# ============================================================
+#  להוספת אבני דרך נוספות: להעתיק את הקובץ לשמות
+#  Milestone50.yml, Milestone100.yml, להגדיל את הפרסים,
+#  ולרשום כל אחד ב-config.yml תחת Milestones.
+# ============================================================

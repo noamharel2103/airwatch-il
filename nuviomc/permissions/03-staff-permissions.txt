@@ -1,0 +1,183 @@
+# ============================================================
+#  NuvioMC — שלב 3: הרשאות צוות
+#  הרץ אחרי קבצים 01 ו-02.
+#  הקבצים כתובים ל-EssentialsX. אם מערכת הענישה שלך אחרת,
+#  ראה את בלוק ההמרה בסוף הקובץ.
+# ============================================================
+
+# ============================================================
+#  BUILDER — בונה. אין לו שום סמכות ענישה.
+# ============================================================
+lp group builder permission set essentials.gamemode true
+lp group builder permission set essentials.gamemode.creative true
+lp group builder permission set essentials.gamemode.spectator true
+lp group builder permission set essentials.speed true
+lp group builder permission set essentials.tppos true
+
+# WorldEdit — סט בנייה מלא בלי כלי ההרס הגדולים
+lp group builder permission set worldedit.wand true
+lp group builder permission set worldedit.selection.* true
+lp group builder permission set worldedit.clipboard.* true
+lp group builder permission set worldedit.region.* true
+lp group builder permission set worldedit.history.* true
+lp group builder permission set worldedit.navigation.* true
+lp group builder permission set worldedit.generation.* true
+lp group builder permission set worldedit.brush.* true
+lp group builder permission set worldedit.analysis.* true
+lp group builder permission set worldedit.schematic.load true
+lp group builder permission set worldedit.schematic.save true
+lp group builder permission set worldedit.schematic.list true
+
+# פקודות WorldEdit שיכולות למחוק עולם שלם בטעות אחת
+lp group builder permission set worldedit.superpickaxe false
+lp group builder permission set worldedit.snapshots.* false
+
+# תעופה וטלפורט — רק בעולם הבנייה.
+# החלף "buildworld" בשם התיקייה האמיתית של עולם הבנייה.
+lp group builder permission set essentials.fly true world=buildworld
+lp group builder permission set essentials.tp true world=buildworld
+
+# ============================================================
+#  TRIAL — חניך בתקופת ניסיון.
+#  יכול להשתיק ולהעיף. לא יכול לבאן. זה מכוון.
+# ============================================================
+lp group trial permission set essentials.kick true
+lp group trial permission set essentials.mute true
+lp group trial permission set essentials.socialspy true
+lp group trial permission set essentials.seen true
+lp group trial permission set essentials.whois true
+lp group trial permission set essentials.invsee true
+lp group trial permission set essentials.invsee.preventmodify true
+lp group trial permission set essentials.tp true
+lp group trial permission set essentials.tptoggle.others false
+
+# CoreProtect — קריאה בלבד. חניך בודק מי שבר, לא מחזיר.
+lp group trial permission set coreprotect.inspect true
+lp group trial permission set coreprotect.lookup true
+lp group trial permission set coreprotect.help true
+
+# התראות אנטי־צ'יט (GrimAC)
+lp group trial permission set grim.alerts true
+lp group trial permission set grim.brand true
+
+# ============================================================
+#  HELPER — עוזר מלא
+# ============================================================
+lp group helper permission set essentials.vanish true
+lp group helper permission set essentials.vanish.effect true
+lp group helper permission set essentials.mute.offline true
+lp group helper permission set essentials.kick.notify true
+lp group helper permission set essentials.tphere true
+lp group helper permission set essentials.near true
+lp group helper permission set essentials.clearinventory true
+lp group helper permission set grim.verbose true
+lp group helper permission set coreprotect.near true
+
+# ============================================================
+#  MOD — מודרטור. מכאן מתחילים באנים.
+# ============================================================
+lp group mod permission set essentials.ban true
+lp group mod permission set essentials.ban.notify true
+lp group mod permission set essentials.ban.offline true
+lp group mod permission set essentials.tempban true
+lp group mod permission set essentials.unban true
+lp group mod permission set essentials.jail true
+lp group mod permission set essentials.togglejail true
+lp group mod permission set essentials.broadcast true
+lp group mod permission set essentials.tpo true
+lp group mod permission set essentials.tpohere true
+
+# באן צמיתות ידני — מוגבל בכוונה.
+# essentials.tempban.unlimited מאפשר /tempban לנצח, מה שהופך
+# כל הגבלת זמן לחסרת משמעות. מודרטור מקבל טווח מוגבל;
+# באן צמיתות עובר דרך /ban ותיעוד.
+lp group mod permission set essentials.tempban.unlimited false
+
+# CoreProtect — מכאן אפשר גם להחזיר, אבל לא למחוק היסטוריה
+lp group mod permission set coreprotect.rollback true
+lp group mod permission set coreprotect.restore true
+lp group mod permission set coreprotect.teleport true
+lp group mod permission set coreprotect.status true
+lp group mod permission set coreprotect.purge false
+
+# ============================================================
+#  ADMIN — ניהול תוכן וכלכלה
+# ============================================================
+lp group admin permission set essentials.gamemode true
+lp group admin permission set essentials.gamemode.creative true
+lp group admin permission set essentials.gamemode.spectator true
+lp group admin permission set essentials.gamemode.adventure true
+lp group admin permission set essentials.gamemode.others true
+lp group admin permission set essentials.give true
+lp group admin permission set essentials.item true
+lp group admin permission set essentials.eco true
+lp group admin permission set essentials.heal true
+lp group admin permission set essentials.god true
+lp group admin permission set essentials.fly true
+lp group admin permission set essentials.speed true
+lp group admin permission set essentials.time true
+lp group admin permission set essentials.weather true
+lp group admin permission set essentials.setwarp true
+lp group admin permission set essentials.delwarp true
+lp group admin permission set essentials.setspawn true
+lp group admin permission set essentials.setjail true
+lp group admin permission set essentials.clearinventory.others true
+lp group admin permission set essentials.kits.* true
+
+# WorldEdit מלא
+lp group admin permission set worldedit.* true
+
+# CoreProtect מלא
+lp group admin permission set coreprotect.* true
+
+# ניהול מערכת ההצבעה
+lp group admin permission set votingplugin.admin true
+
+# חסינות מפני ענישה — מכאן ומעלה. מודרטור לא יכול לבאן אדמין.
+lp group admin permission set essentials.ban.exempt true
+lp group admin permission set essentials.kick.exempt true
+lp group admin permission set essentials.mute.exempt true
+
+# ============================================================
+#  MANAGER — ניהול צוות והרשאות
+# ============================================================
+lp group manager permission set essentials.* true
+lp group manager permission set luckperms.* true
+
+# גם למנג'ר אין את אלה. שלוש הפקודות האלה הן היחידות
+# שיכולות לעקוף את כל עץ ההרשאות או להפיל את השרת בטעות.
+lp group manager permission set minecraft.command.op false
+lp group manager permission set minecraft.command.deop false
+lp group manager permission set minecraft.command.stop false
+lp group manager permission set bukkit.command.reload false
+lp group manager permission set essentials.plugin false
+
+# ============================================================
+#  OWNER — אתה
+# ============================================================
+lp group owner permission set * true
+
+# ============================================================
+#  אם מערכת הענישה שלך אינה EssentialsX
+# ============================================================
+# החלף את שורות ה-essentials.ban / mute / kick / tempban
+# במקבילות שלהן. הצורה הכללית:
+#
+#   LiteBans:      litebans.ban  litebans.tempban  litebans.mute
+#                  litebans.kick  litebans.warn  litebans.unban
+#                  litebans.history
+#
+#   AdvancedBan:   ab.ban.perma  ab.ban.temp  ab.mute.perma
+#                  ab.mute.temp  ab.kick.use  ab.warn.temp
+#                  ab.unban  ab.history
+#
+#   LibertyBans:   libertybans.ban.command  libertybans.mute.command
+#                  libertybans.kick.command  libertybans.warn.command
+#                  libertybans.*.undo
+#
+# אל תסמוך על הרשימות האלה בעיוור — הרץ בקונסולה
+#   lp verbose on
+# ואז נסה את הפקודה במשחק. LuckPerms ידפיס בדיוק איזה
+# node הפלאגין ביקש. אחר כך:
+#   lp verbose off
+# זו הדרך הבטוחה לגלות שמות הרשאות של כל פלאגין, בלי לנחש.

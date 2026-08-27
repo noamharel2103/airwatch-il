@@ -1,0 +1,54 @@
+# ============================================================
+#  NuvioMC — VoteSites.yml
+#  יעד: plugins/VotingPlugin/VoteSites.yml
+#
+#  לפני שמעלים, להחליף בכל אתר:
+#    VoteURL     — קישור ההצבעה האמיתי לשרת שלך מאותו אתר
+#    ServiceSite — חייב להיות מדויק. ראה הערה למטה.
+#
+#  איך למצוא את ServiceSite הנכון:
+#  להצביע פעם אחת עם debug: true ב-Votifier, ולהעתיק מהקונסולה
+#  את שם השירות בדיוק כפי שהוא הודפס. ניחוש כאן = הצבעות
+#  שמגיעות אבל לא מזכות בפרס.
+#
+#  שורות שמתחילות ב-# הן הערות ואפשר להשאיר אותן.
+# ============================================================
+
+Sites:
+
+  MinecraftMP:
+    ServiceSite: 'minecraft-mp.com'
+    VoteURL: 'https://minecraft-mp.com/server/<המזהה_שלך>/vote/'
+    VoteDelay: 24
+    Rewards:
+    - VoteReward
+
+  PlanetMinecraft:
+    ServiceSite: 'planetminecraft.com'
+    VoteURL: 'https://www.planetminecraft.com/server/<המזהה_שלך>/vote/'
+    VoteDelay: 24
+    Rewards:
+    - VoteReward
+
+  MinecraftServersOrg:
+    ServiceSite: 'minecraftservers.org'
+    VoteURL: 'https://minecraftservers.org/vote/<המזהה_שלך>'
+    VoteDelay: 24
+    Rewards:
+    - VoteReward
+
+  TopG:
+    ServiceSite: 'topg.org'
+    VoteURL: 'https://topg.org/minecraft-servers/server-<המזהה_שלך>'
+    VoteDelay: 24
+    Rewards:
+    - VoteReward
+
+# ============================================================
+#  להוספת אתר נוסף — להעתיק בלוק, לשנות את השם העליון
+#  (חייב להיות ייחודי), ולעדכן את שלושת השדות.
+#
+#  VoteDelay נמדד בשעות. כמעט כל האתרים הם 24.
+#  אם תשים פחות ממה שהאתר באמת מאפשר, השחקן יראה שהוא
+#  זכאי להצביע ויקבל שגיאה באתר.
+# ============================================================

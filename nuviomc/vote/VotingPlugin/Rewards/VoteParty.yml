@@ -1,0 +1,39 @@
+# ============================================================
+#  NuvioMC — פרס וות'־פארטי
+#  יעד: plugins/VotingPlugin/Rewards/VoteParty.yml
+#
+#  ניתן לכל השחקנים המחוברים כשהשרת מגיע ליעד ההצבעות
+#  המשותף. היעד עצמו נקבע ב-config.yml, לא כאן.
+#
+#  זה הפיצ'ר הכי חזק במערכת ההצבעה: הוא הופך הצבעה
+#  מפעולה אישית לפעולה קהילתית, ושחקנים מתחילים לשכנע
+#  אחד את השני להצביע כדי להגיע ליעד.
+# ============================================================
+
+Messages:
+  Player: '&d&lוות׳ פארטי! &fהשרת הגיע ליעד — הנה הפרס שלך.'
+  Title:
+    Enabled: true
+    Title: '&d&lVOTE PARTY'
+    SubTitle: '&fהגענו ליעד!'
+    FadeIn: 10
+    ShowTime: 60
+    FadeOut: 20
+
+Money: 1000
+EXP: 100
+
+Items:
+  PartyKey:
+    Material: TRIPWIRE_HOOK
+    Amount: 3
+    Name: '&d&lמפתח וות׳ פארטי'
+    Lore:
+    - '&7כי השרת הגיע ליעד ההצבעות ביחד'
+
+Commands: []
+
+Sound:
+  Sound: ENTITY_FIREWORK_ROCKET_LAUNCH
+  Volume: 1
+  Pitch: 1

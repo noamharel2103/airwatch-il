@@ -1,0 +1,99 @@
+# ============================================================
+#  NuvioMC — שלב 1: יצירת קבוצות, משקלים, פריפיקסים ומסלולים
+#  הרץ בקונסולת הפאנל (בלי /) או בצ'אט כאדמין (עם /)
+#  שורות שמתחילות ב-# הן הערות — אל תדביק אותן, או שהקונסולה
+#  פשוט תתעלם מהן. עדיף להדביק רק את הפקודות.
+# ============================================================
+
+# ---------- יצירת הקבוצות ----------
+lp creategroup vip
+lp creategroup vipplus
+lp creategroup mvp
+lp creategroup builder
+lp creategroup trial
+lp creategroup helper
+lp creategroup mod
+lp creategroup admin
+lp creategroup manager
+lp creategroup owner
+
+# ---------- משקלים ----------
+# המשקל קובע שני דברים: מי מנצח בהתנגשות הרשאות, ומי מוצג
+# ראשון ברשימת השחקנים / בצ'אט. מספר גבוה = חזק יותר.
+lp group default setweight 0
+lp group vip setweight 10
+lp group vipplus setweight 20
+lp group mvp setweight 30
+lp group builder setweight 40
+lp group trial setweight 45
+lp group helper setweight 50
+lp group mod setweight 60
+lp group admin setweight 80
+lp group manager setweight 90
+lp group owner setweight 100
+
+# ---------- פריפיקסים ----------
+# הפורמט: lp group <קבוצה> meta setprefix <עדיפות> "<טקסט>"
+# העדיפות שווה למשקל כדי שהדרגה הגבוהה תמיד תוצג.
+# רוצה צבעי הקס במקום קודים ישנים? החלף &d ב-&#A855F7 וכו'
+# (עובד ב-Paper 1.16+ עם TAB/EssentialsChat תומכים).
+lp group default meta setprefix 0 "&8[&7Member&8]&r "
+lp group vip meta setprefix 10 "&8[&aVIP&8]&r "
+lp group vipplus meta setprefix 20 "&8[&aVIP&2+&8]&r "
+lp group mvp meta setprefix 30 "&8[&bMVP&8]&r "
+lp group builder meta setprefix 40 "&8[&2Builder&8]&r "
+lp group trial meta setprefix 45 "&8[&eTrial&8]&r "
+lp group helper meta setprefix 50 "&8[&eHelper&8]&r "
+lp group mod meta setprefix 60 "&8[&9Mod&8]&r "
+lp group admin meta setprefix 80 "&8[&cAdmin&8]&r "
+lp group manager meta setprefix 90 "&8[&4Manager&8]&r "
+lp group owner meta setprefix 100 "&8[&5Owner&8]&r "
+
+# ---------- צבע השם בצ'אט ----------
+# נשמר כ-meta כדי ש-TAB / EssentialsChat יוכלו למשוך אותו
+# עם הפלייסהולדר %luckperms_meta_namecolor%
+lp group default meta set namecolor "&7"
+lp group vip meta set namecolor "&a"
+lp group vipplus meta set namecolor "&a"
+lp group mvp meta set namecolor "&b"
+lp group builder meta set namecolor "&2"
+lp group trial meta set namecolor "&e"
+lp group helper meta set namecolor "&e"
+lp group mod meta set namecolor "&9"
+lp group admin meta set namecolor "&c"
+lp group manager meta set namecolor "&4"
+lp group owner meta set namecolor "&5"
+
+# ---------- ירושה ----------
+# שרשרת הדונייטורים
+lp group vip parent add default
+lp group vipplus parent add vip
+lp group mvp parent add vipplus
+
+# בנאי יורש רק משחקן רגיל — בנאי הוא לא מודרטור
+lp group builder parent add default
+
+# שרשרת הצוות. הצוות יורש את הטבות ה-MVP כי זה מקובל
+# ומונע מאנשי צוות לבקש דרגת דונייטור בנפרד.
+lp group trial parent add mvp
+lp group helper parent add trial
+lp group mod parent add helper
+lp group admin parent add mod
+lp group manager parent add admin
+
+# Owner בכוונה לא יורש מ-manager — הוא מקבל * ישירות בקובץ 03.
+# ככה שום שלילת־הרשאה בעץ הצוות לא יכולה לחסום אותך.
+
+# ---------- מסלולים (tracks) ----------
+# מאפשרים /lp user <שם> promote staff במקום לזכור שמות קבוצות
+lp createtrack staff
+lp track staff append trial
+lp track staff append helper
+lp track staff append mod
+lp track staff append admin
+lp track staff append manager
+
+lp createtrack donor
+lp track donor append vip
+lp track donor append vipplus
+lp track donor append mvp
