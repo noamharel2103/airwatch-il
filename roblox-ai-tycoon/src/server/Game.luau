@@ -1114,7 +1114,231 @@ function Game.loanLimit(state): number
 		owed += l.left
 	end
 	local arr = (state.lastMonth and state.lastMonth.revenue or 0) * 12
-	return math.max(0, Config.LOAN_BASE_LIMIT + arr * 0.5 + state.valuation * 0.05 - owed)
+	return math.max(0, Config.LOAN_BASE_LIMIT + arr * 0.6 + state.valuation * 0.08 - owed)
+end
+
+-- Yearly rate the bank opens with. Small loans are cheap, borrowing near your limit is brutal.
+function Game.loanRate(state, amount): number
+	local owed = 0
+	for _, l in ipairs(state.loans) do
+		owed += l.left
+	end
+	local limit = math.max(Game.loanLimit(state) + owed, 1)
+	local share = math.clamp((amount + owed) / limit, 0, 1)
+	local risk = state.users < 1000 and 0.04 or 0
+	return 0.07 + risk + 0.23 * share ^ 1.6
+end
+
+local BANKERS = { "Daniel Ross", "Maya Levin", "Omar Haddad", "Grace Kim", "Lukas Brandt", "Sofia Marino", "Ethan Cole", "Noa Shapira" }
+local BANKS = { "First Pacific Bank", "Ironbridge Bank", "Harbor Credit", "Summit Lending", "Crown Trust" }
+
+-- ---------- meetings: sit across the desk and negotiate ----------
+local function growthOf(state): number
+	local h = state.history
+	if #h >= 4 and (h[#h - 3].revenue or 0) > 0 then
+		return math.clamp((h[#h].revenue or 0) / h[#h - 3].revenue - 1, -1, 3)
+	end
+	return -0.2
+end
+
+local function bestPower(state): number
+	local best = 0
+	for _, m in ipairs(state.models) do
+		if m.status == "released" and m.stats then
+			best = math.max(best, avgStat(m))
+		end
+	end
+	return best / math.max(state.world.frontier, 1)
+end
+
+local function say(mt, lines)
+	mt.line = lines[rng:NextInteger(1, #lines)]
+end
+
+function Actions.meetLoan(state, amount)
+	if state.meeting then
+		return false, "You are already in a meeting"
+	end
+	amount = math.floor(tonumber(amount) or 0)
+	if amount < 1000 then
+		return false, "Ask for at least $1K"
+	end
+	local limit = Game.loanLimit(state)
+	if amount > limit * 1.5 then
+		return false, "No bank will even meet you for that. Your limit is about " .. Format.money(limit) .. "."
+	end
+	-- above the limit they only offer part of it at first
+	local offered = amount > limit and math.floor(limit * rng:NextNumber(0.6, 0.85)) or amount
+	local rate = Game.loanRate(state, offered) * (amount > limit and 1.15 or 1)
+	state.meeting = {
+		kind = "loan", who = BANKERS[rng:NextInteger(1, #BANKERS)], firm = BANKS[rng:NextInteger(1, #BANKS)],
+		asked = amount, amount = offered, rate = rate, months = Config.LOAN_MONTHS,
+		mood = amount > limit and 2 or 3, moves = 4, used = {}, seed = rng:NextInteger(1, 1e6),
+	}
+	local mt = state.meeting
+	if offered < amount then
+		mt.line = string.format("%s? That is a lot. I can lend %s at %.1f%% a year. Convince me.", Format.money(amount), Format.money(offered), rate * 100)
+	else
+		mt.line = string.format("I can lend you %s at %.1f%% a year, paid back over 2 years.", Format.money(offered), rate * 100)
+	end
+	return true
+end
+
+function Actions.meetInvestor(state, idx)
+	if state.meeting then
+		return false, "You are already in a meeting"
+	end
+	local inv = state.investors[idx]
+	if not inv then
+		return false, "Offer expired"
+	end
+	table.remove(state.investors, idx)
+	state.meeting = {
+		kind = "invest", who = inv.person or BANKERS[rng:NextInteger(1, #BANKERS)], firm = inv.name, stage = inv.kind,
+		amount = inv.amount, stake = inv.stake, pre = inv.pre,
+		mood = 3, moves = 4, used = {}, seed = rng:NextInteger(1, 1e6),
+	}
+	state.meeting.line = string.format("So, %s. I can do %s for %.0f%%. Convince me to do better.", state.company, Format.money(inv.amount), inv.stake * 100)
+	return true
+end
+
+-- a move: earnings / demo / more / less / others
+function Actions.meetMove(state, move)
+	local mt = state.meeting
+	if not mt then
+		return false, "No meeting"
+	end
+	if mt.moves <= 0 then
+		return false, "No moves left. Take it or leave."
+	end
+	if (move == "earnings" or move == "demo" or move == "others") and mt.used[move] then
+		return false, "You already did that"
+	end
+	mt.used[move] = true
+	mt.moves -= 1
+	local loan = mt.kind == "loan"
+	local function better(f)
+		if loan then
+			mt.rate = math.max(0.045, mt.rate * (1 - f))
+			if mt.asked and mt.amount < mt.asked then
+				mt.amount = math.min(mt.asked, math.floor(mt.amount * (1 + f)))
+			end
+		else
+			mt.stake = math.max(0.01, mt.stake * (1 - f))
+		end
+	end
+	local function worse(f)
+		if loan then
+			mt.rate = math.min(0.45, mt.rate * (1 + f))
+		else
+			mt.stake = math.min(0.6, mt.stake * (1 + f))
+		end
+	end
+	if move == "earnings" then
+		local g = growthOf(state)
+		if g > 0.15 then
+			mt.mood = math.min(5, mt.mood + 1)
+			better(0.06 + g * 0.05)
+			say(mt, { "Revenue up " .. math.floor(g * 100) .. "% in three months? Okay, I'm listening.", "Those numbers are real? Nice." })
+		elseif g > -0.05 then
+			say(mt, { "Flat. Not bad, not great.", "Hm. Steady, I guess." })
+		else
+			mt.mood -= 1
+			worse(0.05)
+			say(mt, { "You are shrinking. That makes this riskier for me.", "I'd rather not have seen that." })
+		end
+	elseif move == "demo" then
+		local pw = bestPower(state)
+		local crash = rng:NextNumber() < (state.speed >= 4 and 0.3 or 0.15)
+		if pw <= 0 then
+			mt.mood -= 1
+			say(mt, { "There is nothing to demo? Really?", "You don't even have a live model." })
+		elseif crash then
+			mt.mood -= 2
+			worse(0.06)
+			say(mt, { "It just said something very weird. Awkward.", "The demo crashed. In front of me." })
+		elseif pw > 0.85 then
+			mt.mood = math.min(5, mt.mood + 2)
+			better(0.12)
+			say(mt, { "Wait. That is almost as good as the best labs. Wow.", "Okay. That's impressive. Really." })
+		else
+			mt.mood = math.min(5, mt.mood + 1)
+			better(0.04)
+			say(mt, { "It works. Not the best I've seen.", "Decent. A bit behind the leaders." })
+		end
+	elseif move == "more" then
+		local chance = 0.15 + mt.mood * 0.12
+		if rng:NextNumber() < chance then
+			if loan then
+				mt.amount = math.floor(mt.amount * 1.2)
+				mt.asked = math.max(mt.asked or 0, mt.amount)
+				mt.rate *= 1.05
+			else
+				mt.amount = math.floor(mt.amount * 1.2)
+				mt.stake *= 1.1
+			end
+			say(mt, { "Fine. More money. But I want something for it.", "You push hard. Okay, a bit more." })
+		else
+			mt.mood -= 2
+			say(mt, { "No. Don't get greedy.", "That's not happening." })
+		end
+	elseif move == "less" then
+		local chance = 0.1 + mt.mood * 0.11
+		if rng:NextNumber() < chance then
+			better(0.12)
+			say(mt, loan and { "Fine, a lower rate. Don't tell my boss." } or { "Smaller stake? Fine. You are worth it." })
+		else
+			mt.mood -= 1
+			say(mt, { "You are wasting my time.", "Those are already good terms." })
+		end
+	elseif move == "others" then
+		local real = (#state.investors > 0) or state.users > 2e5
+		if real or rng:NextNumber() < 0.3 then
+			mt.mood = math.min(5, mt.mood + 1)
+			better(0.15)
+			say(mt, { "Others? Then let's not lose this. Better terms.", "Okay, okay. I'll beat them." })
+		else
+			mt.mood -= 2
+			say(mt, { "Nobody else is calling you. I checked.", "Really? Name one." })
+		end
+	else
+		return false, "Unknown move"
+	end
+	if mt.mood <= 0 then
+		state.meeting = nil
+		Game.chatMsg(state, "general", "Finance", mt.who .. " from " .. mt.firm .. " walked out of the meeting.")
+		return true, "walked"
+	end
+	return true
+end
+
+function Actions.meetAccept(state)
+	local mt = state.meeting
+	if not mt then
+		return false, "No meeting"
+	end
+	state.meeting = nil
+	if mt.kind == "loan" then
+		local r = mt.rate / 12
+		local n = mt.months
+		local payment = mt.amount * r / (1 - (1 + r) ^ -n)
+		table.insert(state.loans, { amount = mt.amount, left = mt.amount, payment = payment, months = n, rate = mt.rate, bank = mt.firm })
+		state.cash += mt.amount
+		Game.chatMsg(state, "general", "Finance", string.format("Loan of %s from %s at %.1f%% a year.", Format.money(mt.amount), mt.firm, mt.rate * 100))
+	else
+		local post = mt.amount / mt.stake
+		state.cash += mt.amount
+		state.equity *= (1 - mt.stake)
+		state.valuation = math.max(state.valuation, post)
+		Game.newsItem(state, string.format("%s raises %s from %s at a %s valuation", state.company, Format.money(mt.amount), mt.firm, Format.money(post)), "you")
+		Game.chatMsg(state, "general", "Finance", "Round closed. " .. Format.money(mt.amount) .. " in the bank.")
+	end
+	return true
+end
+
+function Actions.meetLeave(state)
+	state.meeting = nil
+	return true
 end
 
 function Actions.takeLoan(state, amount)
@@ -1125,7 +1349,7 @@ function Actions.takeLoan(state, amount)
 	if amount > Game.loanLimit(state) then
 		return false, "The bank says no. Your limit is " .. Format.money(Game.loanLimit(state))
 	end
-	local monthlyRate = Config.LOAN_RATE_YEAR / 12
+	local monthlyRate = Game.loanRate(state, amount) / 12
 	local n = Config.LOAN_MONTHS
 	local payment = amount * monthlyRate / (1 - (1 + monthlyRate) ^ -n)
 	table.insert(state.loans, { amount = amount, left = amount, payment = payment, months = n })
@@ -1151,16 +1375,76 @@ function Game.acquireCost(state, labId)
 	return Labs.valuation(labId, year(state)) * 1.35
 end
 
-function Actions.acquire(state, labId, withStock)
+local BIG_TECH = { google = true, meta = true, microsoft = true, amazon = true, nvidia = true, tencent = true, bytedance = true, baidu = true, qwen = true }
+
+-- Make an offer. They think about it for a few weeks; big deals also need regulators.
+-- premium: 1.2 (lowball), 1.5 (fair), 2.0 (huge)
+function Actions.acquire(state, labId, withStock, premium)
 	local lab = Labs.byId[labId]
 	state.acquired = state.acquired or {}
+	state.offers = state.offers or {}
 	if not lab or state.acquired[labId] then
 		return false, "Not for sale"
 	end
-	local cost = Game.acquireCost(state, labId)
-	if state.valuation < cost * 1.5 then
-		return false, "They laugh at your offer. You need to be worth at least " .. Format.money(cost * 1.5) .. "."
+	for _, o in ipairs(state.offers) do
+		if o.lab == labId then
+			return false, "You already made them an offer. Wait for their answer."
+		end
 	end
+	if (state.cooldowns or {})[labId] and state.day < state.cooldowns[labId] then
+		return false, Labs.displayName(labId) .. " won't talk to you again until " .. Format.date(state.cooldowns[labId])
+	end
+	premium = math.clamp(tonumber(premium) or 1.5, 1.1, 3)
+	local worth = Labs.valuation(labId, year(state))
+	local price = worth * premium
+	if BIG_TECH[labId] and state.valuation < worth * 5 then
+		return false, Labs.displayName(labId) .. " is part of a giant company. You need to be worth " .. Format.money(worth * 5) .. " to even ask."
+	end
+	if state.valuation < price * 0.8 then
+		return false, "They won't take a meeting. You need to be worth at least " .. Format.money(price * 0.8) .. "."
+	end
+	if not withStock and state.cash < price then
+		return false, "Not enough cash for " .. Format.money(price) .. ". Try paying with stock."
+	end
+	table.insert(state.offers, { lab = labId, price = price, premium = premium, stock = withStock == true, day = state.day, answerDay = state.day + rng:NextInteger(10, 25) })
+	Game.chatMsg(state, "general", "Deals team", "Offer sent to " .. Labs.displayName(labId) .. " for " .. Format.money(price) .. ". They will answer in a few weeks.")
+	return true
+end
+
+-- Decide pending offers.
+function Game.tickOffers(state)
+	state.offers = state.offers or {}
+	for i = #state.offers, 1, -1 do
+		local o = state.offers[i]
+		if state.day >= o.answerDay then
+			table.remove(state.offers, i)
+			local lab = Labs.byId[o.lab]
+			local best = state.world.labBest[o.lab]
+			-- doing well = less willing to sell; a fat premium helps a lot
+			local strength = best and math.clamp((best.cap - state.world.frontier + 15) / 15, 0, 1.5) or 0.3
+			-- the bigger they are, the less they want to be bought
+			local size = math.max(0, math.log10(math.max(o.price / o.premium, 1e8) / 1e8)) -- 0 at $100M, 3 at $100B
+			local chance = math.clamp(0.15 + (o.premium - 1) * 0.7 - strength * 0.25 - size * 0.1 - (BIG_TECH[o.lab] and 0.25 or 0) + (o.stock and -0.1 or 0.05), 0.02, 0.85)
+			local blocked = o.price > 5e10 and rng:NextNumber() < math.clamp(0.25 + state.regulator / 200 + (o.price / 1e12), 0, 0.85)
+			state.cooldowns = state.cooldowns or {}
+			if rng:NextNumber() > chance then
+				state.cooldowns[o.lab] = state.day + 90
+				Game.mail(state, "deal", Labs.displayName(o.lab), "Thanks, but no", "We are flattered, but " .. Labs.displayName(o.lab) .. " is not for sale at " .. Format.money(o.price) .. ".")
+			elseif blocked then
+				state.cooldowns[o.lab] = state.day + 180
+				Game.mail(state, "deal", "Competition regulator", "Deal blocked", "We are blocking your purchase of " .. Labs.displayName(o.lab) .. ". It would give you too much power over AI.")
+				Game.newsItem(state, "Regulators block " .. state.company .. "'s takeover of " .. Labs.displayName(o.lab), "press")
+			elseif (not o.stock) and state.cash < o.price then
+				Game.mail(state, "deal", Labs.displayName(o.lab), "Deal fell through", "They said yes, but you did not have the cash anymore.")
+			else
+				Game.completeAcquire(state, o.lab, o.stock, o.price)
+			end
+		end
+	end
+end
+
+function Game.completeAcquire(state, labId, withStock, cost)
+	local lab = Labs.byId[labId]
 	if withStock then
 		local dilution = cost / (state.valuation + cost)
 		state.equity *= (1 - dilution)
@@ -1170,6 +1454,7 @@ function Actions.acquire(state, labId, withStock)
 		end
 		spend(state, cost, "office")
 	end
+	state.acquired = state.acquired or {}
 	state.acquired[labId] = true
 	state.world.labBest[labId] = nil
 	-- you inherit their brand, people and their best model
@@ -1408,6 +1693,32 @@ function Game.tickTeamChatter(state)
 end
 
 -- Too much misuse and the government pulls your models.
+function Game.tickLawsuits(state)
+	local live = state.product.activeModel and state.models[state.product.activeModel]
+	if not live or not live.stats then
+		return
+	end
+	local power = Game.avgStat(live) / math.max(state.world.frontier, 1) -- 1 = as good as the best
+	local unsafe = 1 - math.clamp((live.stats.safety or 30) / math.max(Game.avgStat(live), 1), 0, 1)
+	local risk = Config.RISK_BY_SPEED[state.speed] or 1
+	if power > 0.7 and unsafe > 0.25 and rng:NextNumber() < 0.004 * risk * power * unsafe * (1 + math.log10(1 + state.users / 1e5)) then
+		local CASES = {
+			{ "Families of scam victims", "Your model helped criminals write thousands of scam messages." },
+			{ "A group of authors", "Your model reproduces our books word for word." },
+			{ "A hospital network", "Your model gave dangerous medical advice to patients." },
+			{ "A bank", "Hackers used your model to break into our systems." },
+			{ "A state attorney general", "Your model is too powerful and has no real safety guardrails." },
+		}
+		local c = CASES[rng:NextInteger(1, #CASES)]
+		local amount = math.floor(math.max(5e5, state.valuation * rng:NextNumber(0.005, 0.03) * power * unsafe * 2) / 1000) * 1000
+		local m = Game.mail(state, "event", c[1], "You are being sued", c[2] .. " They want " .. Format.money(amount) .. ".", {
+			{ label = "Settle " .. Format.money(amount), fx = { cash = -amount, rep = -2 } },
+			{ label = "Fight it in court", fx = { cash = -amount * 0.25, rep = -6, reg = 10 } },
+		})
+		Game.newsItem(state, c[1] .. " sue " .. state.company .. " over " .. live.name, "press")
+	end
+end
+
 function Game.tickGovernment(state)
 	state.misuse = math.max(0, (state.misuse or 0) - 0.25)
 	if (state.misuse or 0) >= 100 then
@@ -1919,6 +2230,8 @@ function Game.tickDay(state)
 	tickProblems(state, fx)
 	Game.tickTeamChatter(state)
 	Game.tickGovernment(state)
+	Game.tickLawsuits(state)
+	Game.tickOffers(state)
 	Game.tickPeople(state)
 	Game.tickAchievements(state)
 	randomEvent(state)
@@ -1972,7 +2285,7 @@ function Game.monthly(state, y)
 	-- loan repayments
 	for i = #state.loans, 1, -1 do
 		local l = state.loans[i]
-		local interest = l.left * Config.LOAN_RATE_YEAR / 12
+		local interest = l.left * (l.rate or Config.LOAN_RATE_YEAR) / 12
 		local pay = math.min(l.payment, l.left + interest)
 		state.cash -= pay
 		state.month.costs += pay
@@ -1984,12 +2297,35 @@ function Game.monthly(state, y)
 	end
 	-- investors only call once people use your AI
 	local loc = locationOf(state)
-	if #state.investors < 2 and state.users > 2000 and rng:NextNumber() < 0.18 * loc.investors then
+	-- bigger and faster growing = more investors, bigger checks, smaller stakes (like real rounds)
+	local growth = 0
+	local h = state.history
+	if #h >= 4 and h[#h - 3].users > 0 then
+		growth = math.clamp(state.users / h[#h - 3].users - 1, -0.5, 3)
+	end
+	local interest = math.clamp(0.08 + math.log10(1 + state.users) / 30 + growth * 0.12, 0.02, 0.6) * loc.investors
+	if #state.investors < 3 and state.users > 2000 and rng:NextNumber() < interest then
 		local inv = Catalog.investors[rng:NextInteger(1, #Catalog.investors)]
-		local markup = rng:NextNumber(0.9, 1.25) * (best and best.rank == 1 and 1.3 or 1)
-		local pre = state.valuation * markup
-		local amount = pre * rng:NextNumber(0.08, 0.22)
+		local v = math.max(state.valuation, 3e6)
+		-- round stage by size: seed, A, B/C, growth, mega
+		local stage, minD, maxD
+		if v < 2.5e7 then
+			stage, minD, maxD = "Seed", 0.12, 0.25
+		elseif v < 2e8 then
+			stage, minD, maxD = "Series A", 0.15, 0.25
+		elseif v < 2e9 then
+			stage, minD, maxD = "Series B", 0.10, 0.20
+		elseif v < 3e10 then
+			stage, minD, maxD = "Growth round", 0.05, 0.12
+		else
+			stage, minD, maxD = "Mega round", 0.02, 0.07
+		end
+		local markup = rng:NextNumber(0.85, 1.15) * (1 + growth * 0.25) * (best and best.rank == 1 and 1.25 or 1)
+		local pre = v * markup
+		local dil = rng:NextNumber(minD, maxD)
+		local amount = pre * dil / (1 - dil)
 		local post = pre + amount
+		inv = { name = inv.name, kind = stage .. " | " .. inv.kind, blurb = inv.blurb }
 		table.insert(state.investors, { name = inv.name, kind = inv.kind, blurb = inv.blurb, amount = amount, pre = pre, post = post, stake = amount / post, expires = state.day + 60 })
 		Game.mail(state, "investor", inv.name, "Term sheet", string.format("We would like to invest %s at a %s pre-money valuation. See Bank.", Format.money(amount), Format.money(pre)))
 	end
@@ -2060,6 +2396,7 @@ function Game.snapshot(state)
 			end
 			return out
 		end)(),
+		offers = state.offers or {}, cooldowns = state.cooldowns or {}, meeting = state.meeting, loanRate = Game.loanRate(state, 1e6),
 		misuse = state.misuse or 0, resetReady = state.resetReady or 0,
 		eraCeiling = Game.eraCeiling(state), achievements = state.achievements or {}, lastAchievement = state.lastAchievement, boxes = #(state.boxes or {}), problems = state.problems or {}, acquired = state.acquired or {}, location = state.location, loans = state.loans, loanLimit = Game.loanLimit(state), gpuCap = Game.gpuCap(state),
 	}

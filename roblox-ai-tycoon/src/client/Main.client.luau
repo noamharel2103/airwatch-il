@@ -18,6 +18,7 @@ local Company = require(Modules.AppCompany)
 local Playground = require(Modules.Playground)
 local Reveal = require(Modules.Reveal)
 local Unbox = require(Modules.Unbox)
+local Meeting = require(Modules.Meeting)
 
 local player = Players.LocalPlayer
 local cam = workspace.CurrentCamera
@@ -167,6 +168,7 @@ local lastAch: string? = nil
 local knownResearch: { [string]: boolean }? = nil
 local Research = require(game:GetService("ReplicatedStorage").Shared.Research)
 Net.onState(function(s)
+	Meeting.update(Shell.overlay, s)
 	-- breakthroughs pop up as toasts (research runs by itself)
 	if knownResearch then
 		for id in pairs(s.research.done) do

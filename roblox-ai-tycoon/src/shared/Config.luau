@@ -22,7 +22,7 @@ Config.START_CLOUD_CREDITS = 0
 -- Bank loans: credit limit grows with revenue and valuation. Repaid monthly over LOAN_MONTHS.
 Config.LOAN_RATE_YEAR = 0.11
 Config.LOAN_MONTHS = 24
-Config.LOAN_BASE_LIMIT = 150e3
+Config.LOAN_BASE_LIMIT = 30e6 -- banks lend up to $30M at the start, at a steep yearly rate
 
 -- Where you start. Perks make each city play a bit differently.
 Config.LOCATIONS = {

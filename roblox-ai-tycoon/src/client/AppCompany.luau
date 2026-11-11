@@ -77,7 +77,7 @@ function App.mount(ctx, s)
 		end)
 	elseif page == "acquire" then
 		UI.label(sc, "Buy your rivals", 26, T.text, { FontFace = UI.HEAVY })
-		UI.label(sc, "You get their best model, their researchers and their fans. They disappear from the leaderboard. You must be worth 1.5x the price.", 14, T.sub)
+		UI.label(sc, "Make an offer. Bigger offers get a yes more often. Strong labs rarely sell, and regulators can block big deals. If you lack cash you pay in stock.", 14, T.sub)
 		local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = sc })
 		new("UIGridLayout", { CellSize = UDim2.new(1 / 3, -8, 0, 150), CellPadding = UDim2.fromOffset(10, 10), Parent = grid })
 		local list = table.clone(Labs.list)
@@ -97,15 +97,26 @@ function App.mount(ctx, s)
 			new("TextLabel", { Text = Labs.displayName(lab.id), FontFace = UI.BOLD, TextSize = 20, Position = UDim2.fromOffset(26, -4), Size = UDim2.new(1, -26, 0, 26), Parent = c })
 			new("TextLabel", { Text = owned and "OWNED BY YOU" or ("Price " .. Format.money(price)), FontFace = UI.BOLD, TextSize = 16, TextColor3 = owned and T.green or T.yellow, Position = UDim2.fromOffset(0, 28), Size = UDim2.new(1, 0, 0, 20), Parent = c })
 			if not owned then
-				new("TextLabel", { Text = canAfford and "They will take your call." or ("Be worth " .. Format.money(price * 1.5) .. " first"), TextSize = 13, TextColor3 = T.sub, Position = UDim2.fromOffset(0, 52), Size = UDim2.new(1, 0, 0, 18), Parent = c })
-				local row = new("Frame", { BackgroundTransparency = 1, Position = UDim2.new(0, 0, 1, -40), Size = UDim2.new(1, 0, 0, 38), Parent = c })
-				UI.list(row, 6, true)
-				UI.button(row, "Pay cash", function()
-					Net.act("acquire", lab.id, false)
-				end, canAfford and "success" or "ghost", { Size = UDim2.fromOffset(120, 36) })
-				UI.button(row, "Pay in stock", function()
-					Net.act("acquire", lab.id, true)
-				end, canAfford and "primary" or "ghost", { Size = UDim2.fromOffset(140, 36) })
+				local pending = false
+				for _, o in ipairs(s.offers or {}) do
+					if o.lab == lab.id then
+						pending = true
+					end
+				end
+				local cd = (s.cooldowns or {})[lab.id]
+				local worth = price / 1.35
+				local status = pending and "OFFER SENT. WAITING FOR AN ANSWER." or ((cd and s.day < cd) and ("SAID NO. TRY AGAIN " .. Format.date(cd)) or ("Worth about " .. Format.money(worth)))
+				new("TextLabel", { Text = status, FontFace = UI.FONT, TextSize = 14, TextColor3 = pending and T.yellow or T.sub, BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 52), Size = UDim2.new(1, 0, 0, 18), Parent = c })
+				if not pending and not (cd and s.day < cd) then
+					local row = new("Frame", { BackgroundTransparency = 1, Position = UDim2.new(0, 0, 1, -40), Size = UDim2.new(1, 0, 0, 38), Parent = c })
+					UI.list(row, 6, true)
+					for _, o in ipairs({ { "LOW 1.2x", 1.2 }, { "FAIR 1.5x", 1.5 }, { "HUGE 2x", 2.0 } }) do
+						UI.button(row, o[1], function()
+							local offer = worth * o[2]
+							Net.act("acquire", lab.id, s.cash < offer, o[2])
+						end, o[2] == 1.5 and T.green or "ghost", { Size = UDim2.fromOffset(112, 36), TextSize = 12 })
+					end
+				end
 			end
 		end
 	else
@@ -129,7 +140,7 @@ function App.key(s)
 	for _ in pairs(s.acquired or {}) do
 		n += 1
 	end
-	return page .. tostring(s.resetReady) .. n .. s.year .. math.floor(math.log10(math.max(s.valuation, 10)) * 4) .. s.office .. s.product.appName .. s.product.subPrice .. s.product.apiPrice .. s.product.proPrice .. tostring(s.product.activeModel)
+	return page .. tostring(s.resetReady) .. #(s.offers or {}) .. n .. s.year .. math.floor(math.log10(math.max(s.valuation, 10)) * 4) .. s.office .. s.product.appName .. s.product.subPrice .. s.product.apiPrice .. s.product.proPrice .. tostring(s.product.activeModel)
 end
 
 return App

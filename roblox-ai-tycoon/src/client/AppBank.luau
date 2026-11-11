@@ -86,28 +86,40 @@ function App.mount(ctx, s)
 		UI.label(c, string.format("Invests %s for %.1f%% of the company. Values you at %s.", Format.money(inv.amount), inv.stake * 100, Format.money(inv.post)), 15, T.yellow)
 		local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 36), Parent = c })
 		UI.list(row, 8, true)
-		UI.button(row, "Accept", function()
-			Net.act("investor", i, true)
-		end, "success")
+		UI.button(row, "Meet them", function()
+			Net.act("meetInvestor", i)
+		end, "success", { Size = UDim2.fromOffset(150, 34) })
 		UI.button(row, "Decline", function()
 			Net.act("investor", i, false)
 		end, "ghost")
 	end
 	-- loans
 	UI.label(sc, "Bank loans", 18, T.text, { FontFace = UI.HEAVY })
-	UI.label(sc, string.format("You can borrow up to %s at 11%% a year, paid back monthly over 2 years.", Format.money(s.loanLimit)), 13, T.sub)
-	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 36), Parent = sc })
+	UI.label(sc, string.format("Banks lend you up to about %s. Small loans start near %.0f%% a year, borrowing close to your limit can cost 25%%+ a year. Paid back monthly over 2 years. Big loans need a hard negotiation.", Format.money(s.loanLimit), (s.loanRate or 0.1) * 100), 13, T.sub)
+	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 40), Parent = sc })
 	UI.list(row, 8, true)
-	for _, amt in ipairs({ 10e3, 50e3, 250e3, 1e6, 10e6, 100e6 }) do
-		if amt <= s.loanLimit then
-			UI.button(row, "Borrow " .. Format.money(amt), function()
-				Net.act("takeLoan", amt)
-			end, "primary", { Size = UDim2.fromOffset(150, 34) })
+	local box = new("TextBox", { Text = "", PlaceholderText = "Amount, like 5000000", ClearTextOnFocus = false, FontFace = UI.FONT, TextSize = 18, TextColor3 = T.text, PlaceholderColor3 = T.dim, BackgroundColor3 = T.panel2 or T.panel, Size = UDim2.fromOffset(260, 38), Parent = row })
+	UI.stroke(box, T.line, 3)
+	UI.button(row, "Meet the bank", function()
+		local txt = box.Text:lower():gsub("[,%$ ]", "")
+		local mult = 1
+		if txt:sub(-1) == "k" then
+			mult, txt = 1e3, txt:sub(1, -2)
+		elseif txt:sub(-1) == "m" then
+			mult, txt = 1e6, txt:sub(1, -2)
+		elseif txt:sub(-1) == "b" then
+			mult, txt = 1e9, txt:sub(1, -2)
 		end
-	end
+		local n = tonumber(txt)
+		if n then
+			Net.act("meetLoan", n * mult)
+		else
+			Net.toast("Type an amount, like 2M or 500K", "error")
+		end
+	end, "primary", { Size = UDim2.fromOffset(190, 38) })
 	for i, l in ipairs(s.loans) do
 		local r = UI.card(sc)
-		UI.label(r, string.format("Loan of %s: %s left, %s per month, %d months to go", Format.money(l.amount), Format.money(l.left), Format.money(l.payment), l.months), 14, T.text)
+		UI.label(r, string.format("%s loan from %s at %.1f%%: %s left, %s per month, %d months to go", Format.money(l.amount), l.bank or "the bank", (l.rate or 0.11) * 100, Format.money(l.left), Format.money(l.payment), l.months), 14, T.text)
 		UI.button(r, "Repay now", function()
 			Net.act("repayLoan", i)
 		end, "ghost", { Position = UDim2.new(1, -130, 0, 0), Size = UDim2.fromOffset(120, 30) })
