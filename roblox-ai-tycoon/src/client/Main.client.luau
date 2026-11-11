@@ -69,19 +69,74 @@ local function setRoom(stage: number)
 end
 setRoom(1)
 local t0 = os.clock()
-RunService.RenderStepped:Connect(function()
+-- camera zoom toward whatever you clicked (computer, rig...) before it opens
+local zoomCF: CFrame? = nil
+local zoomA, zoomTarget = 0, 0
+local zooming = false
+local mx, my = 0, 0
+local function overlayBusy(): boolean
+	for _, c in ipairs(Shell.overlay:GetChildren()) do
+		if c:IsA("GuiObject") and c.Visible and c.Size.X.Scale >= 1 then
+			return true
+		end
+	end
+	return false
+end
+RunService.RenderStepped:Connect(function(dt)
 	cam = workspace.CurrentCamera
 	if baseCF then
 		cam.CameraType = Enum.CameraType.Scriptable
 		local t = os.clock() - t0
-		local mouse = UIS:GetMouseLocation()
-		local v = cam.ViewportSize
-		local mx = (mouse.X / math.max(v.X, 1) - 0.5)
-		local my = (mouse.Y / math.max(v.Y, 1) - 0.5)
+		-- the camera only follows the mouse while you are looking at the room, not inside a screen
+		if not (Shell.isOpen() or zooming or zoomTarget > 0 or overlayBusy()) then
+			local mouse = UIS:GetMouseLocation()
+			local v = cam.ViewportSize
+			mx += ((mouse.X / math.max(v.X, 1) - 0.5) - mx) * math.min(1, dt * 4)
+			my += ((mouse.Y / math.max(v.Y, 1) - 0.5) - my) * math.min(1, dt * 4)
+		end
 		-- gentle parallax toward the mouse + idle breathing
-		cam.CFrame = baseCF * CFrame.Angles(math.rad(-my * 2 + math.sin(t * 0.4) * 0.15), math.rad(-mx * 3), 0)
+		local room = baseCF * CFrame.Angles(math.rad(-my * 2 + math.sin(t * 0.4) * 0.15), math.rad(-mx * 3), 0)
+		zoomA += (zoomTarget - zoomA) * math.min(1, dt * 7)
+		if zoomCF and zoomA > 0.001 then
+			local a = zoomA * zoomA * (3 - 2 * zoomA)
+			cam.CFrame = room:Lerp(zoomCF, a)
+		else
+			cam.CFrame = room
+		end
 	end
 end)
+
+-- zoom in on an object, wait a beat, then run open()
+local function focusThen(inst: Instance, open: () -> ())
+	if zooming then
+		return
+	end
+	local cf, size
+	if inst:IsA("Model") then
+		cf, size = inst:GetBoundingBox()
+	elseif inst:IsA("BasePart") then
+		cf, size = inst.CFrame, inst.Size
+	end
+	if not cf or not baseCF then
+		open()
+		return
+	end
+	local center = cf.Position
+	local dir = (baseCF.Position - center).Unit
+	local dist = math.max(size.X, size.Y, size.Z) * 1.3 + 3
+	zoomCF = CFrame.lookAt(center + dir * dist + Vector3.new(0, 0.6, 0), center)
+	zoomTarget = 1
+	zooming = true
+	task.delay(0.9, function()
+		zooming = false
+		open()
+	end)
+end
+local function zoomOut()
+	zoomTarget = 0
+end
+Shell.onClose = zoomOut
+RigView.onClose = zoomOut
 
 -- hover + click on objects in the room
 local hl = Instance.new("Highlight")
@@ -149,13 +204,18 @@ UIS.InputBegan:Connect(function(input, processed)
 				end)
 			end
 		elseif inst and inst.Name == "GpuRack" and Net.state then
-			UI.guardUntil = os.clock() + 0.4
-			RigView.open(Shell.overlay, inst, Net.state, function()
-				Shell.openComputer("parts")
+			focusThen(inst, function()
+				UI.guardUntil = os.clock() + 0.4
+				RigView.open(Shell.overlay, inst, Net.state, function()
+					zoomTarget = 1
+					Shell.openComputer("parts")
+				end)
 			end)
 		elseif inst then
-			UI.guardUntil = os.clock() + 0.4
-			Shell.openComputer(app ~= "desktop" and app or nil)
+			focusThen(inst, function()
+				UI.guardUntil = os.clock() + 0.4
+				Shell.openComputer(app ~= "desktop" and app or nil)
+			end)
 		end
 	end
 end)

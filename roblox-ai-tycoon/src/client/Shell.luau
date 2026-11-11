@@ -227,6 +227,9 @@ end
 function Shell.closeComputer()
 	Shell.closeApp()
 	comp.Visible = false
+	if Shell.onClose then
+		Shell.onClose()
+	end
 	-- (hint stays hidden)
 end
 function Shell.isOpen()

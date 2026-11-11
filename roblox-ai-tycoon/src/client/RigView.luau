@@ -15,6 +15,9 @@ local root: Instance? = nil
 local conn: RBXScriptConnection? = nil
 
 function RigView.close()
+	if root and RigView.onClose and not RigView.reopening then
+		RigView.onClose()
+	end
 	if conn then
 		conn:Disconnect()
 		conn = nil
@@ -106,7 +109,9 @@ function RigView.refresh(s)
 			-- rebuild the whole view so the 3D model shows the change too
 			task.defer(function()
 				if root and RigView.rig then
+					RigView.reopening = true
 					RigView.open(RigView.host, RigView.rig, s, RigView.onShop)
+					RigView.reopening = false
 					RigView.lastKey = key
 				end
 			end)

@@ -100,7 +100,25 @@ end
 -- Index = { [slot] = { company, day, valuation, stage } }
 function Saves.listSlots(userId: number)
 	if not Saves.available then
-		return memory[key(userId)] or {}
+		-- local saves: rebuild the list from the slot files so a lost index never hides a company
+		local idx = memory[key(userId)] or {}
+		local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
+		local Format = require(Shared.Format)
+		local Catalog = require(Shared.Catalog)
+		for slot = 1, Saves.MAX_SLOTS do
+			local data = memory[key(userId, slot)]
+			if type(data) == "table" and data.company then
+				idx[tostring(slot)] = {
+					company = data.company,
+					day = data.day,
+					date = Format.monthYear(data.day or 1),
+					valuation = data.valuation or 0,
+					stage = (Catalog.officeStages[data.office or 1] or Catalog.officeStages[1]).name,
+					users = data.users or 0,
+				}
+			end
+		end
+		return idx
 	end
 	local ok, res = retry(function()
 		return (store :: DataStore):GetAsync(key(userId))

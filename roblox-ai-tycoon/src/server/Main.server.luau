@@ -172,6 +172,11 @@ RunService.Heartbeat:Connect(function(dt)
 		if s.dirty and os.clock() - s.lastPush > 0.25 then
 			push(player, s)
 		end
+		-- in Studio, save every 15 seconds so stopping a test never loses progress
+		if RunService:IsStudio() and os.clock() - ((s :: any).lastAuto or 0) > 15 then
+			(s :: any).lastAuto = os.clock()
+			task.spawn(saveSession, player)
+		end
 	end
 end)
 
