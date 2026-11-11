@@ -12,6 +12,43 @@ local new = UI.new
 
 local App = { id = "parts", name = "Parts", icon = "parts", color = Color3.fromRGB(240, 150, 60) }
 local qty = 8
+local mode = "gpus"
+local PcParts = require(Shared.PcParts)
+
+local function mountComputer(ctx, s)
+	local sc = UI.scroll(ctx.body)
+	UI.list(sc, 10)
+	UI.pad(sc, 0, 0, 10, 8)
+	UI.label(sc, "Upgrade your computer. Better parts train faster, run cooler and look great in your room.", 14, T.sub)
+	for _, cat in ipairs(PcParts.categories) do
+		local cur = PcParts.get(s.pc, cat.id)
+		UI.label(sc, cat.name .. "   (now: " .. cur.name .. ")", 18, T.text, { FontFace = UI.HEAVY })
+		local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = sc })
+		new("UIGridLayout", { CellSize = UDim2.new(1 / 3, -8, 0, 120), CellPadding = UDim2.fromOffset(10, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = grid })
+		for i, part in ipairs(PcParts.list[cat.id]) do
+			if i > 1 then
+				local owned = s.pc and s.pc[cat.id] == part.id
+				local soon = s.year < part.year
+				local c = new("Frame", { BackgroundColor3 = owned and Color3.fromRGB(40, 90, 70) or T.panel2, LayoutOrder = i, Parent = grid })
+				UI.stroke(c, T.line, 3)
+				UI.pad(c, 10, 12)
+				new("TextLabel", { Text = part.name, FontFace = UI.HEAVY, TextSize = 13, TextColor3 = T.text, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 18), Parent = c })
+				local effect = part.speed and string.format("+%d%% training speed", math.floor((part.speed - 1) * 100 + 0.5))
+					or part.heat and string.format("%d%% less heat", math.floor((1 - part.heat) * 100 + 0.5))
+					or part.kw and string.format("+%d kW power", part.kw)
+					or part.hype and string.format("+%d hype", part.hype) or ""
+				new("TextLabel", { Text = effect, TextSize = 13, TextColor3 = T.green, BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 20), Size = UDim2.new(1, 0, 0, 16), Parent = c })
+				new("TextLabel", { Text = part.blurb, TextSize = 12, TextColor3 = T.dim, TextWrapped = true, BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 38), Size = UDim2.new(1, 0, 0, 30), TextYAlignment = Enum.TextYAlignment.Top, Parent = c })
+				local label = owned and "INSTALLED" or (soon and ("COMES " .. part.year) or ("Buy " .. Format.money(part.price)))
+				UI.button(c, label, function()
+					if not owned and not soon then
+						Net.act("buyPcPart", cat.id, part.id)
+					end
+				end, (owned or soon or s.cash < part.price) and "ghost" or "success", { Position = UDim2.new(0, 0, 1, -32), Size = UDim2.new(1, 0, 0, 32) })
+			end
+		end
+	end
+end
 
 function App.mount(ctx, s)
 	if not s then
@@ -19,6 +56,18 @@ function App.mount(ctx, s)
 	end
 	UI.clear(ctx.tabs)
 	UI.clear(ctx.body)
+	UI.button(ctx.tabs, "GPUs", function()
+		mode = "gpus"
+		App.mount(ctx, Net.state)
+	end, mode == "gpus" and "primary" or "ghost", { Size = UDim2.fromOffset(90, 34) })
+	UI.button(ctx.tabs, "Your computer", function()
+		mode = "pc"
+		App.mount(ctx, Net.state)
+	end, mode == "pc" and "primary" or "ghost", { Size = UDim2.fromOffset(160, 34) })
+	if mode == "pc" then
+		mountComputer(ctx, s)
+		return
+	end
 	for _, q in ipairs({ 1, 8, 64, 512, 4096 }) do
 		UI.button(ctx.tabs, "x" .. q, function()
 			qty = q
@@ -94,7 +143,10 @@ function App.mount(ctx, s)
 end
 
 function App.key(s)
-	local k = tostring(s.year) .. math.floor(s.clusterPower * 10) .. (s.gpuSlots or 0) .. (s.gpuUsed or 0) .. (s.cash >= 3e6 and "r" or "p")
+	local k = mode .. tostring(s.year) .. math.floor(s.clusterPower * 10) .. math.floor(math.log10(math.max(s.cash, 1)) * 3) .. (s.gpuSlots or 0) .. (s.gpuUsed or 0)
+	for cat, id in pairs(s.pc or {}) do
+		k ..= cat .. id
+	end
 	for id, n in pairs(s.gpus.owned) do
 		k ..= id .. n
 	end

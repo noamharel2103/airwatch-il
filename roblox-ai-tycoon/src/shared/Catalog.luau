@@ -19,8 +19,26 @@ C.storage = {
 	{ id = "biggarage", name = "Huge garage", cost = 3e6, rent = 40e3, slots = 800, kw = 900, desc = "A giant garage with its own power line." },
 	{ id = "cage", name = "Colocation cage", cost = 15e6, rent = 250e3, slots = 4000, kw = 5e3, desc = "Your racks inside someone else's datacenter." },
 	{ id = "hall", name = "Data hall", cost = 180e6, rent = 2e6, slots = 40000, kw = 60e3, desc = "A whole hall, liquid cooling, 24/7 guards." },
+	{ id = "basement", name = "Parents' basement", cost = 5e3, rent = 0, slots = 6, kw = 5, desc = "Free rent. Your mom asks what all the noise is." },
+	{ id = "container", name = "Shipping container", cost = 60e3, rent = 1.5e3, slots = 40, kw = 40, desc = "A metal box in a parking lot, full of GPUs." },
+	{ id = "barn", name = "Old barn in Iowa", cost = 400e3, rent = 3e3, slots = 160, kw = 150, desc = "Cheap land, cheap power, lots of cows." },
+	{ id = "mall", name = "Empty shopping mall", cost = 1.5e6, rent = 15e3, slots = 400, kw = 450, desc = "The food court is now a server room." },
+	{ id = "texas", name = "Warehouse in Texas", cost = 6e6, rent = 70e3, slots = 1600, kw = 1.8e3, desc = "Big, cheap and the grid mostly holds." },
+	{ id = "bunker", name = "Underground bunker", cost = 9e6, rent = 60e3, slots = 1200, kw = 1.4e3, desc = "Old military bunker. Nobody is stealing these GPUs." },
+	{ id = "iceland", name = "Datacenter in Iceland", cost = 25e6, rent = 200e3, slots = 6000, kw = 8e3, desc = "Free cooling from the cold and geothermal power." },
+	{ id = "norway", name = "Fjord datacenter, Norway", cost = 60e6, rent = 500e3, slots = 14000, kw = 18e3, desc = "Cooled by sea water, powered by waterfalls." },
+	{ id = "nevada", name = "Desert lot in Nevada", cost = 90e6, rent = 600e3, slots = 20000, kw = 30e3, desc = "Solar panels as far as you can see." },
+	{ id = "virginia", name = "Data hall in Virginia", cost = 220e6, rent = 2.5e6, slots = 50000, kw = 70e3, desc = "Where the internet lives." },
+	{ id = "uae", name = "Campus in Abu Dhabi", cost = 600e6, rent = 6e6, slots = 120000, kw = 180e3, desc = "Oil money meets AI money." },
+	{ id = "nuclear", name = "Site next to a nuclear plant", cost = 1.2e9, rent = 12e6, slots = 220000, kw = 400e3, desc = "Your own reactor's worth of power." },
+	{ id = "ocean", name = "Floating ocean datacenter", cost = 1.8e9, rent = 15e6, slots = 260000, kw = 450e3, desc = "A ship full of servers, cooled by the sea." },
+	{ id = "gigawatt", name = "Gigawatt supercluster", cost = 8e9, rent = 70e6, slots = 1200000, kw = 2e6, desc = "The biggest computer ever built." },
+	{ id = "moon", name = "Datacenter on the Moon", cost = 60e9, rent = 300e6, slots = 6000000, kw = 9e6, desc = "Cold, quiet and very far from regulators." },
 	{ id = "datacenter", name = "Hyperscale datacenter", cost = 2.5e9, rent = 25e6, slots = 400000, kw = 700e3, desc = "Your own campus of servers in the desert." },
 }
+table.sort(C.storage, function(a, b)
+	return a.cost < b.cost
+end)
 C.storageById = {}
 for _, st in ipairs(C.storage) do
 	C.storageById[st.id] = st

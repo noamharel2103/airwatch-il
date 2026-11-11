@@ -19,6 +19,9 @@ local Playground = require(Modules.Playground)
 local Reveal = require(Modules.Reveal)
 local Unbox = require(Modules.Unbox)
 local Meeting = require(Modules.Meeting)
+local PcVisuals = require(Modules.PcVisuals)
+local DecorVisuals = require(Modules.DecorVisuals)
+local RigView = require(Modules.RigView)
 
 local player = Players.LocalPlayer
 local cam = workspace.CurrentCamera
@@ -145,6 +148,11 @@ UIS.InputBegan:Connect(function(input, processed)
 					Shell.toast("Installed! Your GPUs are working.", "good")
 				end)
 			end
+		elseif inst and inst.Name == "GpuRack" and Net.state then
+			UI.guardUntil = os.clock() + 0.4
+			RigView.open(Shell.overlay, inst, Net.state, function()
+				Shell.openComputer("parts")
+			end)
 		elseif inst then
 			UI.guardUntil = os.clock() + 0.4
 			Shell.openComputer(app ~= "desktop" and app or nil)
@@ -170,6 +178,11 @@ local knownResearch: { [string]: boolean }? = nil
 local Research = require(game:GetService("ReplicatedStorage").Shared.Research)
 Net.onState(function(s)
 	Meeting.update(Shell.overlay, s)
+	RigView.refresh(s)
+	if rooms then
+		PcVisuals.update(rooms:FindFirstChild("Stage" .. (s.office or 1)), s.pc)
+		DecorVisuals.update(rooms:FindFirstChild("Stage" .. (s.office or 1)), s.decor)
+	end
 	-- breakthroughs pop up as toasts (research runs by itself)
 	if knownResearch then
 		for id in pairs(s.research.done) do

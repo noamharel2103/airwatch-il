@@ -19,7 +19,7 @@ function App.mount(ctx, s)
 	end
 	UI.clear(ctx.tabs)
 	UI.clear(ctx.body)
-	for _, p in ipairs({ { "app", "Your AI app" }, { "office", "Office" }, { "acquire", "Buy companies" } }) do
+	for _, p in ipairs({ { "app", "Your AI app" }, { "office", "Office" }, { "room", "Room shop" }, { "acquire", "Buy companies" } }) do
 		UI.button(ctx.tabs, p[2], function()
 			page = p[1]
 			App.mount(ctx, Net.state)
@@ -79,6 +79,29 @@ function App.mount(ctx, s)
 		priceRow("API price per 1M output tokens", { 0.5, 2, 5, 10, 15, 30, 60 }, s.product.apiPrice, function(v)
 			Net.act("setPrices", s.product.subPrice, v, s.product.proPrice)
 		end)
+	elseif page == "room" then
+		local Decor = require(game:GetService("ReplicatedStorage").Shared.Decor)
+		UI.label(sc, "Make your place yours. Everything shows up in your room.", 14, T.sub)
+		local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = sc })
+		new("UIGridLayout", { CellSize = UDim2.new(1 / 3, -8, 0, 116), CellPadding = UDim2.fromOffset(10, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = grid })
+		for i, d in ipairs(Decor.list) do
+			local owned = (s.decor or {})[d.id]
+			local c = new("Frame", { BackgroundColor3 = owned and Color3.fromRGB(40, 90, 70) or T.panel2, LayoutOrder = i, Parent = grid })
+			UI.stroke(c, T.line, 3)
+			UI.pad(c, 10, 12)
+			new("TextLabel", { Text = d.name, FontFace = UI.HEAVY, TextSize = 13, TextColor3 = T.text, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 18), Parent = c })
+			local eff = d.speed and string.format("+%d%% training speed", math.floor((d.speed - 1) * 100 + 0.5)) or ""
+			if d.hype then
+				eff ..= (eff ~= "" and "   " or "") .. "+" .. d.hype .. " hype"
+			end
+			new("TextLabel", { Text = eff, TextSize = 13, TextColor3 = T.green, BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 20), Size = UDim2.new(1, 0, 0, 16), Parent = c })
+			new("TextLabel", { Text = d.blurb, TextSize = 12, TextColor3 = T.dim, TextWrapped = true, BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 38), Size = UDim2.new(1, 0, 0, 28), TextYAlignment = Enum.TextYAlignment.Top, Parent = c })
+			UI.button(c, owned and "IN YOUR ROOM" or ("Buy " .. Format.money(d.price)), function()
+				if not owned then
+					Net.act("buyDecor", d.id)
+				end
+			end, (owned or s.cash < d.price) and "ghost" or "success", { Position = UDim2.new(0, 0, 1, -32), Size = UDim2.new(1, 0, 0, 32) })
+		end
 	elseif page == "acquire" then
 		UI.label(sc, "Buy your rivals", 26, T.text, { FontFace = UI.HEAVY })
 		UI.label(sc, "Make an offer. Bigger offers get a yes more often. Strong labs rarely sell, and regulators can block big deals. If you lack cash you pay in stock.", 14, T.sub)
@@ -144,7 +167,11 @@ function App.key(s)
 	for _ in pairs(s.acquired or {}) do
 		n += 1
 	end
-	return page .. tostring(s.resetReady) .. tostring(s.resetMoment) .. #(s.offers or {}) .. n .. s.year .. math.floor(math.log10(math.max(s.valuation, 10)) * 4) .. s.office .. s.product.appName .. s.product.subPrice .. s.product.apiPrice .. s.product.proPrice .. tostring(s.product.activeModel)
+	local dk = ""
+	for id in pairs(s.decor or {}) do
+		dk ..= id
+	end
+	return page .. dk .. tostring(s.resetReady) .. tostring(s.resetMoment) .. #(s.offers or {}) .. n .. s.year .. math.floor(math.log10(math.max(s.valuation, 10)) * 4) .. s.office .. s.product.appName .. s.product.subPrice .. s.product.apiPrice .. s.product.proPrice .. tostring(s.product.activeModel)
 end
 
 return App

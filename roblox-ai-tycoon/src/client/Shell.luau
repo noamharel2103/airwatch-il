@@ -266,6 +266,9 @@ task.spawn(function()
 	end
 end)
 
+local lastProblemKey = nil
+local afterProblems
+
 Net.onState(function(s)
 	dateL.Text = Format.date(s.day)
 	compL.Text = s.company .. "  |  valued " .. Format.money(s.valuation)
@@ -280,6 +283,17 @@ Net.onState(function(s)
 	warn.Text = s.speed == 4 and "x4: things break faster when you are not watching" or (s.speed == 2 and "x2: a bit riskier" or "")
 	tbName.Text = s.company .. "   " .. Format.money(s.cash)
 	tbClock.Text = Format.date(s.day)
+	local pkey = tostring(math.floor((s.misuse or 0))) .. tostring(s.cash >= 0)
+	for _, p in ipairs(s.problems or {}) do
+		pkey ..= p.kind .. math.floor(p.progress * 25) .. tostring(p.rushed)
+	end
+	for _, m in ipairs(s.models) do
+		pkey ..= m.status == "banned" and "b" or ""
+	end
+	if pkey == lastProblemKey then
+		return afterProblems(s)
+	end
+	lastProblemKey = pkey
 	UI.clear(problemBox)
 	local massive = false
 	for _, p in ipairs(s.problems or {}) do
@@ -310,7 +324,18 @@ Net.onState(function(s)
 		new("TextLabel", { Text = PROBLEM_LABEL[p.kind] or p.kind, FontFace = UI.HEAVY, TextSize = 13, TextColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 6), Size = UDim2.new(1, -24, 0, 20), Parent = f })
 		local h = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 32), Size = UDim2.new(1, -24, 0, 14), Parent = f })
 		UI.bar(h, p.progress, T.yellow, 14)
+		if not p.rushed and p.rushCost then
+			f.Size = UDim2.new(1, 0, 0, 100)
+			local kind = p.kind
+			UI.button(f, "FIX IT NOW  " .. Format.money(p.rushCost), function()
+				Net.act("rushFix", kind)
+			end, T.yellow, { Position = UDim2.fromOffset(12, 56), Size = UDim2.new(1, -24, 0, 34), TextSize = 12 })
+		end
 	end
+	afterProblems(s)
+end)
+
+afterProblems = function(s)
 	if s.training then
 		trainMini.Visible = true
 		trainL.Text = "Training " .. s.training.name
@@ -366,6 +391,6 @@ Net.onState(function(s)
 			openApp.refresh(openApp.ctx, s)
 		end
 	end
-end)
+end
 
 return Shell

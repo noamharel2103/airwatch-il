@@ -15,6 +15,8 @@ local B = require(Shared.Benchmarks)
 local Launch = require(script.Parent.Launch)
 
 local Game = {}
+local PcParts = require(game:GetService("ReplicatedStorage").Shared.PcParts)
+local Decor = require(game:GetService("ReplicatedStorage").Shared.Decor)
 local rng = Random.new()
 
 local function year(state)
@@ -205,7 +207,7 @@ function Game.gpuSlots(state): number
 end
 
 function Game.kwCap(state): number
-	local kw = Catalog.officeStages[state.office].kw
+	local kw = Catalog.officeStages[state.office].kw + PcParts.kw(state.pc)
 	for id, c in pairs(state.storage or {}) do
 		kw += Catalog.storageById[id].kw * c
 	end
@@ -338,6 +340,67 @@ end
 
 -- ===== actions =====
 local Actions = {}
+
+function Actions.buyDecor(state, id)
+	local d = Decor.byId[id]
+	if not d then
+		return false, "Unknown item"
+	end
+	state.decor = state.decor or {}
+	if state.decor[id] then
+		return false, "You already have it"
+	end
+	if state.cash < d.price then
+		return false, "Not enough cash"
+	end
+	state.cash -= d.price
+	state.month.costs += d.price
+	state.month.office += d.price
+	state.decor[id] = true
+	if d.hype then
+		state.hype = math.min(100, state.hype + d.hype)
+	end
+	return true
+end
+
+function Actions.removePcPart(state, cat)
+	state.pc = state.pc or PcParts.default()
+	local cur = PcParts.get(state.pc, cat)
+	if not cur or cur.tier <= 1 then
+		return false, "Nothing to remove"
+	end
+	local back = math.floor(cur.price * 0.4)
+	state.cash += back
+	state.pc[cat] = PcParts.list[cat][1].id
+	Game.chatMsg(state, "infra", "Infra", "Took out the " .. cur.name .. " and sold it for " .. Format.money(back) .. ".")
+	return true
+end
+
+function Actions.buyPcPart(state, cat, id)
+	local part = PcParts.byId[cat] and PcParts.byId[cat][id]
+	if not part then
+		return false, "Unknown part"
+	end
+	state.pc = state.pc or PcParts.default()
+	if state.pc[cat] == id then
+		return false, "Already installed"
+	end
+	if year(state) < part.year then
+		return false, part.name .. " comes out in " .. part.year
+	end
+	if state.cash < part.price then
+		return false, "Not enough cash"
+	end
+	state.cash -= part.price
+	state.month.costs += part.price
+	state.month.compute += part.price
+	state.pc[cat] = id
+	if part.hype and part.hype > 0 then
+		state.hype = math.min(100, state.hype + part.hype)
+	end
+	Game.chatMsg(state, "infra", "Infra", "Installed the " .. part.name .. ". " .. part.blurb)
+	return true
+end
 Actions.buyStorage = function(...) return Game.buyStorage(...) end
 Game.Actions = Actions
 
@@ -714,7 +777,8 @@ end
 function Game.boostDays(state, m)
 	local power = math.max(Game.clusterPower(state), 0.01)
 	local infra = Game.staffEffects(state).infra
-	return math.clamp(math.ceil(6 * (m.size / 7) ^ 0.55 / power ^ 0.5 / (1 + infra * 0.08)), 1, 40)
+	local pcSpeed = PcParts.speed(state.pc) * Decor.speed(state.decor)
+	return math.clamp(math.ceil(6 * (m.size / 7) ^ 0.55 / power ^ 0.5 / (1 + infra * 0.08) / pcSpeed), 1, 40)
 end
 
 -- What is possible right now: you can beat today's best models, but not by decades.
@@ -772,7 +836,7 @@ local function finishBoost(state, m)
 	Game.applyStats(m)
 	-- pushing GPUs this hard can fry some of them
 	local fx2 = Game.staffEffects(state)
-	if rng:NextNumber() < 0.18 * (1 + avgStat(m) / 60) / (1 + fx2.infra * 0.2) then
+	if rng:NextNumber() < 0.18 * (1 + avgStat(m) / 60) / (1 + fx2.infra * 0.2) * PcParts.heat(state.pc) then
 		local best, bestN, bucket
 		for _, b in ipairs({ state.gpus.owned, state.gpus.rented }) do
 			for id, n in pairs(b) do
@@ -1793,14 +1857,20 @@ function Game.tickLawsuits(state)
 end
 
 function Game.tickGovernment(state)
-	state.misuse = math.max(0, (state.misuse or 0) - 0.25)
+	state.misuse = math.max(0, (state.misuse or 0) - 0.5)
+	if (state.misuse or 0) >= 60 and not state.misuseWarned then
+		state.misuseWarned = true
+		Game.mail(state, "warning", "Government AI Office", "Final warning", "Your model is being abused at scale. Fix it now (hire an emergency crew, add safety staff) or we will shut it down.")
+	elseif (state.misuse or 0) < 30 then
+		state.misuseWarned = false
+	end
 	if (state.misuse or 0) >= 100 then
 		state.misuse = 35
 		local banned = {}
 		for _, m in ipairs(state.models) do
 			if m.status == "released" then
 				m.status = "banned"
-				m.bannedUntil = state.day + 45
+				m.bannedUntil = state.day + 30
 				table.insert(banned, m.name)
 			end
 		end
@@ -1821,12 +1891,43 @@ function Game.tickGovernment(state)
 	end
 end
 
+-- Throw money at a problem: emergency contractors jump it halfway to fixed. Once per problem.
+function Game.rushCost(state, kind): number
+	local base = { outage = 20e3, hack = 40e3, jailbreak = 25e3, bug = 10e3, exploit = 30e3, massive = 150e3, overheat = 15e3 }
+	return math.floor((base[kind] or 20e3) * (1 + state.users / 2e5) ^ 0.5 / 1000) * 1000
+end
+
+function Actions.rushFix(state, kind)
+	for _, p in ipairs(state.problems or {}) do
+		if p.kind == kind then
+			if p.rushed then
+				return false, "The emergency crew is already on it"
+			end
+			local cost = Game.rushCost(state, kind)
+			if state.cash < cost then
+				return false, "Need " .. Format.money(cost) .. " for an emergency crew"
+			end
+			state.cash -= cost
+			state.month.costs += cost
+			p.rushed = true
+			p.progress = math.min(0.99, p.progress + 0.5)
+			if kind == "massive" then
+				state.misuse = math.max(0, (state.misuse or 0) - 25)
+			end
+			Game.chatMsg(state, "general", "Ops", "Emergency crew hired. They are fixing it as fast as they can.")
+			return true
+		end
+	end
+	return false, "Nothing to fix"
+end
+
 local function tickProblems(state, fx)
 	state.problems = state.problems or {}
 	for i = #state.problems, 1, -1 do
 		local p = state.problems[i]
 		local def = Game.PROBLEMS[p.kind]
 		local crew = fx[def.fixer] or 0
+		p.rushCost = Game.rushCost(state, p.kind)
 		-- you and your laptop fix it slowly; every engineer helps
 		p.progress += (0.6 + crew * 0.8) / def.need
 		if p.kind == "outage" then
@@ -1846,7 +1947,7 @@ local function tickProblems(state, fx)
 			state.month.costs += loss
 			state.users *= 0.99
 			state.reputation = math.max(0, state.reputation - 0.6)
-			state.misuse = (state.misuse or 0) + 1.6 + math.log10(1 + state.users / 1e5)
+			state.misuse = (state.misuse or 0) + 0.7 + 0.4 * math.log10(1 + state.users / 1e5)
 		end
 		if p.progress >= 1 then
 			table.remove(state.problems, i)
@@ -1864,7 +1965,7 @@ local function tickProblems(state, fx)
 		Game.startProblem(state, "hack")
 	end
 	local t = state.training
-	if t and t.days > 15 and rng:NextNumber() < 0.012 * risk / (1 + fx.infra * 0.2) then
+	if t and t.days > 15 and rng:NextNumber() < 0.012 * risk / (1 + fx.infra * 0.2) * PcParts.heat(state.pc) then
 		Game.startProblem(state, "overheat")
 	end
 	-- live models break in fun ways (weak safety = more jailbreaks)
@@ -1879,7 +1980,8 @@ local function tickProblems(state, fx)
 			Game.startProblem(state, "bug")
 		end
 		-- the big one
-		if rng:NextNumber() < 0.0035 * risk * (live.flaws.jailbreak or 0.5) * (1 + math.log10(1 + state.users / 1e4)) then
+		-- only once you are big (2024+, 200K+ users) and still rare
+		if state.day >= 365 and state.users >= 2e5 and rng:NextNumber() < 0.0012 * risk * (live.flaws.jailbreak or 0.5) * (1 + math.log10(1 + state.users / 1e5)) then
 			Game.startProblem(state, "massive")
 			local inc = Launch.incident(state, "JAILBREAK", live.name)
 			table.insert(state.feed, 1, { kind = "incident", data = inc, day = state.day })
@@ -2473,7 +2575,7 @@ function Game.snapshot(state)
 			end
 			return out
 		end)(),
-		storage = state.storage or {}, gpuSlots = Game.gpuSlots(state), gpuUsed = Game.gpuUsed(state), kwCap = Game.kwCap(state),
+		pc = state.pc or PcParts.default(), decor = state.decor or {}, storage = state.storage or {}, gpuSlots = Game.gpuSlots(state), gpuUsed = Game.gpuUsed(state), kwCap = Game.kwCap(state),
 		offers = state.offers or {}, cooldowns = state.cooldowns or {}, meeting = state.meeting, loanRate = Game.loanRate(state, 1e6),
 		misuse = state.misuse or 0, resetReady = state.resetReady or 0, resetMoment = (function()
 			local live = state.product.activeModel and state.models[state.product.activeModel]
