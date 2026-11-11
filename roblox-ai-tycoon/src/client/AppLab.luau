@@ -71,12 +71,12 @@ local function updatePreview(s)
 		rentDay += Hardware.rentPrice(Hardware.byId[id], s.year) * 24 * n
 	end
 	local dayStr = days > 730 and "years" or (math.ceil(days) .. " days")
-	previewWidgets.time.Text = string.format("%s   (%s real time at x1)", dayStr, days > 730 and "forever" or (string.format("%.1f min", days * 4 / 60)))
-	previewWidgets.cost.Text = string.format("Up front %s   |   GPUs %s/day", Format.money(ev.extraCost), Format.money(rentDay))
+	previewWidgets.time.Text = days > 730 and "Too big for your GPUs" or string.format("%s  (about %.0f min)", dayStr, math.max(1, days * 4 / 60))
+	previewWidgets.cost.Text = ev.extraCost > 0 and ("Costs " .. Format.money(ev.extraCost)) or ""
 	previewWidgets.size.Text = string.format("%s params, %s tokens, %s FLOP", Format.count(ev.params), Format.count(ev.tokens), string.format("%.1e", ev.flop))
 	-- abilities
 	UI.clear(previewWidgets.abil)
-	for _, d in ipairs({ "coding", "math", "reasoning", "writing", "knowledge", "multilingual", "agents", "vision" }) do
+	for _, d in ipairs({ "coding", "math", "writing", "knowledge" }) do
 		local v = ev.abilities[d] or 0
 		local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 16), Parent = previewWidgets.abil })
 		new("TextLabel", { Text = d:sub(1, 1):upper() .. d:sub(2), TextSize = 12, TextColor3 = T.sub, Size = UDim2.new(0, 90, 1, 0), Parent = row })
@@ -101,9 +101,7 @@ local function updatePreview(s)
 	if ev.flaws.jailbreak > 0.7 then
 		UI.label(previewWidgets.notes, "Jailbreak risk is high. Add red-teaming or refusal tuning.", 13, T.orange)
 	end
-	if #ev.combos == 0 and #ev.warnings == 0 then
-		UI.label(previewWidgets.notes, "Tip: combine options for combo bonuses (code + reasoning RL, MoE + MLA + FP8...)", 12, T.dim)
-	end
+
 	local canTrain = not s.training and #ev.locked == 0 and days <= 730
 	previewWidgets.train.BackgroundColor3 = canTrain and T.green or T.line
 	previewWidgets.train.Text = s.training and "A model is already training" or ("Train " .. (recipe.name ~= "" and recipe.name or (s.company .. "-" .. (#s.models + 1))))
@@ -241,13 +239,13 @@ local function buildTrain(body, s)
 		UI.label(sc, "1. How big?", 20, T.text, { FontFace = UI.HEAVY })
 		local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = sc })
 		new("UIGridLayout", { CellSize = UDim2.fromOffset(100, 48), CellPadding = UDim2.fromOffset(8, 8), Parent = grid })
-		local sizeColors = { T.green, T.green, T.teal, T.teal, T.accent, T.accent, T.purple, T.purple, T.orange, T.orange, T.red, T.red, T.red }
-		for i, sz in ipairs(Opts.SIZES) do
+		local SIMPLE_SIZES = { 0.5, 3, 7, 70, 405, 2000 }
+		for i, sz in ipairs(SIMPLE_SIZES) do
 			local label = sz >= 1000 and string.format("%gT", sz / 1000) or (string.format("%gB", sz))
 			UI.button(grid, label, function()
 				recipe.size = sz
 				Lab.mount(Lab.ctx, Net.state, true)
-			end, recipe.size == sz and sizeColors[i] or "ghost")
+			end, recipe.size == sz and T.accent or "ghost")
 		end
 		UI.label(sc, "2. What should it be great at?", 20, T.text, { FontFace = UI.HEAVY })
 		local FOCUS = {
@@ -423,8 +421,8 @@ local function buildTrain(body, s)
 	UI.label(rs, "Training time", 13, T.sub)
 	local timeL = UI.label(rs, "", 15, T.text, { FontFace = UI.BOLD })
 	local costL = UI.label(rs, "", 12, T.sub)
-	local sizeL = UI.label(rs, "", 11, T.dim)
-	UI.label(rs, "Abilities (vs average)", 13, T.sub)
+	local sizeL = UI.label(rs, "", 11, T.dim, { Visible = false })
+	UI.label(rs, "Strengths", 13, T.sub)
 	local abil = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = rs })
 	UI.list(abil, 4)
 	local notes = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = rs })

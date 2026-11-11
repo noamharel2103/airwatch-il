@@ -6,9 +6,9 @@ local UI = {}
 -- Blocky retro OS look (Roblox style): navy panels, cyan/green chunky buttons, pixel font.
 -- Bright cartoon theme: white/sky panels, saturated blue/green/yellow/red, thick dark outlines.
 UI.T = {
-	bg = Color3.fromRGB(214, 228, 246),
-	panel = Color3.fromRGB(196, 214, 240),
-	panel2 = Color3.fromRGB(236, 243, 252),
+	bg = Color3.fromRGB(176, 206, 242),
+	panel = Color3.fromRGB(150, 188, 236),
+	panel2 = Color3.fromRGB(205, 225, 250),
 	line = Color3.fromRGB(28, 36, 64),
 	text = Color3.fromRGB(28, 36, 64),
 	sub = Color3.fromRGB(80, 96, 140),
@@ -156,28 +156,29 @@ function UI.button(parent: Instance, text: string, onClick: (() -> ())?, kind: a
 		TextWrapped = false,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		BackgroundTransparency = 0,
-		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundColor3 = color,
 		Size = UDim2.new(0, math.max(110, #text * 10 + 40), 0, 46),
 		Parent = parent,
 	})
 	new("UICorner", { CornerRadius = UDim.new(0, 10), Parent = b })
 	new("UIStroke", { Color = Color3.fromRGB(20, 26, 48), Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = b })
 	local textStroke = new("UIStroke", { Color = color:Lerp(Color3.new(0, 0, 0), 0.6), Thickness = 1.2, ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual, Parent = b })
-	local grad = new("UIGradient", { Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.28), color), Rotation = 90, Parent = b })
+	textStroke.Enabled = false
+	local busy = false
+	local applied: Color3? = nil
 	local function setColor(c)
+		busy = true
 		local ghost = c == UI.GHOST or c == Color3.fromRGB(150, 170, 205)
 		if ghost then
-			grad.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(222, 232, 248))
+			applied = Color3.fromRGB(226, 238, 252)
+			b.BackgroundColor3 = applied
 			b.TextColor3 = T.text
-			textStroke.Enabled = false
-			b.TextStrokeTransparency = 1
 		else
-			grad.Color = ColorSequence.new(c:Lerp(Color3.new(1, 1, 1), 0.28), c)
+			applied = c
+			b.BackgroundColor3 = c
 			b.TextColor3 = Color3.new(1, 1, 1)
-			textStroke.Enabled = false
-			b.TextStrokeTransparency = 0.7
-			textStroke.Color = c:Lerp(Color3.new(0, 0, 0), 0.6)
 		end
+		busy = false
 	end
 	setColor(color)
 	b.MouseEnter:Connect(function()
@@ -206,10 +207,10 @@ function UI.button(parent: Instance, text: string, onClick: (() -> ())?, kind: a
 	end
 	-- callers that recolour later via BackgroundColor3 still work
 	b:GetPropertyChangedSignal("BackgroundColor3"):Connect(function()
-		if b.BackgroundColor3 ~= Color3.new(1, 1, 1) then
+		-- signals are deferred: ignore the echo of our own write
+		if not busy and b.BackgroundColor3 ~= applied then
 			color = b.BackgroundColor3
 			setColor(color)
-			b.BackgroundColor3 = Color3.new(1, 1, 1)
 		end
 	end)
 	return b

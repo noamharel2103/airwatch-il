@@ -24,7 +24,7 @@ rescale()
 workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
 
 -- ===== HUD =====
-local hud = new("Frame", { Name = "HUD", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false, Parent = gui })
+local hud = new("Frame", { Name = "HUD", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 60, Parent = gui })
 Shell.hud = hud
 local topRight = new("Frame", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, 14), Size = UDim2.fromOffset(330, 96), BackgroundColor3 = T.bg, BackgroundTransparency = 0.12, Parent = hud })
 UI.corner(topRight, 16)
@@ -58,12 +58,12 @@ local _, trainFill = UI.bar(trainBarHolder, 0, T.purple, 10)
 local trainSub = new("TextLabel", { Text = "", TextSize = 12, TextColor3 = T.sub, Position = UDim2.fromOffset(14, 50), Size = UDim2.new(1, -28, 0, 14), Parent = trainMini })
 
 -- news ticker (bottom)
-local ticker = new("Frame", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -14), Size = UDim2.fromOffset(760, 34), BackgroundColor3 = T.bg, BackgroundTransparency = 0.15, ClipsDescendants = true, Parent = hud })
+local ticker = new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 14), Size = UDim2.new(1, -700, 0, 40), BackgroundColor3 = T.bg, BackgroundTransparency = 0.15, ClipsDescendants = true, Parent = hud })
 UI.corner(ticker, 12)
 local tickTag = new("TextLabel", { Text = "NEWS", FontFace = UI.HEAVY, TextSize = 12, TextColor3 = T.bg, BackgroundTransparency = 0, BackgroundColor3 = T.yellow, Size = UDim2.fromOffset(56, 34), TextXAlignment = Enum.TextXAlignment.Center, Parent = ticker })
 local tickText = new("TextLabel", { Text = "", TextSize = 14, Position = UDim2.fromOffset(66, 0), Size = UDim2.new(1, -76, 1, 0), TextTruncate = Enum.TextTruncate.AtEnd, TextWrapped = false, Parent = ticker })
 
-local hint = new("TextLabel", { Text = "Press E at the laptop (or Tab) to open the computer", TextSize = 14, TextColor3 = T.sub, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -56), Size = UDim2.fromOffset(500, 18), TextXAlignment = Enum.TextXAlignment.Center, Parent = hud })
+local hint = new("TextLabel", { Visible = false, Text = "Click the laptop to open the computer", TextSize = 14, TextColor3 = T.sub, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -56), Size = UDim2.fromOffset(500, 18), TextXAlignment = Enum.TextXAlignment.Center, Parent = hud })
 
 -- toasts
 local toasts = new("Frame", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, 130), Size = UDim2.fromOffset(360, 400), BackgroundTransparency = 1, Parent = gui, ZIndex = 50 })
@@ -86,14 +86,11 @@ Net.setToast(Shell.toast)
 -- ===== Computer =====
 local comp = new("Frame", { Name = "Computer", BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.5, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 10, Parent = gui })
 Shell.computer = comp
-local screen = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(1, -40, 1, -40), BackgroundColor3 = Color3.fromRGB(20, 28, 52), ZIndex = 10, Parent = comp })
+local screen = new("Frame", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -14), Size = UDim2.new(1, -28, 1, -134), BackgroundColor3 = Color3.fromRGB(20, 28, 52), ZIndex = 10, Parent = comp })
 UI.corner(screen, 22)
-UI.grad(screen, Color3.fromRGB(140, 215, 255), Color3.fromRGB(70, 160, 245), 90)
+UI.grad(screen, Color3.fromRGB(120, 190, 250), Color3.fromRGB(80, 150, 235), 90)
 -- blocky city skyline wallpaper
-for i = 0, 24 do
-	local h = 80 + ((i * 53) % 160)
-	new("Frame", { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(i / 25, 0, 1, 0), Size = UDim2.new(1 / 25, 2, 0, h), BackgroundColor3 = Color3.fromRGB(255, 255, 255), BackgroundTransparency = 0.55, ZIndex = 10, Parent = screen })
-end
+
 local desk = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(40, 40), Size = UDim2.new(0, 400, 1, -120), ZIndex = 11, Parent = screen })
 new("UIGridLayout", { CellSize = UDim2.fromOffset(104, 112), CellPadding = UDim2.fromOffset(14, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = desk })
 -- taskbar
@@ -139,7 +136,7 @@ local function buildWindow(app)
 	if appWindow then
 		appWindow:Destroy()
 	end
-	local w = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.48), Size = UDim2.new(1, -140, 1, -130), BackgroundColor3 = T.bg, BackgroundTransparency = 0, ZIndex = 20, Parent = winLayer })
+	local w = new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 16), Size = UDim2.new(1, -32, 1, -96), BackgroundColor3 = T.bg, BackgroundTransparency = 0, ZIndex = 20, Parent = winLayer })
 	UI.corner(w, 18)
 	UI.stroke(w, Color3.fromRGB(10, 12, 22), 4)
 	local bar = new("Frame", { Size = UDim2.new(1, 0, 0, 56), BackgroundColor3 = T.accent, ZIndex = 21, Parent = w })
@@ -155,8 +152,8 @@ local function buildWindow(app)
 	end, "ghost", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 10), Size = UDim2.fromOffset(40, 36), ZIndex = 22 })
 	local body = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(18, 62), Size = UDim2.new(1, -36, 1, -78), ZIndex = 21, ClipsDescendants = true, Parent = w })
 	appWindow = w
-	w.Size = UDim2.new(1, -200, 1, -190)
-	UI.tween(w, 0.25, { Size = UDim2.new(1, -140, 1, -130) }, Enum.EasingStyle.Back)
+	w.Size = UDim2.new(1, -80, 1, -150)
+	UI.tween(w, 0.2, { Size = UDim2.new(1, -32, 1, -96) }, Enum.EasingStyle.Back)
 	return body, tabs
 end
 
@@ -193,8 +190,8 @@ end
 function Shell.openComputer(appId: string?)
 	comp.Visible = true
 	hud.Visible = true
-	screen.Size = UDim2.new(1, -120, 1, -120)
-	UI.tween(screen, 0.3, { Size = UDim2.new(1, -40, 1, -40) })
+	screen.Size = UDim2.new(1, -100, 1, -200)
+	UI.tween(screen, 0.25, { Size = UDim2.new(1, -28, 1, -134) })
 	hint.Visible = false
 	if appId then
 		Shell.open(appId)
@@ -203,7 +200,7 @@ end
 function Shell.closeComputer()
 	Shell.closeApp()
 	comp.Visible = false
-	hint.Visible = true
+	-- (hint stays hidden)
 end
 function Shell.isOpen()
 	return comp.Visible
