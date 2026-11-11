@@ -43,8 +43,12 @@ function App.mount(ctx, s)
 				new("TextLabel", { Text = "  " .. f, TextSize = 14, TextColor3 = Color3.fromRGB(30, 30, 34), Size = UDim2.new(1, 0, 0, 18), Parent = phone })
 			end
 		end
-		local ready = (s.resetReady or 0) <= s.day
-		UI.button(sc, ready and ("RESET EVERYONE'S USAGE LIMITS  " .. Format.money(math.floor(s.users * 0.4 + 5000))) or ("LIMITS RESET AGAIN ON " .. Format.date(s.resetReady)), function()
+		local ready = (s.resetReady or 0) <= s.day and s.resetMoment ~= nil
+		local resetText = (s.resetReady or 0) > s.day and ("LIMITS RESET AGAIN ON " .. Format.date(s.resetReady))
+			or (s.resetMoment == "launch" and ("NEW MODEL OUT: RESET LIMITS SO EVERYONE TRIES IT  " .. Format.money(math.floor(s.users * 0.4 + 5000))))
+			or (s.resetMoment == "crisis" and ("SAY SORRY: RESET EVERYONE'S LIMITS  " .. Format.money(math.floor(s.users * 0.4 + 5000))))
+			or "RESET LIMITS: ONLY AFTER A LAUNCH OR A CRISIS"
+		UI.button(sc, resetText, function()
 			if Net.act("resetLimits") then
 				Net.toast("Usage limits reset. Users are going crazy.", "good")
 			end
@@ -140,7 +144,7 @@ function App.key(s)
 	for _ in pairs(s.acquired or {}) do
 		n += 1
 	end
-	return page .. tostring(s.resetReady) .. #(s.offers or {}) .. n .. s.year .. math.floor(math.log10(math.max(s.valuation, 10)) * 4) .. s.office .. s.product.appName .. s.product.subPrice .. s.product.apiPrice .. s.product.proPrice .. tostring(s.product.activeModel)
+	return page .. tostring(s.resetReady) .. tostring(s.resetMoment) .. #(s.offers or {}) .. n .. s.year .. math.floor(math.log10(math.max(s.valuation, 10)) * 4) .. s.office .. s.product.appName .. s.product.subPrice .. s.product.apiPrice .. s.product.proPrice .. tostring(s.product.activeModel)
 end
 
 return App

@@ -146,6 +146,7 @@ UIS.InputBegan:Connect(function(input, processed)
 				end)
 			end
 		elseif inst then
+			UI.guardUntil = os.clock() + 0.4
 			Shell.openComputer(app ~= "desktop" and app or nil)
 		end
 	end

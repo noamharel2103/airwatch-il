@@ -157,6 +157,7 @@ function UI.card(parent: Instance, props: { [string]: any }?)
 end
 
 UI.GHOST = Color3.fromRGB(150, 170, 205)
+UI.guardUntil = 0
 -- kind: "primary" | "ghost" | "danger" | "success" | color
 -- Roblox simulator style: rounded, tall, gradient, thick outline, white outlined text.
 function UI.button(parent: Instance, text: string, onClick: (() -> ())?, kind: any?, props: { [string]: any }?)
@@ -214,7 +215,12 @@ function UI.button(parent: Instance, text: string, onClick: (() -> ())?, kind: a
 	b.MouseLeave:Connect(function()
 		setColor(color)
 	end)
+	local born = os.clock()
 	b.MouseButton1Click:Connect(function()
+		-- ignore the mouse-up of the click that just opened this screen (or rebuilt it)
+		if os.clock() - born < 0.25 or os.clock() < UI.guardUntil then
+			return
+		end
 		local sc = b:FindFirstChildOfClass("UIScale") or new("UIScale", { Parent = b })
 		sc.Scale = 0.92
 		TweenService:Create(sc, TweenInfo.new(0.22, Enum.EasingStyle.Back), { Scale = 1 }):Play()

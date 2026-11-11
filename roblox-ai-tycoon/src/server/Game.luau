@@ -225,7 +225,7 @@ function Game.gpuUsed(state): number
 	return n
 end
 
-function Actions.buyStorage(state, id)
+function Game.buyStorage(state, id)
 	local st = Catalog.storageById[id]
 	if not st then
 		return false, "Unknown place"
@@ -233,7 +233,9 @@ function Actions.buyStorage(state, id)
 	if state.cash < st.cost then
 		return false, "Not enough cash for the " .. st.name
 	end
-	spend(state, st.cost, "office")
+	state.cash -= st.cost
+	state.month.costs += st.cost
+	state.month.office += st.cost
 	state.storage = state.storage or {}
 	state.storage[id] = (state.storage[id] or 0) + 1
 	Game.chatMsg(state, "infra", "Infra", "We got the " .. st.name .. ". Room for " .. Format.count(st.slots) .. " more GPUs.")
@@ -336,6 +338,7 @@ end
 
 -- ===== actions =====
 local Actions = {}
+Actions.buyStorage = function(...) return Game.buyStorage(...) end
 Game.Actions = Actions
 
 function Actions.setSpeed(state, s)
@@ -688,18 +691,23 @@ Game.avgStat = avgStat
 function Game.boostCost(state, m)
 	local D = Config.DIFFICULTY
 	local level = 1.06 ^ math.max(0, avgStat(m) - 15)
-	return math.floor(1500 * (1 + m.size) ^ 0.75 * (1 + (year(state) - 2023) * 0.3) * D * level / 100) * 100
+	return math.floor(1500 * (1 + m.size) ^ 0.75 * (1 + (year(state) - 2023) * 0.3) * D * level * Game.smallDiscount(state) / 100) * 100
+end
+
+-- A tiny startup pays a fraction (it trains small, on cheap power): your first models fit in $150K.
+function Game.smallDiscount(state): number
+	return math.clamp((math.max(state.valuation, 0) + math.max(state.cash, 0)) / 3e6, 0.15, 1)
 end
 
 -- Electricity for one training round, on top of the compute cost.
 function Game.boostPower(state, m)
 	local kw = Game.clusterPower(state) * 1.0
-	return math.floor(kw * 24 * Game.boostDays(state, m) * 0.12 * Config.DIFFICULTY * (1 + avgStat(m) / 40))
+	return math.floor(kw * 24 * Game.boostDays(state, m) * 0.12 * Config.DIFFICULTY * (1 + avgStat(m) / 40) * Game.smallDiscount(state))
 end
 
 -- You need enough ML people to push a model further.
 function Game.boostStaffNeeded(m)
-	return math.max(0, math.floor((avgStat(m) - 20) / 12))
+	return math.max(0, math.floor((avgStat(m) - 32) / 12))
 end
 
 -- Better GPUs and more infra engineers = faster training.
@@ -1105,16 +1113,32 @@ function Actions.resetLimits(state)
 	if state.users < 100 then
 		return false, "You need users first"
 	end
+	-- it only lands after a big moment: a fresh model launch or a crisis you want people to forget
+	local live = state.product.activeModel and state.models[state.product.activeModel]
+	local launch = live and live.releasedDay and state.day - live.releasedDay <= 14
+	local crisis = state.lastCrisisDay and state.day - state.lastCrisisDay <= 14
+	if not launch and not crisis then
+		return false, "Nobody would notice right now. Reset limits right after a new model launches or after something bad happens."
+	end
 	local cost = math.floor(state.users * 0.4 + 5000)
 	if state.cash < cost then
 		return false, "Serving everyone for free costs " .. Format.money(cost)
 	end
 	spend(state, cost, "inference")
 	state.resetReady = state.day + 30
-	state.users = math.min(state.users * 1.08 + 500, state.world.marketUsers * 1e6 * Config.MAX_MARKET_SHARE)
-	state.hype = math.min(100, state.hype + 10)
-	state.reputation = math.min(100, state.reputation + 4)
-	local LOVE = { "THEY RESET THE LIMITS. best company ever", "limits reset at 2am, I'm not sleeping tonight", "ok " .. state.company .. " just won me back", "free usage reset?? marry me " .. state.company }
+	if launch then
+		-- everyone floods in to try the new model, and more people rate it
+		state.users = math.min(state.users * 1.15 + 1000, state.world.marketUsers * 1e6 * Config.MAX_MARKET_SHARE)
+		state.hype = math.min(100, state.hype + 12)
+		live.users = (live.users or 0) * 1.15
+		live.extraRatings = (live.extraRatings or 0) + 1
+	else
+		-- after a disaster it buys back trust
+		state.users = math.min(state.users * 1.04 + 300, state.world.marketUsers * 1e6 * Config.MAX_MARKET_SHARE)
+		state.reputation = math.min(100, state.reputation + 8)
+		state.hype = math.min(100, state.hype + 4)
+	end
+	local LOVE = launch and { "limits reset the same week " .. (live and live.name or "the new model") .. " dropped?? testing it all night", "ok I tried the new model 40 times thanks to the reset. it's good", "THEY RESET THE LIMITS. best company ever" } or { "ok " .. state.company .. " just won me back", "after that mess, a free reset is the least they could do. still, thanks", "free usage reset?? fine I forgive you " .. state.company }
 	Game.chatMsg(state, "dms", "Users", LOVE[rng:NextInteger(1, #LOVE)])
 	Game.newsItem(state, state.company .. " resets usage limits for everyone. Users celebrate.", "you")
 	return true
@@ -1605,6 +1629,7 @@ Game.PROBLEMS = {
 
 function Game.startProblem(state, kind)
 	state.problems = state.problems or {}
+	state.lastCrisisDay = state.day
 	for _, p in ipairs(state.problems) do
 		if p.kind == kind then
 			return
@@ -2450,7 +2475,15 @@ function Game.snapshot(state)
 		end)(),
 		storage = state.storage or {}, gpuSlots = Game.gpuSlots(state), gpuUsed = Game.gpuUsed(state), kwCap = Game.kwCap(state),
 		offers = state.offers or {}, cooldowns = state.cooldowns or {}, meeting = state.meeting, loanRate = Game.loanRate(state, 1e6),
-		misuse = state.misuse or 0, resetReady = state.resetReady or 0,
+		misuse = state.misuse or 0, resetReady = state.resetReady or 0, resetMoment = (function()
+			local live = state.product.activeModel and state.models[state.product.activeModel]
+			if live and live.releasedDay and state.day - live.releasedDay <= 14 then
+				return "launch"
+			elseif state.lastCrisisDay and state.day - state.lastCrisisDay <= 14 then
+				return "crisis"
+			end
+			return nil
+		end)(),
 		eraCeiling = Game.eraCeiling(state), achievements = state.achievements or {}, lastAchievement = state.lastAchievement, boxes = #(state.boxes or {}), problems = state.problems or {}, acquired = state.acquired or {}, location = state.location, loans = state.loans, loanLimit = Game.loanLimit(state), gpuCap = Game.gpuCap(state),
 	}
 end

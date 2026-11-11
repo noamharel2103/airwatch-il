@@ -153,6 +153,9 @@ function Shell.register(app)
 	UI.corner(badge, 11)
 	badges[app.id] = badge
 	btn.MouseButton1Click:Connect(function()
+		if os.clock() < UI.guardUntil then
+			return
+		end
 		Shell.open(app.id)
 	end)
 end

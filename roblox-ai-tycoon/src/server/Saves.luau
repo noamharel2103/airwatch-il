@@ -44,7 +44,8 @@ local okStore = pcall(function()
 end)
 Saves.available = okStore and store ~= nil
 -- an unpublished place has no DataStores; skip the slow retries and use the local fallback
-if game.GameId == 0 then
+-- in Studio, always save to tools/save_server.py (Studio API access is usually off and slow to fail)
+if game.GameId == 0 or RunService:IsStudio() then
 	Saves.available = false
 end
 
