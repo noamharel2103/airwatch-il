@@ -806,11 +806,15 @@ function Actions.rent(state, id, n)
 		n = -cur
 	end
 	if n > 0 and Game.clusterPower(state) + h.power * n > Game.gpuCap(state) then
-		local room = math.floor((Game.gpuCap(state) - Game.clusterPower(state)) / h.power)
-		if room <= 0 then
-			return false, "No cloud provider has more capacity for you this year. Build reputation, raise money or wait for next year's supply."
+		-- over your allocation: a broker finds GPUs, but the extra ones cost 8x
+		local room = math.max(0, math.floor((Game.gpuCap(state) - Game.clusterPower(state)) / h.power))
+		local over = n - room
+		local fee = Hardware.rentPrice(h, year(state)) * 24 * 30 * 8 * over
+		if state.cash < fee then
+			return false, string.format("Over your GPU limit the extra %d cost 8x: a %s broker fee. Not enough cash.", over, Format.money(fee))
 		end
-		n = room
+		spend(state, fee, "compute")
+		Game.chatMsg(state, "infra", "Infra", string.format("Over our limit, so a broker found %d extra GPUs. We paid 8x: %s.", over, Format.money(fee)))
 	end
 	if n > 0 then
 		-- new parts arrive in a box at home; they start working once you open it
@@ -829,10 +833,10 @@ function Actions.buy(state, id, n)
 	if not h or not Hardware.available(h, state.day) or n <= 0 then
 		return false, "Not available"
 	end
-	if Game.clusterPower(state) + h.power * n > Game.gpuCap(state) then
-		return false, "Nvidia's allocation for you is sold out this year (" .. Format.count(Game.gpuCap(state)) .. " H100-equivalents)."
-	end
-	local price = Hardware.buyPrice(h, year(state)) * n
+	-- over your allocation you can still buy, but the extra GPUs cost 8x (grey market)
+	local room = math.max(0, math.floor((Game.gpuCap(state) - Game.clusterPower(state)) / h.power))
+	local over = math.max(0, n - room)
+	local price = Hardware.buyPrice(h, year(state)) * (n - over + over * 8)
 	if state.cash < price then
 		return false, "Not enough cash"
 	end
@@ -1135,19 +1139,21 @@ function Actions.boost(state, modelId, a, b)
 	if m.boosting then
 		return false, "Already training this model"
 	end
-	if not (m.stats[a] and m.stats[b]) or a == b then
-		return false, "Pick 2 different stats"
+	if b == "" then
+		b = nil
+	end
+	if not m.stats[a] or (b and (not m.stats[b] or a == b)) then
+		return false, "Pick 1 or 2 different stats"
 	end
 	local ceil = Game.eraCeiling(state)
-	if m.stats[a] >= ceil and m.stats[b] >= ceil then
-		return false, "That's the smartest anyone can make a model in " .. year(state) .. ". New breakthroughs raise the limit."
-	end
+	-- past this year's limit you can still push, but each round only adds +1
 	local need = Game.boostStaffNeeded(m)
 	local have = (state.staff.junior or 0) + (state.staff.senior or 0) + (state.staff.star or 0)
 	if have < need then
 		return false, "A model this smart needs " .. need .. " ML engineers to keep improving. You have " .. have .. "."
 	end
-	local cost = Game.boostCost(state, m) + Game.boostPower(state, m)
+	-- one stat: cheaper, and all the effort goes into it
+	local cost = (Game.boostCost(state, m) + Game.boostPower(state, m)) * (b and 1 or 0.6)
 	if state.cash < cost then
 		return false, "Not enough cash (" .. Format.money(cost) .. " with electricity)"
 	end
@@ -1169,7 +1175,7 @@ local function finishBoost(state, m)
 		-- no hard cap, but going past what is possible this year gets very slow
 		local over = m.stats[k] - ceil
 		local mult = over < -15 and 1 or (over < 0 and math.clamp(-over / 15, 0.35, 1) or 0.12 / (1 + over / 5))
-		local g = math.max(1, math.floor(base * mult + 0.5))
+		local g = over >= 0 and 1 or math.max(1, math.floor(base * mult * (bst.b and 1 or 1.5) + 0.5))
 		m.stats[k] += g
 		table.insert(gains, (g > 0 and ("+" .. g) or "MAXED") .. " " .. k:sub(1, 1):upper() .. k:sub(2))
 	end

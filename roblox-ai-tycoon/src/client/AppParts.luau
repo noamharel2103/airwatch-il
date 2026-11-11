@@ -116,7 +116,7 @@ function App.mount(ctx, s)
 	local h2 = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 10), Parent = head })
 	UI.bar(h2, (s.gpuUsed or 0) / math.max(s.gpuSlots or 4, 1), T.green, 10)
 	UI.label(head, string.format("Your %s fits %d GPUs. Bought GPUs need space, rented ones live in the cloud and bill every hour.", stage.name, stage.slots or 4), 12, T.sub)
-	UI.label(head, "GPU supply is tight in early years. Reputation and valuation get you more allocation.", 12, T.dim)
+	UI.label(head, "Over your allocation you can still get GPUs, but every extra one costs 8x the price.", 13, T.yellow)
 	-- places to keep GPUs
 	UI.label(sc, "Places for your GPUs", 18, T.text, { FontFace = UI.HEAVY })
 	local sgrid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = sc })

@@ -203,20 +203,23 @@ local function buildModels(body, s)
 	if busy then
 		local total = math.max(1, m.boosting.doneDay - m.boosting.startDay)
 		local frac = math.clamp((s.day - m.boosting.startDay) / total, 0, 1)
-		UI.label(trainRow, "TRAINING " .. m.boosting.a:upper() .. " + " .. m.boosting.b:upper(), 13, T.yellow, { FontFace = UI.BOLD })
+		UI.label(trainRow, "TRAINING " .. m.boosting.a:upper() .. (m.boosting.b and (" + " .. m.boosting.b:upper()) or ""), 13, T.yellow, { FontFace = UI.BOLD })
 		local h = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 26), Size = UDim2.new(1, 0, 0, 22), Parent = trainRow })
 		local _, f = UI.bar(h, frac, T.purple, 22)
 		live.boostFill = f
 		live.boostModel = m.id
-	elseif #picks == 2 then
+	elseif #picks >= 1 then
 		local staffNote = (m.boostStaff or 0) > 0 and ("  NEEDS " .. m.boostStaff .. " ENGINEERS") or ""
-		UI.button(trainRow, string.format("TRAIN %s + %s   %s + %s POWER   %d DAYS%s", picks[1]:upper(), picks[2]:upper(), Format.money(m.boostCost), Format.money(m.boostPower or 0), m.boostDays, staffNote), function()
-			if Net.act("boost", m.id, picks[1], picks[2]) then
+		local one = #picks == 1
+		local mult = one and 0.6 or 1
+		local what = one and (picks[1]:upper() .. " ONLY (x1.5 GAIN)") or (picks[1]:upper() .. " + " .. picks[2]:upper())
+		UI.button(trainRow, string.format("TRAIN %s   %s + %s POWER   %d DAYS%s", what, Format.money(m.boostCost * mult), Format.money((m.boostPower or 0) * mult), m.boostDays, staffNote), function()
+			if Net.act("boost", m.id, picks[1], picks[2] or "") then
 				picks = {}
 			end
 		end, T.purple, { Size = UDim2.new(1, 0, 0, 52), TextSize = 15 })
 	else
-		UI.label(trainRow, m.lastGain and ("LAST TRAINING " .. m.lastGain:upper()) or "PICK 2 STATS TO TRAIN", 13, T.sub, { FontFace = UI.BOLD })
+		UI.label(trainRow, m.lastGain and ("LAST TRAINING " .. m.lastGain:upper()) or "PICK 1 OR 2 STATS TO TRAIN", 13, T.sub, { FontFace = UI.BOLD })
 	end
 	-- bottom buttons
 	local bottom = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 0, 1, 0), Size = UDim2.new(1, 0, 0, 66), Parent = right })
