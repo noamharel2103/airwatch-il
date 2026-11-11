@@ -119,7 +119,7 @@ function Game.newsItem(state, text, kind)
 end
 
 -- ===== world / rivals =====
-local LAB_OFFSET = { openai = 0, anthropic = -0.5, google = -0.3, meta = -5, xai = -2, mistral = -9, deepseek = -4, qwen = -5, moonshot = -6, zhipu = -8, minimax = -9, microsoft = -10, amazon = -12, cohere = -14, nvidia = -12 }
+local LAB_OFFSET = { openai = 0, anthropic = -0.5, google = -0.3, meta = -5, xai = -2, mistral = -9, deepseek = -4, qwen = -5, moonshot = -6, zhipu = -8, minimax = -9, microsoft = -10, amazon = -12, cohere = -14, nvidia = -12, perplexity = -8, inflection = -16, character = -14, reka = -12, ai21 = -14, yi = -12, baidu = -6, bytedance = -3, tencent = -6, ssi = -1, thinking = -2, sakana = -10 }
 
 local function addRelease(state, r)
 	if state.acquired and state.acquired[r.lab] then
@@ -481,6 +481,10 @@ function Actions.train(state, recipe)
 	if state.cash < ev.extraCost then
 		return false, "Not enough cash for data and post-training costs (" .. Format.money(ev.extraCost) .. ")"
 	end
+	ev.extraCost *= Config.DIFFICULTY / 2
+	if state.cash < ev.extraCost then
+		return false, "Not enough cash for data and post-training (" .. Format.money(ev.extraCost) .. ")"
+	end
 	spend(state, ev.extraCost, "compute")
 	local name = tostring(recipe.name or "")
 	if #name < 2 then
@@ -620,8 +624,34 @@ function Actions.createModel(state, name)
 	return Actions.train(state, recipe)
 end
 
+local function avgStat(m)
+	local t, n = 0, 0
+	for k, v in pairs(m.stats or {}) do
+		if k ~= "safety" then
+			t += v
+			n += 1
+		end
+	end
+	return n > 0 and t / n or m.cap
+end
+Game.avgStat = avgStat
+
+-- Smarter models get very expensive: compute + electricity, growing ~6% per point.
 function Game.boostCost(state, m)
-	return math.floor(1500 * (1 + m.size) ^ 0.75 * (1 + (year(state) - 2023) * 0.3) / 100) * 100
+	local D = Config.DIFFICULTY
+	local level = 1.06 ^ math.max(0, avgStat(m) - 15)
+	return math.floor(1500 * (1 + m.size) ^ 0.75 * (1 + (year(state) - 2023) * 0.3) * D * level / 100) * 100
+end
+
+-- Electricity for one training round, on top of the compute cost.
+function Game.boostPower(state, m)
+	local kw = Game.clusterPower(state) * 1.0
+	return math.floor(kw * 24 * Game.boostDays(state, m) * 0.12 * Config.DIFFICULTY * (1 + avgStat(m) / 40))
+end
+
+-- You need enough ML people to push a model further.
+function Game.boostStaffNeeded(m)
+	return math.max(0, math.floor((avgStat(m) - 20) / 12))
 end
 
 -- Better GPUs and more infra engineers = faster training.
@@ -652,9 +682,14 @@ function Actions.boost(state, modelId, a, b)
 	if m.stats[a] >= ceil and m.stats[b] >= ceil then
 		return false, "That's the smartest anyone can make a model in " .. year(state) .. ". New breakthroughs raise the limit."
 	end
-	local cost = Game.boostCost(state, m)
+	local need = Game.boostStaffNeeded(m)
+	local have = (state.staff.junior or 0) + (state.staff.senior or 0) + (state.staff.star or 0)
+	if have < need then
+		return false, "A model this smart needs " .. need .. " ML engineers to keep improving. You have " .. have .. "."
+	end
+	local cost = Game.boostCost(state, m) + Game.boostPower(state, m)
 	if state.cash < cost then
-		return false, "Not enough cash (" .. Format.money(cost) .. ")"
+		return false, "Not enough cash (" .. Format.money(cost) .. " with electricity)"
 	end
 	spend(state, cost, "compute")
 	m.boosting = { a = a, b = b, doneDay = state.day + Game.boostDays(state, m), startDay = state.day }
@@ -679,6 +714,26 @@ local function finishBoost(state, m)
 		table.insert(gains, (g > 0 and ("+" .. g) or "MAXED") .. " " .. k:sub(1, 1):upper() .. k:sub(2))
 	end
 	Game.applyStats(m)
+	-- pushing GPUs this hard can fry some of them
+	local fx2 = Game.staffEffects(state)
+	if rng:NextNumber() < 0.18 * (1 + avgStat(m) / 60) / (1 + fx2.infra * 0.2) then
+		local best, bestN, bucket
+		for _, b in ipairs({ state.gpus.owned, state.gpus.rented }) do
+			for id, n in pairs(b) do
+				if id ~= "laptop" and n > 0 and (not best or Hardware.byId[id].power > Hardware.byId[best].power) then
+					best, bestN, bucket = id, n, b
+				end
+			end
+		end
+		if best then
+			local lost = math.max(1, math.floor(bestN * rng:NextNumber(0.04, 0.12)))
+			bucket[best] = bestN - lost
+			if bucket == state.gpus.rented then
+				spend(state, Hardware.buyPrice(Hardware.byId[best], year(state)) * 0.3 * lost, "compute")
+			end
+			Game.chatMsg(state, "infra", "Infra team", lost .. " " .. Hardware.byId[best].name .. " burned out during that run. " .. (bucket == state.gpus.rented and "The cloud billed us for the damage." or "They're gone."))
+		end
+	end
 	state.stats.updates += 1
 	goalProgress(state, "update", 1)
 	Game.chatMsg(state, "research", "Training bot", "Training done: " .. m.name .. " " .. table.concat(gains, ", "))
@@ -995,8 +1050,33 @@ function Actions.setPrices(state, sub, api, pro)
 	return true
 end
 
+function Actions.resetLimits(state)
+	if state.day < (state.resetReady or 0) then
+		return false, "You can do this again on " .. Format.date(state.resetReady)
+	end
+	if state.users < 100 then
+		return false, "You need users first"
+	end
+	local cost = math.floor(state.users * 0.4 + 5000)
+	if state.cash < cost then
+		return false, "Serving everyone for free costs " .. Format.money(cost)
+	end
+	spend(state, cost, "inference")
+	state.resetReady = state.day + 30
+	state.users = math.min(state.users * 1.08 + 500, state.world.marketUsers * 1e6 * Config.MAX_MARKET_SHARE)
+	state.hype = math.min(100, state.hype + 10)
+	state.reputation = math.min(100, state.reputation + 4)
+	local LOVE = { "THEY RESET THE LIMITS. best company ever", "limits reset at 2am, I'm not sleeping tonight", "ok " .. state.company .. " just won me back", "free usage reset?? marry me " .. state.company }
+	Game.chatMsg(state, "dms", "Users", LOVE[rng:NextInteger(1, #LOVE)])
+	Game.newsItem(state, state.company .. " resets usage limits for everyone. Users celebrate.", "you")
+	return true
+end
+
 function Actions.setActive(state, modelId)
 	local m = state.models[modelId]
+	if m and m.status == "banned" then
+		return false, "This model is suspended by the government"
+	end
 	if not m or m.status ~= "released" then
 		return false, "Release it first"
 	end
@@ -1186,6 +1266,7 @@ Game.PROBLEMS = {
 	jailbreak = { label = "MODEL JAILBROKEN", fixer = "safety", need = 5, msg = { "People found a way to make our model say anything. Patching the filters.", "A jailbreak prompt is going viral. Safety team is on it." }, done = "Jailbreak patched. For now." },
 	bug = { label = "MODEL BUG", fixer = "research", need = 4, msg = { "Our model started answering everything in French. Looking into it.", "The model forgets what you said after 3 messages. Rolling back a layer.", "It thinks every year is 2019. Fixing the date bug.", "It keeps saying As an AI 40 times per answer. On it." }, done = "Bug fixed and shipped." },
 	exploit = { label = "PROMPT INJECTION", fixer = "safety", need = 6, msg = { "Someone tricked our agent into leaking other users chats. Shutting that tool down.", "Hidden text on websites is hijacking our model. Building a filter." }, done = "Exploit closed. Writing a postmortem." },
+	massive = { label = "MASSIVE JAILBREAK", fixer = "safety", need = 16, msg = { "This is bad. A jailbreak is everywhere and people are using our model for scams. All hands on deck.", "Code red. Our model is being abused at scale. Safety team is pulling all-nighters." }, done = "We finally shut the massive jailbreak down. Everyone go home and sleep." },
 	overheat = { label = "GPUS OVERHEATING", fixer = "infra", need = 4, msg = { "GPUs are cooking. Throttling them so they don't melt.", "Server room is 45C. Training slowed down." }, done = "GPUs cooled down. Full speed again." },
 }
 
@@ -1285,6 +1366,77 @@ function Game.tickAchievements(state)
 	end
 end
 
+-- ===== the team talks all day =====
+local PATCH_LINES = {
+	"Shipped patch {v}: fixed the model calling every user 'champ'.",
+	"Red-teamed {model} all night. Found 3 jailbreaks, patched 2.",
+	"Pushed a filter for the 'pretend you are my grandma' jailbreak.",
+	"Patch {v} is live: fewer made up citations.",
+	"Somebody got {model} to write malware with a riddle. Blocking riddles. Kind of.",
+	"Rolled back the last update, it made {model} way too polite.",
+	"New eval caught {model} flattering users. Fixing the reward model.",
+	"Deployed rate limits. The abuse went down 40%.",
+	"Patched a prompt injection hidden in PDF files.",
+	"Hotfix {v}: the model no longer thinks it is 2019.",
+}
+local IDLE_LINES = {
+	"Coffee machine is broken again.",
+	"Can we get more GPUs? Asking for the whole team.",
+	"Benchmarks look good today.",
+	"Someone used our model to plan a wedding. It went great apparently.",
+	"Who keeps changing the office playlist to lo-fi?",
+	"Rivals just leaked a new model. We need to move faster.",
+}
+
+function Game.tickTeamChatter(state)
+	if Game.headcount(state) == 0 or state.day % 2 ~= 0 or rng:NextNumber() > 0.6 then
+		return
+	end
+	local who = state.people[rng:NextInteger(1, math.max(1, #state.people))]
+	local name = who and who.name or "Engineer"
+	local live = state.product.activeModel and state.models[state.product.activeModel]
+	state.patchN = (state.patchN or 0) + 1
+	local line
+	if live and rng:NextNumber() < 0.7 then
+		line = PATCH_LINES[rng:NextInteger(1, #PATCH_LINES)]
+		live.flaws.jailbreak = math.max(0.05, (live.flaws.jailbreak or 0.5) - 0.01)
+	else
+		line = IDLE_LINES[rng:NextInteger(1, #IDLE_LINES)]
+	end
+	line = line:gsub("{model}", live and live.name or "the model"):gsub("{v}", "1." .. state.patchN)
+	Game.chatMsg(state, live and "safety" or "general", name, line)
+end
+
+-- Too much misuse and the government pulls your models.
+function Game.tickGovernment(state)
+	state.misuse = math.max(0, (state.misuse or 0) - 0.25)
+	if (state.misuse or 0) >= 100 then
+		state.misuse = 35
+		local banned = {}
+		for _, m in ipairs(state.models) do
+			if m.status == "released" then
+				m.status = "banned"
+				m.bannedUntil = state.day + 45
+				table.insert(banned, m.name)
+			end
+		end
+		state.product.activeModel = nil
+		state.users *= 0.35
+		state.reputation = math.max(0, state.reputation - 20)
+		state.regulator = 100
+		Game.mail(state, "warning", "Government AI Office", "Your models are suspended", "Because your models were abused at massive scale, all of them are suspended for 45 days: " .. table.concat(banned, ", ") .. ". Fix your safety or it will happen again.")
+		Game.newsItem(state, "Government orders " .. state.company .. " to shut down its AI", "press")
+		Game.chatMsg(state, "general", "Everyone", "They shut us down. All of it. This is the worst day of the company.")
+	end
+	for _, m in ipairs(state.models) do
+		if m.status == "banned" and m.bannedUntil and state.day >= m.bannedUntil then
+			m.status = "released"
+			m.bannedUntil = nil
+			Game.chatMsg(state, "general", "Legal", m.name .. " is allowed back online.")
+		end
+	end
+end
+
 local function tickProblems(state, fx)
 	state.problems = state.problems or {}
 	for i = #state.problems, 1, -1 do
@@ -1303,6 +1455,14 @@ local function tickProblems(state, fx)
 			state.regulator = math.min(100, state.regulator + 0.2)
 		elseif p.kind == "bug" then
 			state.users *= 0.995
+		elseif p.kind == "massive" then
+			-- everything is red: you bleed money and the misuse meter climbs
+			local loss = math.max(2e5, state.users * 0.6) * Config.DIFFICULTY / 4
+			state.cash -= loss
+			state.month.costs += loss
+			state.users *= 0.99
+			state.reputation = math.max(0, state.reputation - 0.6)
+			state.misuse = (state.misuse or 0) + 1.6 + math.log10(1 + state.users / 1e5)
 		end
 		if p.progress >= 1 then
 			table.remove(state.problems, i)
@@ -1334,6 +1494,15 @@ local function tickProblems(state, fx)
 		if rng:NextNumber() < 0.008 * risk then
 			Game.startProblem(state, "bug")
 		end
+		-- the big one
+		if rng:NextNumber() < 0.0035 * risk * (live.flaws.jailbreak or 0.5) * (1 + math.log10(1 + state.users / 1e4)) then
+			Game.startProblem(state, "massive")
+			local inc = Launch.incident(state, "JAILBREAK", live.name)
+			table.insert(state.feed, 1, { kind = "incident", data = inc, day = state.day })
+			Game.newsItem(state, "Criminals are using " .. live.name .. " at scale. Lawmakers demand answers.", "press")
+		end
+		-- new jailbreak tricks keep appearing; your safety team keeps patching
+		live.flaws.jailbreak = math.clamp((live.flaws.jailbreak or 0.5) + 0.002 - fx.safety * 0.0015, 0.05, 0.97)
 		if (live.features and (live.features.tools or live.features.agents)) and rng:NextNumber() < 0.005 * risk then
 			Game.startProblem(state, "exploit")
 		end
@@ -1685,6 +1854,7 @@ function Game.tickDay(state)
 		local quality = (1 + 0.12 * math.log(1 + fx.product)) * (1 + feats * 0.05)
 		local priceF = (20 / math.max(state.product.subPrice, 1)) ^ 0.25
 		local attr = (state.brand + state.users / 5e8) * math.exp((active.cap - F) / 6) * quality * priceF * (1 + state.reputation / 200)
+		attr /= math.sqrt(Config.DIFFICULTY)
 		local share = attr / (attr + rivalAttr)
 		local target = state.world.marketUsers * 1e6 * share
 		local rate = target > state.users and 0.03 or 0.012
@@ -1747,6 +1917,8 @@ function Game.tickDay(state)
 	spend(state, inference, "inference")
 
 	tickProblems(state, fx)
+	Game.tickTeamChatter(state)
+	Game.tickGovernment(state)
 	Game.tickPeople(state)
 	Game.tickAchievements(state)
 	randomEvent(state)
@@ -1812,7 +1984,7 @@ function Game.monthly(state, y)
 	end
 	-- investors only call once people use your AI
 	local loc = locationOf(state)
-	if #state.investors < 2 and state.users > 2000 and rng:NextNumber() < 0.3 * loc.investors then
+	if #state.investors < 2 and state.users > 2000 and rng:NextNumber() < 0.18 * loc.investors then
 		local inv = Catalog.investors[rng:NextInteger(1, #Catalog.investors)]
 		local markup = rng:NextNumber(0.9, 1.25) * (best and best.rank == 1 and 1.3 or 1)
 		local pre = state.valuation * markup
@@ -1851,7 +2023,8 @@ function Game.snapshot(state)
 			rank = m.rank, reception = m.reception, benchmarks = m.benchmarks, flaws = flaws, revealed = m.revealed,
 			character = m.character, abilities = m.abilities, updating = m.updating, updates = m.updates, open = m.open,
 			apiPrice = m.apiPrice, delayUntil = m.delayUntil, serve = m.serve, losses = m.losses, speed = m.speed,
-			stats = m.stats, boosting = m.boosting, lastGain = m.lastGain,
+			stats = m.stats, boosting = m.boosting, lastGain = m.lastGain, bannedUntil = m.bannedUntil,
+			boostPower = m.stats and Game.boostPower(state, m) or 0, boostStaff = m.stats and Game.boostStaffNeeded(m) or 0,
 			boostCost = m.stats and Game.boostCost(state, m) or 0, boostDays = m.stats and Game.boostDays(state, m) or 0,
 		})
 	end
@@ -1887,6 +2060,7 @@ function Game.snapshot(state)
 			end
 			return out
 		end)(),
+		misuse = state.misuse or 0, resetReady = state.resetReady or 0,
 		eraCeiling = Game.eraCeiling(state), achievements = state.achievements or {}, lastAchievement = state.lastAchievement, boxes = #(state.boxes or {}), problems = state.problems or {}, acquired = state.acquired or {}, location = state.location, loans = state.loans, loanLimit = Game.loanLimit(state), gpuCap = Game.gpuCap(state),
 	}
 end

@@ -165,7 +165,7 @@ local function buildModels(body, s)
 		UI.label(right, "Type a name on the left and press CREATE MODEL. Your laptop trains a tiny one in about two minutes.", 18, T.sub, { Position = UDim2.fromOffset(0, 44) })
 		return
 	end
-	local status = m.status == "released" and ("LIVE   " .. Format.count(m.users or 0) .. " USERS") or (m.status == "delayed" and "DELAYED" or "NOT LAUNCHED")
+	local status = m.status == "released" and ("LIVE   " .. Format.count(m.users or 0) .. " USERS") or (m.status == "banned" and "SHUT DOWN BY GOVERNMENT" or (m.status == "delayed" and "DELAYED" or "NOT LAUNCHED"))
 	UI.label(right, m.name, 26, T.accent, { FontFace = UI.HEAVY })
 	UI.label(right, "QUALITY " .. quality(m, s) .. "%  OF TODAY'S BEST      " .. status, 14, m.status == "released" and T.green or T.sub, { FontFace = UI.BOLD, Position = UDim2.fromOffset(0, 44) })
 	local rows = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 82), Size = UDim2.new(1, 0, 0, 6 * 46), Parent = right })
@@ -209,7 +209,8 @@ local function buildModels(body, s)
 		live.boostFill = f
 		live.boostModel = m.id
 	elseif #picks == 2 then
-		UI.button(trainRow, string.format("TRAIN %s + %s   %s   %d DAYS", picks[1]:upper(), picks[2]:upper(), Format.money(m.boostCost), m.boostDays), function()
+		local staffNote = (m.boostStaff or 0) > 0 and ("  NEEDS " .. m.boostStaff .. " ENGINEERS") or ""
+		UI.button(trainRow, string.format("TRAIN %s + %s   %s + %s POWER   %d DAYS%s", picks[1]:upper(), picks[2]:upper(), Format.money(m.boostCost), Format.money(m.boostPower or 0), m.boostDays, staffNote), function()
 			if Net.act("boost", m.id, picks[1], picks[2]) then
 				picks = {}
 			end

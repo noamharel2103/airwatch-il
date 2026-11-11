@@ -58,7 +58,22 @@ local subL = new("TextLabel", { Text = "", TextSize = 13, TextColor3 = T.sub, Po
 -- live problems (servers down, hacked...) with the team's fix progress
 local problemBox = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(16, 120), Size = UDim2.fromOffset(360, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = hud })
 UI.list(problemBox, 8)
-local PROBLEM_LABEL = { outage = "SERVERS DOWN", hack = "WE GOT HACKED", overheat = "GPUS OVERHEATING", jailbreak = "MODEL JAILBROKEN", bug = "MODEL BUG", exploit = "PROMPT INJECTION" }
+-- the whole screen goes red during a massive jailbreak
+local redAlert = new("Frame", { BackgroundColor3 = Color3.fromRGB(255, 0, 30), BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 1, Parent = hud })
+new("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(0.5, 1), NumberSequenceKeypoint.new(1, 0.2) }), Parent = redAlert })
+task.spawn(function()
+	local t = 0
+	while true do
+		t += 0.05
+		if redAlert:GetAttribute("On") then
+			redAlert.BackgroundTransparency = 0.55 + math.sin(t * 4) * 0.15
+		else
+			redAlert.BackgroundTransparency = 1
+		end
+		task.wait(0.05)
+	end
+end)
+local PROBLEM_LABEL = { massive = "MASSIVE JAILBREAK", outage = "SERVERS DOWN", hack = "WE GOT HACKED", overheat = "GPUS OVERHEATING", jailbreak = "MODEL JAILBROKEN", bug = "MODEL BUG", exploit = "PROMPT INJECTION" }
 
 -- training mini status (bottom left)
 local trainMini = new("Frame", { Position = UDim2.new(0, 16, 1, -86), Size = UDim2.fromOffset(300, 70), BackgroundColor3 = T.bg, BackgroundTransparency = 0.12, Visible = false, Parent = hud })
@@ -263,6 +278,28 @@ Net.onState(function(s)
 	tbName.Text = s.company .. "   " .. Format.money(s.cash)
 	tbClock.Text = Format.date(s.day)
 	UI.clear(problemBox)
+	local massive = false
+	for _, p in ipairs(s.problems or {}) do
+		if p.kind == "massive" then
+			massive = true
+		end
+	end
+	redAlert:SetAttribute("On", massive)
+	if massive then
+		local f = new("Frame", { BackgroundColor3 = Color3.fromRGB(120, 0, 20), Size = UDim2.new(1, 0, 0, 58), Parent = problemBox })
+		UI.stroke(f, T.line, 3)
+		new("TextLabel", { Text = string.format("MISUSE %d%%  (100%% = government shutdown)", math.floor(s.misuse or 0)), FontFace = UI.BOLD, TextSize = 12, TextColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 6), Size = UDim2.new(1, -24, 0, 20), Parent = f })
+		local h = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 32), Size = UDim2.new(1, -24, 0, 14), Parent = f })
+		UI.bar(h, (s.misuse or 0) / 100, T.red, 14)
+	end
+	for _, m in ipairs(s.models) do
+		if m.status == "banned" then
+			local f = new("Frame", { BackgroundColor3 = Color3.fromRGB(30, 30, 30), Size = UDim2.new(1, 0, 0, 40), Parent = problemBox })
+			UI.stroke(f, T.red, 3)
+			new("TextLabel", { Text = "GOVERNMENT SHUTDOWN: " .. m.name, FontFace = UI.BOLD, TextSize = 12, TextColor3 = T.red, BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 0), Size = UDim2.new(1, -24, 1, 0), Parent = f })
+			break
+		end
+	end
 	for _, p in ipairs(s.problems or {}) do
 		local f = new("Frame", { BackgroundColor3 = T.red, Size = UDim2.new(1, 0, 0, 58), Parent = problemBox })
 		UI.corner(f, 2)

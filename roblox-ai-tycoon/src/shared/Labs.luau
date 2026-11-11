@@ -23,6 +23,18 @@ Labs.list = {
 	{ id = "amazon", name = "Amazon", parody = "Amazin", color = Color3.fromRGB(255, 153, 0), brand = 0.8, cadence = 12, open = 1, hype = 3, cash = 80e9 },
 	{ id = "cohere", name = "Cohere", parody = "Cohear", color = Color3.fromRGB(57, 89, 76), brand = 0.3, cadence = 12, open = 5, hype = 2, cash = 0.4e9 },
 	{ id = "nvidia", name = "Nvidia", parody = "Envidia", color = Color3.fromRGB(118, 185, 0), brand = 0.3, cadence = 12, open = 9, hype = 6, cash = 30e9 },
+	{ id = "perplexity", name = "Perplexity", parody = "Perplexed", color = Color3.fromRGB(32, 128, 141), brand = 0.6, cadence = 6, open = 2, hype = 7, cash = 1e9 },
+	{ id = "inflection", name = "Inflection", parody = "Inflation", color = Color3.fromRGB(255, 120, 60), brand = 0.4, cadence = 9, open = 1, hype = 6, cash = 1.5e9 },
+	{ id = "character", name = "Character.AI", parody = "Charactr", color = Color3.fromRGB(80, 80, 200), brand = 0.6, cadence = 8, open = 1, hype = 5, cash = 0.2e9 },
+	{ id = "reka", name = "Reka", parody = "Rekka", color = Color3.fromRGB(230, 90, 160), brand = 0.15, cadence = 10, open = 3, hype = 3, cash = 0.1e9 },
+	{ id = "ai21", name = "AI21", parody = "AI22", color = Color3.fromRGB(240, 90, 120), brand = 0.15, cadence = 10, open = 5, hype = 2, cash = 0.3e9 },
+	{ id = "yi", name = "01.AI", parody = "02.AI", color = Color3.fromRGB(30, 200, 120), brand = 0.2, cadence = 8, open = 8, hype = 3, cash = 0.3e9 },
+	{ id = "baidu", name = "Baidu ERNIE", parody = "Biadu BERNIE", color = Color3.fromRGB(45, 50, 230), brand = 0.6, cadence = 7, open = 4, hype = 4, cash = 20e9 },
+	{ id = "bytedance", name = "ByteDance Doubao", parody = "BiteDance", color = Color3.fromRGB(20, 20, 30), brand = 0.9, cadence = 5, open = 3, hype = 5, cash = 50e9 },
+	{ id = "tencent", name = "Tencent Hunyuan", parody = "Tenpercent", color = Color3.fromRGB(0, 150, 255), brand = 0.5, cadence = 7, open = 6, hype = 3, cash = 50e9 },
+	{ id = "ssi", name = "Safe Superintelligence", parody = "Very Safe Inc", color = Color3.fromRGB(240, 240, 240), brand = 0.3, cadence = 18, open = 0, hype = 8, cash = 3e9 },
+	{ id = "thinking", name = "Thinking Machines", parody = "Thonking Machines", color = Color3.fromRGB(250, 200, 80), brand = 0.3, cadence = 12, open = 4, hype = 7, cash = 2e9 },
+	{ id = "sakana", name = "Sakana AI", parody = "Sakanana", color = Color3.fromRGB(240, 70, 70), brand = 0.15, cadence = 10, open = 7, hype = 4, cash = 0.3e9 },
 }
 
 Labs.byId = {} :: { [string]: any }
@@ -46,6 +58,18 @@ Labs.valuationB = {
 	microsoft = { [2023] = 2500, [2024] = 3100, [2025] = 3700, [2026] = 4000 },
 	amazon = { [2023] = 1500, [2024] = 2100, [2025] = 2400, [2026] = 2600 },
 	cohere = { [2023] = 2.2, [2024] = 5.5, [2025] = 7, [2026] = 25 },
+	perplexity = { [2023] = 0.5, [2024] = 9, [2025] = 20, [2026] = 24 },
+	inflection = { [2023] = 4, [2024] = 4, [2025] = 2, [2026] = 2 },
+	character = { [2023] = 1, [2024] = 2.5, [2025] = 1, [2026] = 1 },
+	reka = { [2023] = 0.3, [2024] = 0.5, [2025] = 1, [2026] = 1 },
+	ai21 = { [2023] = 1.4, [2024] = 1.4, [2025] = 2, [2026] = 2 },
+	yi = { [2023] = 1, [2024] = 1, [2025] = 1, [2026] = 1 },
+	baidu = { [2023] = 40, [2024] = 35, [2025] = 30, [2026] = 35 },
+	bytedance = { [2023] = 220, [2024] = 300, [2025] = 330, [2026] = 400 },
+	tencent = { [2023] = 400, [2024] = 450, [2025] = 550, [2026] = 600 },
+	ssi = { [2023] = 0.5, [2024] = 5, [2025] = 32, [2026] = 40 },
+	thinking = { [2023] = 0.5, [2024] = 1, [2025] = 12, [2026] = 40 },
+	sakana = { [2023] = 0.2, [2024] = 1, [2025] = 2.6, [2026] = 3 },
 	nvidia = { [2023] = 1100, [2024] = 3200, [2025] = 4300, [2026] = 4800 },
 }
 
@@ -84,6 +108,20 @@ local RAW = [[
 2023-03-21|google|Bard|35|C|0|Rushed launch after a costly demo error
 2023-05-10|google|PaLM 2|40|C|2|Powers Bard
 2023-07-11|anthropic|Claude 2|44|C|33|100K context reads whole books
+2023-05-02|inflection|Pi|33|C|0|A kind and chatty personal AI
+2023-10-17|baidu|ERNIE 4.0|42|C|0|China's answer to GPT-4
+2023-11-05|yi|Yi-34B|39|O|0|Tops the open leaderboard for a week
+2023-11-22|inflection|Inflection-2|46|C|0|Claims second place in the world
+2024-03-07|inflection|Inflection-2.5|51|C|0|Then most of the team leaves for Microsoft
+2024-03-28|ai21|Jamba|40|O|0|Mamba and transformer hybrid
+2024-04-15|reka|Reka Core|48|C|10|Small team, multimodal frontier model
+2024-11-05|tencent|Hunyuan-Large|52|O|0|Biggest open MoE of its time
+2025-01-22|bytedance|Doubao 1.5 Pro|62|C|1|Cheap and good, huge Chinese user base
+2025-02-11|perplexity|Sonar|60|C|1|Search answers, built on open models
+2025-03-21|sakana|AI Scientist v2|50|O|0|Its paper passes peer review
+2025-10-15|bytedance|Seed 2.0|78|C|2|Number one app in China
+2026-03-20|thinking|Tinker Model 1|84|O|0|Ex-OpenAI team's first model
+2026-08-30|ssi|SSI Preview|90|C|0|Silent for two years, then this
 2023-07-18|meta|Llama 2 70B|38|O|0|Open weights go commercial
 2023-08-03|qwen|Qwen-7B|28|O|0|Start of the Qwen open-weights machine
 2023-09-27|mistral|Mistral 7B|32|O|0|Dropped as a magnet link
@@ -212,6 +250,17 @@ Labs.futureNames = {
 	moonshot = { "Kimi K4", "Kimi K5" },
 	zhipu = { "GLM-6", "GLM-7" },
 	minimax = { "MiniMax M4", "MiniMax M5" },
+	perplexity = { "Sonar 3", "Sonar 4" },
+	character = { "Character 3", "Character 4" },
+	reka = { "Reka Core 3", "Reka 4" },
+	ai21 = { "Jamba 3", "Jamba 4" },
+	yi = { "Yi-3", "Yi-4" },
+	baidu = { "ERNIE 6", "ERNIE 7" },
+	bytedance = { "Seed 3.0", "Seed 4.0" },
+	tencent = { "Hunyuan 3", "Hunyuan 4" },
+	ssi = { "SSI-1", "SSI-2" },
+	thinking = { "Tinker Model 2", "Tinker Model 3" },
+	sakana = { "AI Scientist v4", "Sakana 5" },
 }
 
 return Labs

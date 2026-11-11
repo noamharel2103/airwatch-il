@@ -43,6 +43,12 @@ function App.mount(ctx, s)
 				new("TextLabel", { Text = "  " .. f, TextSize = 14, TextColor3 = Color3.fromRGB(30, 30, 34), Size = UDim2.new(1, 0, 0, 18), Parent = phone })
 			end
 		end
+		local ready = (s.resetReady or 0) <= s.day
+		UI.button(sc, ready and ("RESET EVERYONE'S USAGE LIMITS  " .. Format.money(math.floor(s.users * 0.4 + 5000))) or ("LIMITS RESET AGAIN ON " .. Format.date(s.resetReady)), function()
+			if Net.act("resetLimits") then
+				Net.toast("Usage limits reset. Users are going crazy.", "good")
+			end
+		end, ready and T.green or "ghost", { Size = UDim2.fromOffset(560, 54), TextSize = 14 })
 		UI.label(sc, "App name", 14, T.sub)
 		local box = new("TextBox", { Text = s.product.appName, ClearTextOnFocus = false, BackgroundTransparency = 0, BackgroundColor3 = T.panel2, Size = UDim2.new(0, 360, 0, 40), TextSize = 16, Parent = sc })
 		UI.corner(box, 10)
@@ -123,7 +129,7 @@ function App.key(s)
 	for _ in pairs(s.acquired or {}) do
 		n += 1
 	end
-	return page .. n .. s.year .. math.floor(math.log10(math.max(s.valuation, 10)) * 4) .. s.office .. s.product.appName .. s.product.subPrice .. s.product.apiPrice .. s.product.proPrice .. tostring(s.product.activeModel)
+	return page .. tostring(s.resetReady) .. n .. s.year .. math.floor(math.log10(math.max(s.valuation, 10)) * 4) .. s.office .. s.product.appName .. s.product.subPrice .. s.product.apiPrice .. s.product.proPrice .. tostring(s.product.activeModel)
 end
 
 return App

@@ -50,6 +50,10 @@ Config.ELECTRICITY_PER_KWH = 0.09
 
 Config.GOALS_PER_WEEK = 3
 
+-- Overall difficulty (owner asked for 8x harder). Scales upgrade costs, power bills,
+-- training costs and how hard it is to win users.
+Config.DIFFICULTY = 8
+
 -- GPU allocation: how much compute (H100-equivalents) a startup can get its hands on.
 -- 2023 H100s were allocation-only with ~39-week lead times (research 05). Grows with reputation/valuation.
 Config.GPU_ALLOCATION = { [2023] = 600, [2024] = 3500, [2025] = 25000, [2026] = 150000, [2027] = 600000, [2028] = 2e6, [2030] = 1e7 }
