@@ -34,8 +34,28 @@ function App.mount(ctx, s)
 	UI.label(head, string.format("Cluster: %.1f H100-equivalents   |   allocation limit %s this year", s.clusterPower, Format.count(s.gpuCap)), 18, T.text, { FontFace = UI.BOLD })
 	local h = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 10), Parent = head })
 	UI.bar(h, s.clusterPower / math.max(s.gpuCap, 1), T.orange, 10)
-	UI.label(head, string.format("Owned GPUs use your power: %.0f / %s kW (%s). Rented GPUs live in the cloud and bill every hour.", s.ownedKw, Format.count(stage.kw), stage.name), 12, T.sub)
+	UI.label(head, string.format("Space for your own GPUs: %s / %s   |   power %.0f / %s kW", Format.count(s.gpuUsed or 0), Format.count(s.gpuSlots or 4), s.ownedKw, Format.count(s.kwCap or stage.kw)), 16, T.text, { FontFace = UI.BOLD })
+	local h2 = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 10), Parent = head })
+	UI.bar(h2, (s.gpuUsed or 0) / math.max(s.gpuSlots or 4, 1), T.green, 10)
+	UI.label(head, string.format("Your %s fits %d GPUs. Bought GPUs need space, rented ones live in the cloud and bill every hour.", stage.name, stage.slots or 4), 12, T.sub)
 	UI.label(head, "GPU supply is tight in early years. Reputation and valuation get you more allocation.", 12, T.dim)
+	-- places to keep GPUs
+	UI.label(sc, "Places for your GPUs", 18, T.text, { FontFace = UI.HEAVY })
+	local sgrid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = sc })
+	new("UIGridLayout", { CellSize = UDim2.new(1 / 3, -8, 0, 132), CellPadding = UDim2.fromOffset(10, 10), Parent = sgrid })
+	for _, st in ipairs(Catalog.storage) do
+		local have = (s.storage or {})[st.id] or 0
+		local c = new("Frame", { BackgroundColor3 = T.panel2, Parent = sgrid })
+		UI.stroke(c, T.line, 3)
+		UI.pad(c, 10, 12)
+		new("TextLabel", { Text = st.name .. (have > 0 and ("  x" .. have) or ""), FontFace = UI.HEAVY, TextSize = 14, TextColor3 = T.text, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 20), Parent = c })
+		new("TextLabel", { Text = string.format("%s GPUs   |   %s kW   |   %s/mo", Format.count(st.slots), Format.count(st.kw), Format.money(st.rent)), TextSize = 13, TextColor3 = T.sub, BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 24), Size = UDim2.new(1, 0, 0, 18), Parent = c })
+		new("TextLabel", { Text = st.desc, TextSize = 12, TextColor3 = T.dim, TextWrapped = true, BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 44), Size = UDim2.new(1, 0, 0, 30), TextYAlignment = Enum.TextYAlignment.Top, Parent = c })
+		UI.button(c, "Buy " .. Format.money(st.cost), function()
+			Net.act("buyStorage", st.id)
+		end, s.cash >= st.cost and "success" or "ghost", { Position = UDim2.new(0, 0, 1, -34), Size = UDim2.new(1, 0, 0, 34) })
+	end
+	UI.label(sc, "GPUs", 18, T.text, { FontFace = UI.HEAVY })
 	local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = sc })
 	new("UIGridLayout", { CellSize = UDim2.new(0.5, -6, 0, 168), CellPadding = UDim2.fromOffset(10, 10), Parent = grid })
 	for _, hw in ipairs(Hardware.list) do
@@ -74,7 +94,7 @@ function App.mount(ctx, s)
 end
 
 function App.key(s)
-	local k = tostring(s.year) .. math.floor(s.clusterPower * 10)
+	local k = tostring(s.year) .. math.floor(s.clusterPower * 10) .. (s.gpuSlots or 0) .. (s.gpuUsed or 0) .. (s.cash >= 3e6 and "r" or "p")
 	for id, n in pairs(s.gpus.owned) do
 		k ..= id .. n
 	end

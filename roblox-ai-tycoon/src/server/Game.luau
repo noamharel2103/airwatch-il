@@ -195,6 +195,51 @@ function Game.gpuCap(state): number
 	return math.floor(base * (0.6 + state.reputation / 125) * math.min(2.5, math.sqrt(1 + state.valuation / 2e10)))
 end
 
+-- GPU places: your room plus any garages or datacenters you bought
+function Game.gpuSlots(state): number
+	local n = Catalog.officeStages[state.office].slots or 4
+	for id, c in pairs(state.storage or {}) do
+		n += Catalog.storageById[id].slots * c
+	end
+	return n
+end
+
+function Game.kwCap(state): number
+	local kw = Catalog.officeStages[state.office].kw
+	for id, c in pairs(state.storage or {}) do
+		kw += Catalog.storageById[id].kw * c
+	end
+	return kw
+end
+
+function Game.gpuUsed(state): number
+	local n = 0
+	for _, c in pairs(state.gpus.owned) do
+		n += c
+	end
+	for _, b in ipairs(state.boxes or {}) do
+		if b.kind == "buy" then
+			n += b.n
+		end
+	end
+	return n
+end
+
+function Actions.buyStorage(state, id)
+	local st = Catalog.storageById[id]
+	if not st then
+		return false, "Unknown place"
+	end
+	if state.cash < st.cost then
+		return false, "Not enough cash for the " .. st.name
+	end
+	spend(state, st.cost, "office")
+	state.storage = state.storage or {}
+	state.storage[id] = (state.storage[id] or 0) + 1
+	Game.chatMsg(state, "infra", "Infra", "We got the " .. st.name .. ". Room for " .. Format.count(st.slots) .. " more GPUs.")
+	return true
+end
+
 function Game.ownedKw(state): number
 	local kw = 0
 	for id, n in pairs(state.gpus.owned) do
@@ -398,8 +443,11 @@ function Actions.buy(state, id, n)
 		return false, "Not enough cash"
 	end
 	local stage = Catalog.officeStages[state.office]
-	if Game.ownedKw(state) + h.kw * 1.4 * n > stage.kw then
-		return false, string.format("Not enough power. Your %s supports %s kW. Rent in the cloud or upgrade.", stage.name, Format.count(stage.kw))
+	if Game.gpuUsed(state) + n > Game.gpuSlots(state) then
+		return false, string.format("No space. You have room for %s GPUs. Buy a garage or a datacenter in Parts, or upgrade your office.", Format.count(Game.gpuSlots(state)))
+	end
+	if Game.ownedKw(state) + h.kw * 1.4 * n > Game.kwCap(state) then
+		return false, string.format("Not enough power. Your places support %s kW. Buy more storage, rent in the cloud or upgrade.", Format.count(Game.kwCap(state)))
 	end
 	spend(state, price, "compute")
 	state.boxes = state.boxes or {}
@@ -2216,7 +2264,11 @@ function Game.tickDay(state)
 	local fromCredits = math.min(state.credits, rent)
 	state.credits -= fromCredits
 	local power = Game.ownedKw(state) * 24 * Config.ELECTRICITY_PER_KWH * loc.power
-	local office = Catalog.officeStages[state.office].rent / 30 * loc.rent
+	local storageRent = 0
+	for id, c in pairs(state.storage or {}) do
+		storageRent += Catalog.storageById[id].rent * c
+	end
+	local office = (Catalog.officeStages[state.office].rent + storageRent) / 30 * loc.rent
 	if Game.hasProblem(state, "outage") then
 		revenue *= 0.2
 	end
@@ -2396,6 +2448,7 @@ function Game.snapshot(state)
 			end
 			return out
 		end)(),
+		storage = state.storage or {}, gpuSlots = Game.gpuSlots(state), gpuUsed = Game.gpuUsed(state), kwCap = Game.kwCap(state),
 		offers = state.offers or {}, cooldowns = state.cooldowns or {}, meeting = state.meeting, loanRate = Game.loanRate(state, 1e6),
 		misuse = state.misuse or 0, resetReady = state.resetReady or 0,
 		eraCeiling = Game.eraCeiling(state), achievements = state.achievements or {}, lastAchievement = state.lastAchievement, boxes = #(state.boxes or {}), problems = state.problems or {}, acquired = state.acquired or {}, location = state.location, loans = state.loans, loanLimit = Game.loanLimit(state), gpuCap = Game.gpuCap(state),

@@ -4,13 +4,27 @@ local C = {}
 
 -- kw = power budget for GPUs you OWN (rented GPUs live in someone else's datacenter).
 C.officeStages = {
-	{ id = "bedroom", name = "Your bedroom", cost = 0, rent = 0, maxStaff = 3, kw = 2, desc = "A desk, a laptop and a dream." },
-	{ id = "cowork", name = "Co-working desk", cost = 20e3, rent = 6e3, maxStaff = 10, kw = 10, desc = "Free coffee. Loud neighbours." },
-	{ id = "office", name = "Office floor", cost = 400e3, rent = 90e3, maxStaff = 60, kw = 400, desc = "Glass walls, your logo on the door, a server room." },
-	{ id = "hq", name = "Headquarters", cost = 8e6, rent = 900e3, maxStaff = 400, kw = 8e3, desc = "A whole building in Mission Bay." },
-	{ id = "tower", name = "AI Tower", cost = 120e6, rent = 9e6, maxStaff = 2500, kw = 150e3, desc = "Your name on the skyline." },
-	{ id = "campus", name = "Campus + gigawatt datacenter", cost = 4e9, rent = 120e6, maxStaff = 20000, kw = 1.2e6, desc = "A campus and your own power plant." },
+	{ id = "bedroom", slots = 4, name = "Your bedroom", cost = 0, rent = 0, maxStaff = 3, kw = 2, desc = "A desk, a laptop and a dream." },
+	{ id = "cowork", slots = 8, name = "Co-working desk", cost = 20e3, rent = 6e3, maxStaff = 10, kw = 10, desc = "Free coffee. Loud neighbours." },
+	{ id = "office", slots = 48, name = "Office floor", cost = 400e3, rent = 90e3, maxStaff = 60, kw = 400, desc = "Glass walls, your logo on the door, a server room." },
+	{ id = "hq", slots = 400, name = "Headquarters", cost = 8e6, rent = 900e3, maxStaff = 400, kw = 8e3, desc = "A whole building in Mission Bay." },
+	{ id = "tower", slots = 3000, name = "AI Tower", cost = 120e6, rent = 9e6, maxStaff = 2500, kw = 150e3, desc = "Your name on the skyline." },
+	{ id = "campus", slots = 60000, name = "Campus + gigawatt datacenter", cost = 4e9, rent = 120e6, maxStaff = 20000, kw = 1.2e6, desc = "A campus and your own power plant." },
 }
+
+-- Extra places to keep GPUs and servers. You can buy more than one of each.
+C.storage = {
+	{ id = "closet", name = "Storage closet", cost = 15e3, rent = 500, slots = 16, kw = 10, desc = "A locked closet down the hall." },
+	{ id = "garage", name = "Rented garage", cost = 250e3, rent = 6e3, slots = 96, kw = 90, desc = "Fans, extension cords and a lot of noise." },
+	{ id = "biggarage", name = "Huge garage", cost = 3e6, rent = 40e3, slots = 800, kw = 900, desc = "A giant garage with its own power line." },
+	{ id = "cage", name = "Colocation cage", cost = 15e6, rent = 250e3, slots = 4000, kw = 5e3, desc = "Your racks inside someone else's datacenter." },
+	{ id = "hall", name = "Data hall", cost = 180e6, rent = 2e6, slots = 40000, kw = 60e3, desc = "A whole hall, liquid cooling, 24/7 guards." },
+	{ id = "datacenter", name = "Hyperscale datacenter", cost = 2.5e9, rent = 25e6, slots = 400000, kw = 700e3, desc = "Your own campus of servers in the desert." },
+}
+C.storageById = {}
+for _, st in ipairs(C.storage) do
+	C.storageById[st.id] = st
+end
 
 -- Model updates (Lab > Models > Update). req = research node. days = in-game days.
 C.updates = {
