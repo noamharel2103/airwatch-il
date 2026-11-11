@@ -102,9 +102,20 @@ function Goals.mount(ctx, s)
 			end, "success")
 		end
 	end
+	UI.label(sc, "Achievements", 24, T.text, { FontFace = UI.HEAVY })
+	for _, a in ipairs(s.achievementList or {}) do
+		local done = s.achievements and s.achievements[a.id]
+		local c = UI.card(sc, { BackgroundColor3 = done and Color3.fromRGB(20, 110, 70) or T.panel2 })
+		UI.list(c, 2)
+		UI.label(c, (done and "[x] " or "[ ] ") .. a.name, 18, done and T.green or T.text, { FontFace = UI.BOLD })
+		UI.label(c, a.desc .. "   reward " .. require(Shared.Format).money(a.reward), 15, T.sub)
+	end
 end
 function Goals.key(s)
 	local k = ""
+	for id in pairs(s.achievements or {}) do
+		k ..= id
+	end
 	for _, g in ipairs(s.goals) do
 		k ..= g.text .. g.progress .. tostring(g.claimed)
 	end

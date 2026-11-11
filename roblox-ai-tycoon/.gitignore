@@ -2,3 +2,6 @@ src/manifest.json
 src/_devsync.txt
 src/_build_world.txt
 art/preview_*.png
+.saves/
+src/_stamp.txt
+src/_build_stamp.txt

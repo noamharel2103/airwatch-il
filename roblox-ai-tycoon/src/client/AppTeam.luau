@@ -33,7 +33,7 @@ function App.mount(ctx, s)
 		UI.list(side, 4)
 		UI.label(side, s.company, 18, T.text, { FontFace = UI.HEAVY })
 		UI.label(side, s.headcount .. " people", 12, T.sub)
-		for _, ch in ipairs({ "general", "research", "infra", "safety" }) do
+		for _, ch in ipairs({ "dms", "general", "research", "infra", "safety" }) do
 			local b = UI.button(side, "# " .. ch, function()
 				channel = ch
 				App.mount(ctx, Net.state)

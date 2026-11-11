@@ -17,6 +17,7 @@ local MailGoals = require(Modules.AppMail)
 local Company = require(Modules.AppCompany)
 local Playground = require(Modules.Playground)
 local Reveal = require(Modules.Reveal)
+local Unbox = require(Modules.Unbox)
 
 local player = Players.LocalPlayer
 local cam = workspace.CurrentCamera
@@ -25,7 +26,7 @@ for _, app in ipairs({ Lab, Parts, Team, Bank, Social, MailGoals.Mail, MailGoals
 	Shell.register(app)
 end
 Lab.setPlayground(Playground)
-Lab.host = Shell.gui
+Lab.host = Shell.overlay
 Lab.social = Social
 Lab.openReviews = function(name)
 	Social.selectLaunch(name)
@@ -132,15 +133,16 @@ UIS.InputBegan:Connect(function(input, processed)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 		local inst, app = pick()
 		if inst and app == "openbox" then
-			local ok, got = Net.act("openBoxes")
-			if ok then
-				-- pop the box open
+			local ok, items = Net.act("openBoxes")
+			if ok and type(items) == "table" then
 				for _, part in ipairs(inst:GetDescendants()) do
 					if part:IsA("BasePart") then
 						UI.tween(part, 0.35, { Transparency = 1, Size = part.Size * 1.3 })
 					end
 				end
-				Shell.toast("Unpacked: " .. tostring(got), "good")
+				task.spawn(Unbox.play, Shell.overlay, items, function()
+					Shell.toast("Installed! Your GPUs are working.", "good")
+				end)
 			end
 		elseif inst then
 			Shell.openComputer(app ~= "desktop" and app or nil)
@@ -160,6 +162,8 @@ local function totalGpus(s)
 	return n
 end
 local lastBoxes = 0
+local seenChat = -1
+local lastAch: string? = nil
 local knownResearch: { [string]: boolean }? = nil
 local Research = require(game:GetService("ReplicatedStorage").Shared.Research)
 Net.onState(function(s)
@@ -178,6 +182,28 @@ Net.onState(function(s)
 	local room = rooms and rooms:FindFirstChild("Stage" .. s.office)
 	if not room then
 		return
+	end
+	-- someone messaged you
+	local dmCount = 0
+	local lastDm
+	for _, c in ipairs(s.chat) do
+		if c.ch == "dms" then
+			dmCount += 1
+			lastDm = c
+		end
+	end
+	if seenChat >= 0 and dmCount > seenChat and lastDm then
+		Shell.toast(lastDm.from .. ": " .. lastDm.text, "warn")
+	end
+	seenChat = dmCount
+	-- achievement unlocked
+	if s.lastAchievement and s.lastAchievement.id ~= lastAch then
+		if lastAch ~= nil then
+			Shell.toast("ACHIEVEMENT: " .. s.lastAchievement.name .. "  +" .. require(game:GetService("ReplicatedStorage").Shared.Format).money(s.lastAchievement.reward), "good")
+		end
+		lastAch = s.lastAchievement.id
+	elseif lastAch == nil then
+		lastAch = ""
 	end
 	if (s.boxes or 0) > lastBoxes then
 		Shell.toast("A package arrived! Leave the desk and click the box to open it.", "good")

@@ -73,7 +73,7 @@ end
 
 SlotsRF.OnServerInvoke = function(player: Player, action: string, slot: number?, name: string?, location: string?)
 	if action == "list" then
-		return { slots = Saves.listSlots(player.UserId), persistent = Saves.available }
+		return { slots = Saves.listSlots(player.UserId), persistent = Saves.available or RunService:IsStudio() }
 	elseif action == "play" then
 		slot = math.clamp(math.floor(tonumber(slot) or 1), 1, Saves.MAX_SLOTS)
 		if sessions[player] then
@@ -103,7 +103,7 @@ SlotsRF.OnServerInvoke = function(player: Player, action: string, slot: number?,
 		end
 		sessions[player] = { state = state, slot = slot :: number, acc = 0, lastPush = 0, dirty = true, lastSaveMonth = -1 }
 		push(player, sessions[player])
-		return { ok = true, persistent = Saves.available }
+		return { ok = true, persistent = Saves.available or RunService:IsStudio() }
 	elseif action == "delete" then
 		slot = math.clamp(math.floor(tonumber(slot) or 1), 1, Saves.MAX_SLOTS)
 		if sessions[player] and sessions[player].slot == slot then

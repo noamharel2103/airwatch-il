@@ -24,4 +24,7 @@ with open(os.path.join(ROOT, "manifest.json"), "w", encoding="utf-8") as f:
 import shutil
 shutil.copyfile(os.path.join(os.path.dirname(os.path.abspath(__file__)), "sync.luau"), os.path.join(ROOT, "_devsync.txt"))
 shutil.copyfile(os.path.join(os.path.dirname(os.path.abspath(__file__)), "build_world.luau"), os.path.join(ROOT, "_build_world.txt"))
+import time
+with open(os.path.join(ROOT, "_stamp.txt"), "w") as f:
+    f.write(str(time.time()))
 print(len(files), "files")

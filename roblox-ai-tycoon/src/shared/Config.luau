@@ -13,8 +13,8 @@ Config.SPEEDS = { 0, 1, 2, 4 }
 -- Risk multiplier per speed: faster = more can go wrong while you aren't watching.
 Config.RISK_BY_SPEED = { [0] = 0, [1] = 1, [2] = 2.2, [4] = 5 }
 
--- Starting position: a laptop, $30K of savings, and a dream. Loans and investors come later.
-Config.START_CASH = 30e3
+-- Starting position: a laptop, $150K of savings, and a dream. Loans and investors come later.
+Config.START_CASH = 150e3
 Config.START_VALUATION = 0
 Config.START_FOUNDER_EQUITY = 1
 Config.START_CLOUD_CREDITS = 0
@@ -22,7 +22,7 @@ Config.START_CLOUD_CREDITS = 0
 -- Bank loans: credit limit grows with revenue and valuation. Repaid monthly over LOAN_MONTHS.
 Config.LOAN_RATE_YEAR = 0.11
 Config.LOAN_MONTHS = 24
-Config.LOAN_BASE_LIMIT = 60e3
+Config.LOAN_BASE_LIMIT = 150e3
 
 -- Where you start. Perks make each city play a bit differently.
 Config.LOCATIONS = {

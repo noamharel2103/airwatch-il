@@ -68,8 +68,14 @@ function App.mount(ctx, s)
 		for _, w in ipairs(d.why) do
 			UI.label(sc, w, 14, T.sub)
 		end
+		for _, rv in ipairs(d.reviews or {}) do
+			Reveal.review(sc, rv)
+		end
 		for _, h in ipairs(d.press) do
 			Reveal.headline(sc, h)
+		end
+		for _, v in ipairs(d.videos or {}) do
+			Reveal.video(sc, v)
 		end
 		for _, t in ipairs(d.threads) do
 			Reveal.thread(sc, t)

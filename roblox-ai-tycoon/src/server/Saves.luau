@@ -9,11 +9,44 @@ Saves.MAX_SLOTS = 3
 local STORE_NAME = RunService:IsStudio() and "Companies_Studio_v1" or "Companies_v1"
 
 local store: DataStore? = nil
-local memory = {} -- fallback when DataStores are unavailable (unpublished place / API access off)
+-- Fallback when DataStores are unavailable (unpublished place / API access off).
+-- In Studio it talks to tools/save_server.py so playtests keep your companies; otherwise RAM only.
+local Http = game:GetService("HttpService")
+local LOCAL = "http://127.0.0.1:34874/"
+local ram = {}
+local memory = setmetatable({}, {
+	__index = function(_, k)
+		if RunService:IsStudio() then
+			local ok, res = pcall(function()
+				return Http:JSONDecode(Http:GetAsync(LOCAL .. "load/" .. k))
+			end)
+			if ok then
+				return res
+			end
+		end
+		return ram[k]
+	end,
+	__newindex = function(_, k, v)
+		ram[k] = v
+		if RunService:IsStudio() then
+			pcall(function()
+				if v == nil then
+					Http:RequestAsync({ Url = LOCAL .. "save/" .. k, Method = "DELETE" })
+				else
+					Http:PostAsync(LOCAL .. "save/" .. k, Http:JSONEncode(v), Enum.HttpContentType.ApplicationJson)
+				end
+			end)
+		end
+	end,
+})
 local okStore = pcall(function()
 	store = DataStoreService:GetDataStore(STORE_NAME)
 end)
 Saves.available = okStore and store ~= nil
+-- an unpublished place has no DataStores; skip the slow retries and use the local fallback
+if game.GameId == 0 then
+	Saves.available = false
+end
 
 -- Deep copy that drops anything a DataStore cannot hold (functions, Instances, NaN/inf).
 local function clean(v, depth)
@@ -121,6 +154,7 @@ function Saves.delete(userId: number, slot: number)
 		memory[key(userId, slot)] = nil
 		local idx = memory[key(userId)] or {}
 		idx[tostring(slot)] = nil
+		memory[key(userId)] = idx
 		return true
 	end
 	retry(function()

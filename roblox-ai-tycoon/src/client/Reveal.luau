@@ -74,6 +74,30 @@ function R.thread(parent: Instance, t)
 	return c
 end
 
+function R.review(parent: Instance, rv)
+	local c = new("Frame", { BackgroundColor3 = T.panel2, Size = UDim2.new(1, -8, 0, 64), Parent = parent })
+	UI.corner(c, 2)
+	UI.stroke(c, T.line, 3)
+	local col = rv.score >= 7.5 and T.green or (rv.score >= 5 and T.yellow or T.red)
+	local box = new("TextLabel", { Text = string.format("%.1f", rv.score), FontFace = UI.HEAVY, TextSize = 18, TextColor3 = Color3.new(1, 1, 1), TextXAlignment = Enum.TextXAlignment.Center, BackgroundTransparency = 0, BackgroundColor3 = col, Position = UDim2.fromOffset(8, 8), Size = UDim2.fromOffset(64, 48), Parent = c })
+	UI.stroke(box, T.line, 3)
+	new("TextLabel", { Text = string.upper(rv.outlet), FontFace = UI.BOLD, TextSize = 11, TextColor3 = T.sub, BackgroundTransparency = 1, Position = UDim2.fromOffset(84, 8), Size = UDim2.new(1, -92, 0, 16), Parent = c })
+	new("TextLabel", { Text = rv.quote, FontFace = UI.FONT, TextSize = 16, TextColor3 = T.text, BackgroundTransparency = 1, TextWrapped = true, Position = UDim2.fromOffset(84, 26), Size = UDim2.new(1, -92, 0, 34), Parent = c })
+	return c
+end
+
+function R.video(parent: Instance, v)
+	local c = new("Frame", { BackgroundColor3 = T.panel2, Size = UDim2.new(1, -8, 0, 64), Parent = parent })
+	UI.corner(c, 2)
+	UI.stroke(c, T.line, 3)
+	local thumb = new("Frame", { BackgroundColor3 = Color3.fromRGB(230, 40, 50), Position = UDim2.fromOffset(8, 8), Size = UDim2.fromOffset(84, 48), Parent = c })
+	UI.stroke(thumb, T.line, 3)
+	new("TextLabel", { Text = "PLAY", FontFace = UI.BOLD, TextSize = 12, TextColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromScale(1, 1), Parent = thumb })
+	new("TextLabel", { Text = v.title, FontFace = UI.FONT, TextSize = 16, TextColor3 = T.text, BackgroundTransparency = 1, TextWrapped = true, Position = UDim2.fromOffset(104, 6), Size = UDim2.new(1, -112, 0, 34), Parent = c })
+	new("TextLabel", { Text = v.channel .. "  |  " .. Format.count(v.views) .. " views", FontFace = UI.FONT, TextSize = 13, TextColor3 = T.sub, BackgroundTransparency = 1, Position = UDim2.fromOffset(104, 42), Size = UDim2.new(1, -112, 0, 16), Parent = c })
+	return c
+end
+
 function R.play(gui: ScreenGui, result)
 	local o = new("Frame", { BackgroundColor3 = T.bg, BackgroundTransparency = 0, Size = UDim2.fromScale(1, 1), ZIndex = 100, Parent = gui })
 	local function z(x)
@@ -173,6 +197,12 @@ function R.play(gui: ScreenGui, result)
 		for i, t in ipairs(result.threads) do
 			table.insert(side, { kind = "thread", hour = 1 + i * 4, data = t })
 		end
+		for i, rv in ipairs(result.reviews or {}) do
+			table.insert(side, { kind = "review", hour = 6 + i * 5, data = rv })
+		end
+		for i, v in ipairs(result.videos or {}) do
+			table.insert(side, { kind = "video", hour = 10 + i * 7, data = v })
+		end
 		local items = {}
 		for _, p in ipairs(result.posts) do
 			table.insert(items, { kind = "post", hour = p.hour, data = p })
@@ -195,6 +225,12 @@ function R.play(gui: ScreenGui, result)
 				card.LayoutOrder = -math.floor(h * 100)
 			elseif it.kind == "press" then
 				card = R.headline(sideList, it.data)
+				card.LayoutOrder = -math.floor(h * 100)
+			elseif it.kind == "review" then
+				card = R.review(sideList, it.data)
+				card.LayoutOrder = -math.floor(h * 100)
+			elseif it.kind == "video" then
+				card = R.video(sideList, it.data)
 				card.LayoutOrder = -math.floor(h * 100)
 			else
 				card = R.thread(sideList, it.data)

@@ -33,21 +33,25 @@ local function countReviews(name)
 	end
 	for _, f in ipairs(Social.feed) do
 		if f.kind == "launch" and f.data.modelName == name then
-			return #f.data.posts + #f.data.press + #f.data.threads
+			return #f.data.posts + #f.data.press + #f.data.threads + #(f.data.reviews or {}) + #(f.data.videos or {})
 		end
 	end
 	return 0
 end
 
-local function quality(m)
-	if not m.stats then
-		return math.floor(m.cap)
+-- Quality is measured against today's best AI, so it drops as the world gets better.
+local function quality(m, s)
+	local avg = 0
+	if m.stats then
+		for _, st in ipairs(STATS) do
+			if st.id ~= "safety" then
+				avg += m.stats[st.id] / 5
+			end
+		end
+	else
+		avg = m.cap
 	end
-	local s = 0
-	for _, st in ipairs(STATS) do
-		s += m.stats[st.id]
-	end
-	return math.floor(s / #STATS + 0.5)
+	return math.floor(avg / math.max(s.frontier, 1) * 100 + 0.5)
 end
 
 -- ===== launch dialog (3 simple choices) =====
@@ -163,23 +167,23 @@ local function buildModels(body, s)
 	end
 	local status = m.status == "released" and ("LIVE   " .. Format.count(m.users or 0) .. " USERS") or (m.status == "delayed" and "DELAYED" or "NOT LAUNCHED")
 	UI.label(right, m.name, 26, T.accent, { FontFace = UI.HEAVY })
-	UI.label(right, "QUALITY " .. quality(m) .. "      " .. status, 14, m.status == "released" and T.green or T.sub, { FontFace = UI.BOLD, Position = UDim2.fromOffset(0, 44) })
-	local rows = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 88), Size = UDim2.new(1, 0, 0, 6 * 58), Parent = right })
-	UI.list(rows, 12)
+	UI.label(right, "QUALITY " .. quality(m, s) .. "%  OF TODAY'S BEST      " .. status, 14, m.status == "released" and T.green or T.sub, { FontFace = UI.BOLD, Position = UDim2.fromOffset(0, 44) })
+	local rows = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 82), Size = UDim2.new(1, 0, 0, 6 * 46), Parent = right })
+	UI.list(rows, 6)
 	local busy = m.boosting ~= nil
 	for _, st in ipairs(STATS) do
 		local v = m.stats and m.stats[st.id] or 0
 		local picked = table.find(picks, st.id) ~= nil
 		local isTraining = busy and (m.boosting.a == st.id or m.boosting.b == st.id)
-		local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 46), Parent = rows })
+		local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 40), Parent = rows })
 		new("TextLabel", { Text = st.name, FontFace = UI.BOLD, TextSize = 17, TextColor3 = (picked or isTraining) and T.yellow or T.text, Size = UDim2.new(0, 190, 1, 0), Parent = row })
-		local track = new("Frame", { BackgroundColor3 = Color3.fromRGB(18, 22, 40), Position = UDim2.new(0, 200, 0, 8), Size = UDim2.new(1, -440, 0, 30), Parent = row })
+		local track = new("Frame", { BackgroundColor3 = Color3.fromRGB(18, 22, 40), Position = UDim2.new(0, 200, 0, 7), Size = UDim2.new(1, -440, 0, 26), Parent = row })
 		UI.corner(track, 2)
 		UI.stroke(track, T.line, 3)
-		new("Frame", { BackgroundColor3 = st.color, Size = UDim2.fromScale(v / 100, 1), Parent = track })
+		new("Frame", { BackgroundColor3 = st.color, Size = UDim2.fromScale(math.clamp(v / math.max(s.eraCeiling or 100, 1), 0, 1), 1), Parent = track })
 		new("TextLabel", { Text = tostring(v), FontFace = UI.BOLD, TextSize = 14, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Right, Position = UDim2.new(1, -228, 0, 0), Size = UDim2.new(0, 56, 1, 0), Parent = row })
 		UI.button(row, isTraining and "TRAINING" or (picked and "PICKED" or "PICK"), function()
-			if busy or v >= 100 then
+			if busy then
 				return
 			end
 			local idx = table.find(picks, st.id)
@@ -192,10 +196,10 @@ local function buildModels(body, s)
 				picks[2] = st.id
 			end
 			Lab.mount(Lab.ctx, Net.state)
-		end, isTraining and T.purple or (picked and T.yellow or ((busy or v >= 100) and "ghost" or T.green)), { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.fromOffset(160, 46), TextSize = 14 })
+		end, isTraining and T.purple or (picked and T.yellow or (busy and "ghost" or T.green)), { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.fromOffset(150, 40), TextSize = 14 })
 	end
 	-- train line
-	local trainRow = new("Frame", { BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, 88 + 6 * 58 + 4), Size = UDim2.new(1, 0, 0, 56), Parent = right })
+	local trainRow = new("Frame", { BackgroundTransparency = 1, Position = UDim2.new(0, 0, 1, -128), Size = UDim2.new(1, 0, 0, 54), Parent = right })
 	if busy then
 		local total = math.max(1, m.boosting.doneDay - m.boosting.startDay)
 		local frac = math.clamp((s.day - m.boosting.startDay) / total, 0, 1)

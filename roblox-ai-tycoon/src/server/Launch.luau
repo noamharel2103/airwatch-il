@@ -420,6 +420,39 @@ function Launch.run(state, model, opts)
 			end
 		end
 	end
+	-- Critic reviews with scores (out of 10)
+	local OUTLETS = { "TechWire", "The Verge-ish", "AI Weekly", "Silicon Daily", "ModelWatch", "ByteReview" }
+	local GOOD = { "The best {model} moments feel like magic.", "Fast, smart and surprisingly funny.", "{lab} is now a serious player.", "A must-try for developers.", "Quietly excellent." }
+	local MID = { "Good, not great. Wait for the next version.", "Solid basics, nothing new.", "Fine for homework, shaky for work.", "Promising, but {rivalModel} is still ahead." }
+	local BAD = { "Confidently wrong too often.", "Feels a year behind.", "Hard to recommend at this price.", "Skip this one." }
+	local reviews = {}
+	local usedOutlet = {}
+	for _ = 1, 4 do
+		local o = pick(OUTLETS)
+		if not usedOutlet[o] then
+			usedOutlet[o] = true
+			local sc = math.clamp(score / 10 + rng:NextNumber(-1.2, 1.2), 1, 10)
+			local pool = sc >= 7.5 and GOOD or (sc >= 5 and MID or BAD)
+			table.insert(reviews, { outlet = o, score = math.floor(sc * 10) / 10, quote = fill(pick(pool), vars) })
+		end
+	end
+	-- YouTube videos
+	local YT = {
+		{ "{model} is INSANE (I tested it for 24 hours)", 0.9 },
+		{ "I let {model} run my life for a week", 0.8 },
+		{ "{model} vs {rivalModel}: the honest truth", 0.7 },
+		{ "Is {lab} the next OpenAI?", 0.6 },
+		{ "{model} FAILED my test (watch till the end)", 0.4 },
+		{ "Why everyone is wrong about {model}", 0.5 },
+		{ "I built a game with {model} in 10 minutes", 0.8 },
+	}
+	local CHANNELS = { "TechWithTim-ish", "AI Explained-ish", "Fireship-ish", "MKBHD-ish", "Two Minute Papers-ish", "a 14 year old with 3M subs" }
+	local videos = {}
+	for i = 1, math.clamp(math.floor(1 + reach * 2), 1, 4) do
+		local t = YT[rng:NextInteger(1, #YT)]
+		table.insert(videos, { channel = CHANNELS[rng:NextInteger(1, #CHANNELS)], title = fill(t[1], vars), views = math.floor(rng:NextNumber(2e4, 2e6) * reach * t[2] * (score / 60)) })
+	end
+
 	table.sort(posts, function(a, b)
 		return a.hour < b.hour
 	end)
@@ -465,6 +498,8 @@ function Launch.run(state, model, opts)
 		posts = posts,
 		press = press,
 		threads = threads,
+		reviews = reviews,
+		videos = videos,
 		followups = followups,
 		effects = eff,
 		vars = vars,

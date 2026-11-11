@@ -87,7 +87,7 @@ function Game.new(companyName: string, locationId: string?)
 	state.gpus.owned.laptop = 1
 	Game.refreshCandidates(state)
 	local loc = locationOf(state)
-	Game.mail(state, "Welcome", "You, last night", "The plan", "$30K of savings, one gaming laptop, " .. loc.name:lower() .. ". Train a tiny model in the Lab, ship it, get users. The Bank will lend you money, and once people use your AI, investors will call. ChatGPT already exists. GPT-4 lands in March.")
+	Game.mail(state, "Welcome", "You, last night", "The plan", "$150K of savings, one gaming laptop, " .. loc.name:lower() .. ". Train a tiny model in the Lab, ship it, get users. The Bank will lend you money, and once people use your AI, investors will call. ChatGPT already exists. GPT-4 lands in March.")
 	Game.chatMsg(state, "general", "Mom", "Did you quit your job?? Call me.")
 	Game.newGoals(state)
 	Game.advanceWorld(state)
@@ -413,14 +413,15 @@ function Actions.openBoxes(state)
 	if #boxes == 0 then
 		return false, "No packages"
 	end
-	local got = {}
+	local items = {}
 	for _, b in ipairs(boxes) do
+		local h = Hardware.byId[b.id]
 		local bucket = b.kind == "buy" and state.gpus.owned or state.gpus.rented
 		bucket[b.id] = (bucket[b.id] or 0) + b.n
-		table.insert(got, b.n .. "x " .. Hardware.byId[b.id].name)
+		table.insert(items, { name = h.name, n = b.n, power = h.power * b.n, kind = b.kind, vendor = h.vendor })
 	end
 	state.boxes = {}
-	return true, table.concat(got, ", ")
+	return true, items
 end
 
 function Actions.sell(state, id, n)
@@ -518,7 +519,7 @@ Game.STATS = { "coding", "writing", "math", "reasoning", "chat", "safety" }
 function Game.initStats(m)
 	local a = m.abilities or {}
 	local function st(v)
-		return math.clamp(math.floor(v + 0.5), 1, 100)
+		return math.max(1, math.floor(v + 0.5))
 	end
 	m.stats = {
 		coding = st(m.cap + (a.coding or 0) * 1.5),
@@ -529,6 +530,12 @@ function Game.initStats(m)
 		safety = st(20 + (m.flaws.safety or 15) * 1.4),
 	}
 	m.baseCap = m.cap
+	-- each stat can grow ~25-40 points; bigger models have more room
+	m.statMax = {}
+	local room = 22 + math.clamp(math.log(m.size + 1, 2) * 2.2, 0, 22)
+	for k, v in pairs(m.stats) do
+		m.statMax[k] = math.min(100, v + math.floor(room))
+	end
 	local sum = 0
 	for _, k in ipairs(Game.STATS) do
 		sum += m.stats[k]
@@ -617,9 +624,16 @@ function Game.boostCost(state, m)
 	return math.floor(1500 * (1 + m.size) ^ 0.75 * (1 + (year(state) - 2023) * 0.3) / 100) * 100
 end
 
+-- Better GPUs and more infra engineers = faster training.
 function Game.boostDays(state, m)
 	local power = math.max(Game.clusterPower(state), 0.01)
-	return math.clamp(math.ceil(4 * (m.size / 7) ^ 0.6 / power ^ 0.35), 3, 30)
+	local infra = Game.staffEffects(state).infra
+	return math.clamp(math.ceil(6 * (m.size / 7) ^ 0.55 / power ^ 0.5 / (1 + infra * 0.08)), 1, 40)
+end
+
+-- What is possible right now: you can beat today's best models, but not by decades.
+function Game.eraCeiling(state)
+	return math.floor(state.world.frontier + 14)
 end
 
 -- Pick two stats to train.
@@ -633,6 +647,10 @@ function Actions.boost(state, modelId, a, b)
 	end
 	if not (m.stats[a] and m.stats[b]) or a == b then
 		return false, "Pick 2 different stats"
+	end
+	local ceil = Game.eraCeiling(state)
+	if m.stats[a] >= ceil and m.stats[b] >= ceil then
+		return false, "That's the smartest anyone can make a model in " .. year(state) .. ". New breakthroughs raise the limit."
 	end
 	local cost = Game.boostCost(state, m)
 	if state.cash < cost then
@@ -648,11 +666,17 @@ local function finishBoost(state, m)
 	m.boosting = nil
 	local fx = Game.staffEffects(state)
 	local gains = {}
+	local ceil = Game.eraCeiling(state)
+	local power = math.max(Game.clusterPower(state), 0.01)
 	for _, k in ipairs({ bst.a, bst.b }) do
-		local room = 1 - m.stats[k] / 110
-		local g = math.max(1, math.floor((5 + rng:NextNumber(0, 6) + math.log(1 + fx.research) * 1.5) * room + 0.5))
-		m.stats[k] = math.min(100, m.stats[k] + g)
-		table.insert(gains, "+" .. g .. " " .. k:sub(1, 1):upper() .. k:sub(2))
+		-- more GPUs, a better team and a bigger model all give bigger jumps
+		local base = 3 + rng:NextNumber(0, 4) + math.log(1 + power, 2) * 0.8 + math.log(1 + fx.research) * 1.6 + math.log10(1 + m.size) * 1.2
+		-- no hard cap, but going past what is possible this year gets very slow
+		local over = m.stats[k] - ceil
+		local mult = over < -15 and 1 or (over < 0 and math.clamp(-over / 15, 0.35, 1) or 0.12 / (1 + over / 5))
+		local g = math.max(1, math.floor(base * mult + 0.5))
+		m.stats[k] += g
+		table.insert(gains, (g > 0 and ("+" .. g) or "MAXED") .. " " .. k:sub(1, 1):upper() .. k:sub(2))
 	end
 	Game.applyStats(m)
 	state.stats.updates += 1
@@ -1155,6 +1179,176 @@ function Actions.markRead(state, mailId)
 	return true
 end
 
+-- ===== live problems the team fixes by itself =====
+Game.PROBLEMS = {
+	outage = { label = "SERVERS DOWN", fixer = "infra", need = 6, msg = { "Servers are down! Infra team is on it.", "Everything is on fire. Rebooting clusters now." }, done = "Servers are back up." },
+	hack = { label = "WE GOT HACKED", fixer = "safety", need = 8, msg = { "Someone broke into our API keys. Locking everything down.", "Security breach! Rotating every key we have." }, done = "Breach contained. Keys rotated." },
+	jailbreak = { label = "MODEL JAILBROKEN", fixer = "safety", need = 5, msg = { "People found a way to make our model say anything. Patching the filters.", "A jailbreak prompt is going viral. Safety team is on it." }, done = "Jailbreak patched. For now." },
+	bug = { label = "MODEL BUG", fixer = "research", need = 4, msg = { "Our model started answering everything in French. Looking into it.", "The model forgets what you said after 3 messages. Rolling back a layer.", "It thinks every year is 2019. Fixing the date bug.", "It keeps saying As an AI 40 times per answer. On it." }, done = "Bug fixed and shipped." },
+	exploit = { label = "PROMPT INJECTION", fixer = "safety", need = 6, msg = { "Someone tricked our agent into leaking other users chats. Shutting that tool down.", "Hidden text on websites is hijacking our model. Building a filter." }, done = "Exploit closed. Writing a postmortem." },
+	overheat = { label = "GPUS OVERHEATING", fixer = "infra", need = 4, msg = { "GPUs are cooking. Throttling them so they don't melt.", "Server room is 45C. Training slowed down." }, done = "GPUs cooled down. Full speed again." },
+}
+
+function Game.startProblem(state, kind)
+	state.problems = state.problems or {}
+	for _, p in ipairs(state.problems) do
+		if p.kind == kind then
+			return
+		end
+	end
+	local def = Game.PROBLEMS[kind]
+	table.insert(state.problems, { kind = kind, progress = 0 })
+	local names = { infra = "Infra team", safety = "Security team", research = "Research team" }
+	Game.chatMsg(state, def.fixer, names[def.fixer], def.msg[rng:NextInteger(1, #def.msg)])
+	if kind ~= "overheat" then
+		Game.newsItem(state, (kind == "outage" and (state.product.appName .. " is down for millions of users") or (state.company .. " confirms a security breach")), "press")
+	end
+end
+
+-- ===== people who message you =====
+local DMS = {
+	{ from = "Mom", when = function(s) return true end, text = { "Are you eating? You can not train AI on an empty stomach.", "Your aunt asked what you do. I said computers. Was that right?", "I tried your app. It told me I am very smart. I like it." } },
+	{ from = "Old roommate", when = function(s) return true end, text = { "Bro you still doing the AI thing? Can I be employee number 1?", "Saw your company on Reddit. Wild." } },
+	{ from = "Landlord", when = function(s) return s.office <= 2 end, text = { "Why is my electricity bill 4x? What are you running in there?", "The neighbors say your room is humming." } },
+	{ from = "A user", when = function(s) return s.users > 500 end, text = { "Your AI helped me pass my exam. Thank you!!", "Your AI wrote my wedding speech. Everyone cried.", "Why did your AI call my code brave?" } },
+	{ from = "Angry user", when = function(s) return s.users > 2000 end, text = { "Your model refused to help me name my cat. Unsubscribing.", "It made up a law and I almost went to court with it.", "Down AGAIN? I pay 20 dollars for this." } },
+	{ from = "YouTuber (2.1M subs)", when = function(s) return s.users > 20000 end, text = { "Can I get early access for an Is this better than ChatGPT video?", "We tested your model vs 5 others. You placed 3rd. Want to comment?" } },
+	{ from = "Tech reporter", when = function(s) return s.launches > 0 end, text = { "Any comment on the jailbreak rumors?", "Can I get 15 minutes with the founder for a profile piece?", "Is it true you trained on Reddit?" } },
+	{ from = "Recruiter", when = function(s) return s.users > 10000 end, text = { "Three engineers from a big lab want to talk to you.", "A star researcher is open to offers. Expensive though." } },
+	{ from = "Angel investor", when = function(s) return s.valuation > 2e6 end, text = { "Love what you are building. Coffee next week?", "If you ever raise, I want in. Even a small check." } },
+	{ from = "Famous VC", when = function(s) return s.valuation > 1e9 end, text = { "We would like to lead your next round. Name your price.", "Your growth chart made our partners spill their coffee." } },
+	{ from = "Rival CEO", when = function(s) return s.launches > 1 end, text = { "Nice launch. Ours ships Thursday.", "Ever thought about selling? We would pay well.", "We are hiring your team away. Just letting you know." } },
+	{ from = "Government office", when = function(s) return s.users > 1e6 end, text = { "The committee would like you to testify about AI safety.", "We need to discuss your model's election policy." } },
+	{ from = "A head of state", when = function(s) return s.valuation > 2e11 end, text = { "We want your AI in every school in our country.", "Can your model help run our tax office? Asking seriously." } },
+	{ from = "Bank", when = function(s) return s.cash < 5000 end, text = { "Your balance is getting very low.", "Payment failed: GPU rental. Please top up." } },
+}
+
+function Game.tickPeople(state)
+	if state.day % 5 ~= 0 or rng:NextNumber() > 0.75 then
+		return
+	end
+	local pool = {}
+	for _, d in ipairs(DMS) do
+		if d.when(state) then
+			table.insert(pool, d)
+		end
+	end
+	local d = pool[rng:NextInteger(1, #pool)]
+	if d then
+		Game.chatMsg(state, "dms", d.from, d.text[rng:NextInteger(1, #d.text)])
+	end
+end
+
+local function anyModel(s, fn)
+	for _, m in ipairs(s.models) do
+		if fn(m) then
+			return true
+		end
+	end
+	return false
+end
+
+-- ===== achievements =====
+Game.ACHIEVEMENTS = {
+	{ id = "first_model", name = "Hello World", desc = "Train your first model", reward = 5e3, test = function(s) return #s.models >= 1 end },
+	{ id = "first_launch", name = "Shipped It", desc = "Launch a model", reward = 10e3, test = function(s) return s.launches >= 1 end },
+	{ id = "users_1k", name = "First Fans", desc = "1,000 users", reward = 15e3, test = function(s) return s.users >= 1e3 end },
+	{ id = "users_100k", name = "Going Viral", desc = "100,000 users", reward = 150e3, test = function(s) return s.users >= 1e5 end },
+	{ id = "users_10m", name = "Household Name", desc = "10 million users", reward = 5e6, test = function(s) return s.users >= 1e7 end },
+	{ id = "users_500m", name = "Half the Internet", desc = "500 million users", reward = 2e8, test = function(s) return s.users >= 5e8 end },
+	{ id = "beat_35", name = "Better Than GPT-3", desc = "A model with capability 35+", reward = 50e3, test = function(s) return anyModel(s, function(m) return m.cap >= 35 end) end },
+	{ id = "beat_50", name = "GPT-4 Killer", desc = "A model with capability 50+", reward = 2e6, test = function(s) return anyModel(s, function(m) return m.cap >= 50 end) end },
+	{ id = "frontier", name = "Frontier Lab", desc = "Launch a model better than everyone", reward = 5e7, test = function(s) return anyModel(s, function(m) return m.status == "released" and m.cap > s.world.frontier end) end },
+	{ id = "team_10", name = "Real Company", desc = "10 people on the team", reward = 100e3, test = function(s) return Game.headcount(s) >= 10 end },
+	{ id = "team_100", name = "Scale Up", desc = "100 people", reward = 5e6, test = function(s) return Game.headcount(s) >= 100 end },
+	{ id = "gpus_100", name = "GPU Rich", desc = "100 H100s worth of compute", reward = 500e3, test = function(s) return Game.clusterPower(s) >= 100 end },
+	{ id = "gpus_10k", name = "Datacenter", desc = "10,000 H100s worth", reward = 5e7, test = function(s) return Game.clusterPower(s) >= 1e4 end },
+	{ id = "unicorn", name = "Unicorn", desc = "Worth $1 billion", reward = 1e7, test = function(s) return s.valuation >= 1e9 end },
+	{ id = "decacorn", name = "Decacorn", desc = "Worth $10 billion", reward = 5e7, test = function(s) return s.valuation >= 1e10 end },
+	{ id = "trillion", name = "Trillion Club", desc = "Worth $1 trillion", reward = 5e9, test = function(s) return s.valuation >= 1e12 end },
+	{ id = "open", name = "Open Source Hero", desc = "Launch an open weights model", reward = 100e3, test = function(s) return anyModel(s, function(m) return m.open == true end) end },
+	{ id = "acquire", name = "Shark", desc = "Buy a rival lab", reward = 1e8, test = function(s) return next(s.acquired or {}) ~= nil end },
+	{ id = "survivor", name = "Survivor", desc = "Fix 5 disasters", reward = 250e3, test = function(s) return (s.stats.fixed or 0) >= 5 end },
+	{ id = "office", name = "Moving Up", desc = "Move out of your first room", reward = 50e3, test = function(s) return s.office >= 2 end },
+	{ id = "campus", name = "Campus", desc = "Own the final campus", reward = 1e9, test = function(s) return s.office >= 6 end },
+}
+
+function Game.tickAchievements(state)
+	state.achievements = state.achievements or {}
+	for _, a in ipairs(Game.ACHIEVEMENTS) do
+		if not state.achievements[a.id] and a.test(state) then
+			state.achievements[a.id] = state.day
+			state.cash += a.reward
+			Game.chatMsg(state, "general", "Achievement", a.name .. ": " .. a.desc .. ". +" .. Format.money(a.reward))
+			state.lastAchievement = { id = a.id, name = a.name, desc = a.desc, reward = a.reward, day = state.day }
+		end
+	end
+end
+
+local function tickProblems(state, fx)
+	state.problems = state.problems or {}
+	for i = #state.problems, 1, -1 do
+		local p = state.problems[i]
+		local def = Game.PROBLEMS[p.kind]
+		local crew = fx[def.fixer] or 0
+		-- you and your laptop fix it slowly; every engineer helps
+		p.progress += (0.6 + crew * 0.8) / def.need
+		if p.kind == "outage" then
+			state.users *= 0.985
+		elseif p.kind == "hack" or p.kind == "exploit" then
+			state.reputation = math.max(0, state.reputation - 0.4)
+			state.cash -= 50 + state.users * 0.002
+		elseif p.kind == "jailbreak" then
+			state.reputation = math.max(0, state.reputation - 0.25)
+			state.regulator = math.min(100, state.regulator + 0.2)
+		elseif p.kind == "bug" then
+			state.users *= 0.995
+		end
+		if p.progress >= 1 then
+			table.remove(state.problems, i)
+			state.stats.fixed = (state.stats.fixed or 0) + 1
+			local names = { infra = "Infra team", safety = "Security team", research = "Research team" }
+			Game.chatMsg(state, def.fixer, names[def.fixer], def.done)
+		end
+	end
+	-- new problems (more often at high speed, fewer with a good team)
+	local risk = Config.RISK_BY_SPEED[state.speed] or 1
+	if state.users > 2000 and rng:NextNumber() < 0.004 * risk * (1 + math.log10(1 + state.users / 1e4)) / (1 + fx.infra * 0.15) then
+		Game.startProblem(state, "outage")
+	end
+	if state.users > 5000 and rng:NextNumber() < 0.002 * risk / (1 + fx.safety * 0.2) then
+		Game.startProblem(state, "hack")
+	end
+	local t = state.training
+	if t and t.days > 15 and rng:NextNumber() < 0.012 * risk / (1 + fx.infra * 0.2) then
+		Game.startProblem(state, "overheat")
+	end
+	-- live models break in fun ways (weak safety = more jailbreaks)
+	local live = state.product.activeModel and state.models[state.product.activeModel]
+	if live then
+		if rng:NextNumber() < 0.012 * risk * (live.flaws.jailbreak or 0.5) then
+			Game.startProblem(state, "jailbreak")
+			local inc = Launch.incident(state, "JAILBREAK", live.name)
+			table.insert(state.feed, 1, { kind = "incident", data = inc, day = state.day })
+		end
+		if rng:NextNumber() < 0.008 * risk then
+			Game.startProblem(state, "bug")
+		end
+		if (live.features and (live.features.tools or live.features.agents)) and rng:NextNumber() < 0.005 * risk then
+			Game.startProblem(state, "exploit")
+		end
+	end
+end
+
+function Game.hasProblem(state, kind)
+	for _, p in ipairs(state.problems or {}) do
+		if p.kind == kind then
+			return true
+		end
+	end
+	return false
+end
+
 -- ===== incidents & random events =====
 function Game.applyChoice(state, mail, c)
 	local fx = c.fx or {}
@@ -1265,8 +1459,8 @@ local EVENTS = {
 		})
 		return true, "poach", role
 	end },
-	{ id = "outage", w = 2, cond = function(s)
-		return s.users > 5000
+	{ id = "outage", w = 0, cond = function(s)
+		return false
 	end, run = function(s)
 		Game.chatMsg(s, "infra", "Infra", "We are down. Demand spike.")
 		Game.mail(s, "event", "Infra", "Outage", "Inference cluster is overloaded. Rent emergency capacity?", {
@@ -1422,6 +1616,9 @@ function Game.tickDay(state)
 		local power = Game.clusterPower(state)
 		local ctxEval = TM.evaluate(t.recipe, Game.trainCtx(state))
 		local step = power > 0 and (1 / math.max(ctxEval.days, 1)) or 0
+		if Game.hasProblem(state, "overheat") then
+			step *= 0.4
+		end
 		t.progress = math.min(1, t.progress + step)
 		t.elapsed += 1
 		t.daysLeft = (1 - t.progress) / math.max(step, 1e-9)
@@ -1539,6 +1736,9 @@ function Game.tickDay(state)
 	state.credits -= fromCredits
 	local power = Game.ownedKw(state) * 24 * Config.ELECTRICITY_PER_KWH * loc.power
 	local office = Catalog.officeStages[state.office].rent / 30 * loc.rent
+	if Game.hasProblem(state, "outage") then
+		revenue *= 0.2
+	end
 	state.cash += revenue
 	state.month.revenue += revenue
 	spend(state, salaries, "salaries")
@@ -1546,6 +1746,9 @@ function Game.tickDay(state)
 	spend(state, office, "office")
 	spend(state, inference, "inference")
 
+	tickProblems(state, fx)
+	Game.tickPeople(state)
+	Game.tickAchievements(state)
 	randomEvent(state)
 	autoResolve(state)
 
@@ -1677,7 +1880,14 @@ function Game.snapshot(state)
 		training = t and { name = t.name, progress = t.progress, days = t.days, daysLeft = t.daysLeft, losses = t.losses, spikes = t.spikes, cap = t.eval.cap } or nil,
 		awayLog = state.awayLog, stats = state.stats,
 		launchCosts = Game.launchCosts(state), bestPrice = (Launch.rivalBest(state, state.day) or { priceOut = 10 }).priceOut,
-		boxes = #(state.boxes or {}), acquired = state.acquired or {}, location = state.location, loans = state.loans, loanLimit = Game.loanLimit(state), gpuCap = Game.gpuCap(state),
+		achievementList = (function()
+			local out = {}
+			for _, a in ipairs(Game.ACHIEVEMENTS) do
+				table.insert(out, { id = a.id, name = a.name, desc = a.desc, reward = a.reward })
+			end
+			return out
+		end)(),
+		eraCeiling = Game.eraCeiling(state), achievements = state.achievements or {}, lastAchievement = state.lastAchievement, boxes = #(state.boxes or {}), problems = state.problems or {}, acquired = state.acquired or {}, location = state.location, loans = state.loans, loanLimit = Game.loanLimit(state), gpuCap = Game.gpuCap(state),
 	}
 end
 

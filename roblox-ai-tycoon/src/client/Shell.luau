@@ -15,12 +15,20 @@ local player = Players.LocalPlayer
 local gui = new("ScreenGui", { Name = "Game", ResetOnSpawn = false, IgnoreGuiInset = true, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 5, Parent = player:WaitForChild("PlayerGui") })
 Shell.gui = gui
 local scale = new("UIScale", { Parent = gui })
+-- dialogs (chat, launch, unboxing) live in their own layer above the HUD
+local overlay = new("ScreenGui", { Name = "Overlay", ResetOnSpawn = false, IgnoreGuiInset = true, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 50, Parent = player:WaitForChild("PlayerGui") })
+local overlayScale = new("UIScale", { Parent = overlay })
+scale:GetPropertyChangedSignal("Scale"):Connect(function()
+	overlayScale.Scale = scale.Scale
+end)
+Shell.overlay = overlay
 local function rescale()
 	local cam = workspace.CurrentCamera
 	local v = cam and cam.ViewportSize or Vector2.new(1600, 900)
 	scale.Scale = math.clamp(math.min(v.X / 1450, v.Y / 820), 0.6, 1.5)
 end
 rescale()
+overlayScale.Scale = scale.Scale
 workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
 
 -- ===== HUD =====
@@ -46,6 +54,11 @@ UI.skin(topLeft)
 local compL = new("TextLabel", { Text = "", FontFace = UI.BOLD, TextSize = 15, TextColor3 = T.sub, Position = UDim2.fromOffset(18, 10), Size = UDim2.new(1, -36, 0, 18), Parent = topLeft })
 local cashL = new("TextLabel", { Text = "$0", FontFace = UI.HEAVY, TextSize = 30, TextColor3 = T.green, Position = UDim2.fromOffset(18, 30), Size = UDim2.new(1, -36, 0, 34), Parent = topLeft })
 local subL = new("TextLabel", { Text = "", TextSize = 13, TextColor3 = T.sub, Position = UDim2.fromOffset(18, 66), Size = UDim2.new(1, -36, 0, 18), Parent = topLeft })
+
+-- live problems (servers down, hacked...) with the team's fix progress
+local problemBox = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(16, 120), Size = UDim2.fromOffset(360, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = hud })
+UI.list(problemBox, 8)
+local PROBLEM_LABEL = { outage = "SERVERS DOWN", hack = "WE GOT HACKED", overheat = "GPUS OVERHEATING", jailbreak = "MODEL JAILBROKEN", bug = "MODEL BUG", exploit = "PROMPT INJECTION" }
 
 -- training mini status (bottom left)
 local trainMini = new("Frame", { Position = UDim2.new(0, 16, 1, -86), Size = UDim2.fromOffset(300, 70), BackgroundColor3 = T.bg, BackgroundTransparency = 0.12, Visible = false, Parent = hud })
@@ -249,6 +262,15 @@ Net.onState(function(s)
 	warn.Text = s.speed == 4 and "x4: things break faster when you are not watching" or (s.speed == 2 and "x2: a bit riskier" or "")
 	tbName.Text = s.company .. "   " .. Format.money(s.cash)
 	tbClock.Text = Format.date(s.day)
+	UI.clear(problemBox)
+	for _, p in ipairs(s.problems or {}) do
+		local f = new("Frame", { BackgroundColor3 = T.red, Size = UDim2.new(1, 0, 0, 58), Parent = problemBox })
+		UI.corner(f, 2)
+		UI.stroke(f, T.line, 3)
+		new("TextLabel", { Text = PROBLEM_LABEL[p.kind] or p.kind, FontFace = UI.HEAVY, TextSize = 13, TextColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 6), Size = UDim2.new(1, -24, 0, 20), Parent = f })
+		local h = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 32), Size = UDim2.new(1, -24, 0, 14), Parent = f })
+		UI.bar(h, p.progress, T.yellow, 14)
+	end
 	if s.training then
 		trainMini.Visible = true
 		trainL.Text = "Training " .. s.training.name

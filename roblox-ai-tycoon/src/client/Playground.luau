@@ -126,11 +126,23 @@ end
 
 function P.open(body: Instance, m, s)
 	local overlay = new("TextButton", { Text = "", BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.4, Size = UDim2.fromScale(1, 1), ZIndex = 40, Parent = body })
-	local win = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(0.8, 0, 0.92, 0), BackgroundColor3 = Color3.fromRGB(250, 249, 246), ZIndex = 41, Parent = overlay })
+	local win = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(0.8, 0, 0.82, 0), Active = true, BackgroundColor3 = Color3.fromRGB(250, 249, 246), ZIndex = 41, Parent = overlay })
 	UI.corner(win, 16)
 	local top = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 56), ZIndex = 42, Parent = win })
 	new("TextLabel", { Text = (s.product.appName or "Chat") .. "   |   " .. m.name, FontFace = UI.BOLD, TextSize = 18, TextColor3 = Color3.fromRGB(30, 30, 34), Position = UDim2.fromOffset(20, 0), Size = UDim2.new(1, -100, 1, 0), ZIndex = 42, Parent = top })
-	UI.button(top, "Close", function()
+	-- Escape or clicking outside the window also closes it
+	local esc = game:GetService("UserInputService").InputBegan:Connect(function(input)
+		if input.KeyCode == Enum.KeyCode.Escape then
+			overlay:Destroy()
+		end
+	end)
+	overlay.Destroying:Connect(function()
+		esc:Disconnect()
+	end)
+	overlay.MouseButton1Click:Connect(function()
+		overlay:Destroy()
+	end)
+	UI.button(top, "CLOSE", function()
 		overlay:Destroy()
 	end, "ghost", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0), Size = UDim2.fromOffset(80, 34), ZIndex = 43 })
 	local log = UI.scroll(win, { Position = UDim2.fromOffset(20, 60), Size = UDim2.new(1, -40, 1, -200), ZIndex = 42 })

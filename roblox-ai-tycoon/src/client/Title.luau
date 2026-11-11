@@ -60,7 +60,7 @@ function Title.show(gui: ScreenGui, onPlay: () -> ())
 				end
 			end)
 		end
-		UI.label(d, "You start with $30K and a gaming laptop. The bank will lend you a bit more.", 13, T.yellow)
+		UI.label(d, "You start with $150K and a gaming laptop. The bank will lend you a bit more.", 13, T.yellow)
 		local btns = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 48), Parent = d })
 		UI.list(btns, 10, true)
 		UI.button(btns, "Back", function()
@@ -103,7 +103,7 @@ function Title.show(gui: ScreenGui, onPlay: () -> ())
 				end, "ghost", { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -16, 1, -12), Size = UDim2.fromOffset(80, 28), TextSize = 12 })
 			else
 				new("TextLabel", { Text = "+  New company", FontFace = UI.HEAVY, TextSize = 22, TextColor3 = Color3.fromRGB(30, 30, 34), Size = UDim2.new(1, 0, 0, 28), Parent = paper })
-				new("TextLabel", { Text = "Start with a laptop and $30K", TextSize = 14, TextColor3 = Color3.fromRGB(110, 110, 120), Size = UDim2.new(1, 0, 0, 18), Parent = paper })
+				new("TextLabel", { Text = "Start with a laptop and $150K", TextSize = 14, TextColor3 = Color3.fromRGB(110, 110, 120), Size = UDim2.new(1, 0, 0, 18), Parent = paper })
 			end
 			f.MouseButton1Click:Connect(function()
 				if info then
