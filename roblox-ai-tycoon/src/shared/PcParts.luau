@@ -23,20 +23,20 @@ PcParts.list = {
 		{ id = "epyc5", name = "EPYC 9965", price = 14800, year = 2025, speed = 1.24, blurb = "192 cores. Feeds a whole rack of GPUs." },
 	},
 	ram = {
-		{ id = "r16", name = "16GB DDR4", price = 0, year = 2020, speed = 1.0, sticks = 1, blurb = "Chrome already uses all of it." },
-		{ id = "r32", name = "32GB DDR5", price = 110, year = 2023, speed = 1.03, sticks = 2, blurb = "Room to breathe." },
-		{ id = "r64", name = "64GB DDR5", price = 220, year = 2023, speed = 1.06, sticks = 2, blurb = "Load bigger datasets." },
-		{ id = "r128", name = "128GB DDR5", price = 450, year = 2023, speed = 1.09, sticks = 4, blurb = "Never swap to disk again." },
-		{ id = "r256", name = "256GB ECC", price = 1600, year = 2023, speed = 1.12, sticks = 4, blurb = "Server memory. Fixes its own errors." },
-		{ id = "r1t", name = "1TB ECC", price = 7000, year = 2024, speed = 1.16, sticks = 8, blurb = "A terabyte of RAM. Why not." },
+		{ id = "r16", gb = 16, name = "16GB DDR4", price = 0, year = 2020, speed = 1.0, sticks = 1, blurb = "Chrome already uses all of it." },
+		{ id = "r32", gb = 32, name = "32GB DDR5", price = 110, year = 2023, speed = 1.03, sticks = 2, blurb = "Room to breathe." },
+		{ id = "r64", gb = 64, name = "64GB DDR5", price = 220, year = 2023, speed = 1.06, sticks = 2, blurb = "Load bigger datasets." },
+		{ id = "r128", gb = 128, name = "128GB DDR5", price = 450, year = 2023, speed = 1.09, sticks = 4, blurb = "Never swap to disk again." },
+		{ id = "r256", gb = 256, name = "256GB ECC", price = 1600, year = 2023, speed = 1.12, sticks = 4, blurb = "Server memory. Fixes its own errors." },
+		{ id = "r1t", gb = 1024, name = "1TB ECC", price = 7000, year = 2024, speed = 1.16, sticks = 8, blurb = "A terabyte of RAM. Why not." },
 	},
 	cooling = {
-		{ id = "stock", name = "Stock cooler", price = 0, year = 2020, heat = 1.0, kind = "stock", blurb = "Sounds like a jet engine." },
-		{ id = "air", name = "Tower air cooler", price = 90, year = 2023, heat = 0.8, kind = "air", blurb = "Big metal fins and two fans." },
-		{ id = "aio", name = "360mm liquid AIO", price = 180, year = 2023, heat = 0.6, kind = "aio", blurb = "Liquid cooling with a 3 fan radiator." },
-		{ id = "loop", name = "Custom liquid loop", price = 900, year = 2023, heat = 0.42, kind = "loop", blurb = "Hard tubes, glowing coolant, a reservoir." },
-		{ id = "chiller", name = "Rack liquid cooling", price = 12000, year = 2024, heat = 0.3, kind = "loop", blurb = "Direct to chip liquid cooling for the whole rack." },
-		{ id = "immersion", name = "Immersion tank", price = 25000, year = 2024, heat = 0.18, kind = "immersion", blurb = "The whole server sinks into cooling liquid." },
+		{ id = "stock", name = "Stock cooler", cool = 0.3, price = 0, year = 2020, heat = 1.0, kind = "stock", blurb = "Sounds like a jet engine." },
+		{ id = "air", cool = 0.6, name = "Tower air cooler", price = 90, year = 2023, heat = 0.8, kind = "air", blurb = "Big metal fins and two fans." },
+		{ id = "aio", cool = 1.0, name = "360mm liquid AIO", price = 180, year = 2023, heat = 0.6, kind = "aio", blurb = "Liquid cooling with a 3 fan radiator." },
+		{ id = "loop", cool = 2.5, name = "Custom liquid loop", price = 900, year = 2023, heat = 0.42, kind = "loop", blurb = "Hard tubes, glowing coolant, a reservoir." },
+		{ id = "chiller", cool = 40, name = "Rack liquid cooling", price = 12000, year = 2024, heat = 0.3, kind = "loop", blurb = "Direct to chip liquid cooling for the whole rack." },
+		{ id = "immersion", cool = 120, name = "Immersion tank", price = 25000, year = 2024, heat = 0.18, kind = "immersion", blurb = "The whole server sinks into cooling liquid." },
 	},
 	psu = {
 		{ id = "stock", name = "Laptop charger", price = 0, year = 2020, kw = 0, blurb = "Gets very warm." },
@@ -75,6 +75,31 @@ end
 function PcParts.get(pc, cat)
 	pc = pc or PcParts.default()
 	return PcParts.byId[cat][pc[cat]] or PcParts.list[cat][1]
+end
+
+-- You can own many of each part. stock = { ["ram:r128"] = 12, ["cooling:loop"] = 3, ... }
+function PcParts.count(stock, cat, id): number
+	return (stock or {})[cat .. ":" .. id] or 0
+end
+
+-- Totals of everything you own (the free laptop parts always count once)
+function PcParts.totals(stock)
+	local t = { gb = 16, cool = 0.3, kw = 0 }
+	for key, n in pairs(stock or {}) do
+		local cat, id = key:match("^(%w+):(%w+)$")
+		local p = cat and PcParts.byId[cat] and PcParts.byId[cat][id]
+		if p and n > 0 then
+			t.gb += (p.gb or 0) * n
+			t.cool += (p.cool or 0) * n
+			t.kw += (p.kw or 0) * n
+		end
+	end
+	return t
+end
+
+-- Every GPU you own needs RAM next to it and cooling for its heat.
+function PcParts.needs(ownedGpus: number, ownedKw: number)
+	return { gb = 16 + ownedGpus * 48, cool = 0.3 + ownedKw }
 end
 
 function PcParts.speed(pc): number

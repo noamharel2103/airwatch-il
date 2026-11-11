@@ -19,7 +19,19 @@ local function mountComputer(ctx, s)
 	local sc = UI.scroll(ctx.body)
 	UI.list(sc, 10)
 	UI.pad(sc, 0, 0, 10, 8)
-	UI.label(sc, "Upgrade your computer. Better parts train faster, run cooler and look great in your room.", 14, T.sub)
+	UI.label(sc, "Every GPU you own needs RAM next to it and cooling for its heat. Buy as many as you need.", 14, T.sub)
+	local sup = s.pcSupply or { gb = 16, gbNeed = 16, cool = 0.3, coolNeed = 0.3 }
+	local head = UI.card(sc)
+	UI.list(head, 6)
+	local function meter(label, have, need, unit)
+		local ok = have >= need
+		UI.label(head, string.format("%s  %s / %s %s needed%s", label, Format.count(math.floor(have)), Format.count(math.ceil(need)), unit, ok and "" or "   NOT ENOUGH"), 15, ok and T.text or T.red, { FontFace = UI.BOLD })
+		local b = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 12), Parent = head })
+		UI.bar(b, math.min(1, have / math.max(need, 1)), ok and T.green or T.red, 12)
+	end
+	meter("RAM", sup.gb, sup.gbNeed, "GB")
+	meter("COOLING", sup.cool, sup.coolNeed, "kW")
+	UI.label(head, "Too little RAM slows training a lot. Too little cooling means overheating and burned GPUs.", 12, T.dim)
 	for _, cat in ipairs(PcParts.categories) do
 		local cur = PcParts.get(s.pc, cat.id)
 		UI.label(sc, cat.name .. "   (now: " .. cur.name .. ")", 18, T.text, { FontFace = UI.HEAVY })
@@ -39,12 +51,29 @@ local function mountComputer(ctx, s)
 					or part.hype and string.format("+%d hype", part.hype) or ""
 				new("TextLabel", { Text = effect, TextSize = 13, TextColor3 = T.green, BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 20), Size = UDim2.new(1, 0, 0, 16), Parent = c })
 				new("TextLabel", { Text = part.blurb, TextSize = 12, TextColor3 = T.dim, TextWrapped = true, BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 38), Size = UDim2.new(1, 0, 0, 30), TextYAlignment = Enum.TextYAlignment.Top, Parent = c })
-				local label = owned and "INSTALLED" or (soon and ("COMES " .. part.year) or ("Buy " .. Format.money(part.price)))
-				UI.button(c, label, function()
-					if not owned and not soon then
-						Net.act("buyPcPart", cat.id, part.id)
+				local multi = cat.id == "ram" or cat.id == "cooling" or cat.id == "psu" or cat.id == "storage"
+				if multi then
+					local have = PcParts.count(s.pcStock, cat.id, part.id)
+					c.BackgroundColor3 = have > 0 and Color3.fromRGB(40, 90, 70) or T.panel2
+					local row = new("Frame", { BackgroundTransparency = 1, Position = UDim2.new(0, 0, 1, -32), Size = UDim2.new(1, 0, 0, 32), Parent = c })
+					UI.list(row, 6, true)
+					if soon then
+						UI.button(row, "COMES " .. part.year, nil, "ghost", { Size = UDim2.new(1, 0, 1, 0) })
+					else
+						for _, q in ipairs({ 1, 10, 100 }) do
+							UI.button(row, (q == 1 and ("x" .. have .. "  +1 ") or ("+" .. q .. " ")) .. Format.money(part.price * q), function()
+								Net.act("buyPcPart", cat.id, part.id, q)
+							end, s.cash >= part.price * q and "success" or "ghost", { Size = UDim2.new(q == 1 and 0.4 or 0.3, -4, 1, 0), TextSize = 9 })
+						end
 					end
-				end, (owned or soon or s.cash < part.price) and "ghost" or "success", { Position = UDim2.new(0, 0, 1, -32), Size = UDim2.new(1, 0, 0, 32) })
+				else
+					local label = owned and "INSTALLED" or (soon and ("COMES " .. part.year) or ("Buy " .. Format.money(part.price)))
+					UI.button(c, label, function()
+						if not owned and not soon then
+							Net.act("buyPcPart", cat.id, part.id)
+						end
+					end, (owned or soon or s.cash < part.price) and "ghost" or "success", { Position = UDim2.new(0, 0, 1, -32), Size = UDim2.new(1, 0, 0, 32) })
+				end
 			end
 		end
 	end
@@ -146,6 +175,9 @@ function App.key(s)
 	local k = mode .. tostring(s.year) .. math.floor(s.clusterPower * 10) .. math.floor(math.log10(math.max(s.cash, 1)) * 3) .. (s.gpuSlots or 0) .. (s.gpuUsed or 0)
 	for cat, id in pairs(s.pc or {}) do
 		k ..= cat .. id
+	end
+	for key, n in pairs(s.pcStock or {}) do
+		k ..= key .. n
 	end
 	for id, n in pairs(s.gpus.owned) do
 		k ..= id .. n

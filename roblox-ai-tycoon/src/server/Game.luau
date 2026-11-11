@@ -207,7 +207,7 @@ function Game.gpuSlots(state): number
 end
 
 function Game.kwCap(state): number
-	local kw = Catalog.officeStages[state.office].kw + PcParts.kw(state.pc)
+	local kw = Catalog.officeStages[state.office].kw + PcParts.totals(state.pcStock).kw
 	for id, c in pairs(state.storage or {}) do
 		kw += Catalog.storageById[id].kw * c
 	end
@@ -648,30 +648,78 @@ function Actions.removePcPart(state, cat)
 	end
 	local back = math.floor(cur.price * 0.4)
 	state.cash += back
-	state.pc[cat] = PcParts.list[cat][1].id
+	state.pcStock = state.pcStock or {}
+	local key = cat .. ":" .. cur.id
+	if (state.pcStock[key] or 0) > 1 then
+		state.pcStock[key] -= 1
+	else
+		state.pcStock[key] = nil
+		state.pc[cat] = PcParts.list[cat][1].id
+	end
 	Game.chatMsg(state, "infra", "Infra", "Took out the " .. cur.name .. " and sold it for " .. Format.money(back) .. ".")
 	return true
 end
 
-function Actions.buyPcPart(state, cat, id)
+-- RAM and cooling you have vs what your own GPUs need
+function Game.pcSupply(state)
+	if not state.pcStock then
+		-- older saves: count each installed part once
+		state.pcStock = {}
+		for _, cat in ipairs({ "ram", "cooling", "psu", "storage" }) do
+			local id = state.pc and state.pc[cat]
+			if id and PcParts.byId[cat][id] and PcParts.byId[cat][id].tier > 1 then
+				state.pcStock[cat .. ":" .. id] = 1
+			end
+		end
+	end
+	local n = 0
+	for id, c in pairs(state.gpus.owned) do
+		if id ~= "laptop" then
+			n += c
+		end
+	end
+	local have = PcParts.totals(state.pcStock)
+	local need = PcParts.needs(n, Game.ownedKw(state))
+	return have, need
+end
+
+-- not enough RAM = slower training; not enough cooling = more heat problems
+function Game.pcFactors(state)
+	local have, need = Game.pcSupply(state)
+	local ram = math.clamp(have.gb / math.max(need.gb, 1), 0.35, 1)
+	local cool = math.clamp(need.cool / math.max(have.cool, 0.1), 0.3, 4)
+	return ram, cool
+end
+
+function Actions.buyPcPart(state, cat, id, n)
 	local part = PcParts.byId[cat] and PcParts.byId[cat][id]
 	if not part then
 		return false, "Unknown part"
 	end
+	n = math.clamp(math.floor(tonumber(n) or 1), 1, 10000)
 	state.pc = state.pc or PcParts.default()
-	if state.pc[cat] == id then
+	state.pcStock = state.pcStock or {}
+	local multi = cat == "ram" or cat == "cooling" or cat == "psu" or cat == "storage"
+	if not multi and state.pc[cat] == id then
 		return false, "Already installed"
 	end
 	if year(state) < part.year then
 		return false, part.name .. " comes out in " .. part.year
 	end
-	if state.cash < part.price then
-		return false, "Not enough cash"
+	local cost = part.price * (multi and n or 1)
+	if state.cash < cost then
+		return false, "Not enough cash (" .. Format.money(cost) .. ")"
 	end
-	state.cash -= part.price
-	state.month.costs += part.price
-	state.month.compute += part.price
-	state.pc[cat] = id
+	state.cash -= cost
+	state.month.costs += cost
+	state.month.compute += cost
+	if multi then
+		local key = cat .. ":" .. id
+		state.pcStock[key] = (state.pcStock[key] or 0) + n
+	end
+	if (PcParts.byId[cat][state.pc[cat]] or PcParts.list[cat][1]).tier < part.tier then
+		state.pc[cat] = id
+	end
 	if part.hype and part.hype > 0 then
 		state.hype = math.min(100, state.hype + part.hype)
 	end
@@ -1068,7 +1116,8 @@ end
 function Game.boostDays(state, m)
 	local power = math.max(Game.clusterPower(state), 0.01)
 	local infra = Game.staffEffects(state).infra
-	local pcSpeed = PcParts.speed(state.pc) * Decor.speed(state.decor)
+	local ramF = Game.pcFactors(state)
+	local pcSpeed = PcParts.get(state.pc, "cpu").speed * PcParts.get(state.pc, "storage").speed * ramF * Decor.speed(state.decor)
 	return math.clamp(math.ceil(6 * (m.size / 7) ^ 0.55 / power ^ 0.5 / (1 + infra * 0.08) / pcSpeed), 1, 40)
 end
 
@@ -1127,7 +1176,7 @@ local function finishBoost(state, m)
 	Game.applyStats(m)
 	-- pushing GPUs this hard can fry some of them
 	local fx2 = Game.staffEffects(state)
-	if rng:NextNumber() < 0.18 * (1 + avgStat(m) / 60) / (1 + fx2.infra * 0.2) * PcParts.heat(state.pc) then
+	if rng:NextNumber() < 0.18 * (1 + avgStat(m) / 60) / (1 + fx2.infra * 0.2) * select(2, Game.pcFactors(state)) * 0.5 then
 		local best, bestN, bucket
 		for _, b in ipairs({ state.gpus.owned, state.gpus.rented }) do
 			for id, n in pairs(b) do
@@ -2256,7 +2305,7 @@ local function tickProblems(state, fx)
 		Game.startProblem(state, "hack")
 	end
 	local t = state.training
-	if t and t.days > 15 and rng:NextNumber() < 0.012 * risk / (1 + fx.infra * 0.2) * PcParts.heat(state.pc) then
+	if t and t.days > 15 and rng:NextNumber() < 0.012 * risk / (1 + fx.infra * 0.2) * select(2, Game.pcFactors(state)) * 0.5 then
 		Game.startProblem(state, "overheat")
 	end
 	-- live models break in fun ways (weak safety = more jailbreaks)
@@ -2889,7 +2938,10 @@ function Game.snapshot(state)
 			end
 			return out
 		end)(),
-		pc = state.pc or PcParts.default(), decor = state.decor or {}, storage = state.storage or {}, gpuSlots = Game.gpuSlots(state), gpuUsed = Game.gpuUsed(state), kwCap = Game.kwCap(state),
+		pc = state.pc or PcParts.default(), pcStock = state.pcStock or {}, pcSupply = (function()
+			local have, need = Game.pcSupply(state)
+			return { gb = have.gb, gbNeed = need.gb, cool = have.cool, coolNeed = need.cool }
+		end)(), decor = state.decor or {}, storage = state.storage or {}, gpuSlots = Game.gpuSlots(state), gpuUsed = Game.gpuUsed(state), kwCap = Game.kwCap(state),
 		offers = state.offers or {}, cooldowns = state.cooldowns or {}, meeting = state.meeting, loanRate = Game.loanRate(state, 1e6),
 		misuse = state.misuse or 0, resetReady = state.resetReady or 0, resetMoment = (function()
 			local live = state.product.activeModel and state.models[state.product.activeModel]
