@@ -1,6 +1,7 @@
 --!strict
 -- Tiny UI kit: theme + builders. Modern dark glass look. No emoji anywhere: icons are drawn.
 local TweenService = game:GetService("TweenService")
+local Assets = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Assets"))
 local UI = {}
 
 -- Blocky retro OS look (Roblox style): navy panels, cyan/green chunky buttons, pixel font.
@@ -122,11 +123,33 @@ function UI.label(parent: Instance, text: string, size: number?, color: Color3?,
 	return l
 end
 
+-- Put our drawn 9-slice panel behind a frame's children (ZIndex 0 keeps it under them).
+function UI.skin(frame: GuiObject, color: Color3?)
+	frame.BackgroundTransparency = 1
+	local img = new("ImageLabel", {
+		Name = "Skin",
+		BackgroundTransparency = 1,
+		Image = Assets.panel,
+		ImageColor3 = color or Color3.new(1, 1, 1),
+		ScaleType = Enum.ScaleType.Slice,
+		SliceCenter = Rect.new(40, 40, 216, 200),
+		SliceScale = 0.45,
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = 0,
+		Parent = frame,
+	})
+	for _, c in ipairs(frame:GetChildren()) do
+		if c:IsA("UIStroke") then
+			c:Destroy()
+		end
+	end
+	return img
+end
+
 function UI.card(parent: Instance, props: { [string]: any }?)
 	local f = new("Frame", { BackgroundColor3 = T.panel2, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = parent })
-	UI.corner(f, 12)
-	UI.stroke(f, T.line, 3)
-	UI.pad(f, 12, 14)
+	UI.pad(f, 14, 16)
+	UI.skin(f, Color3.fromRGB(236, 244, 255))
 	for k, v in pairs(props or {}) do
 		(f :: any)[k] = v
 	end
@@ -164,6 +187,8 @@ function UI.button(parent: Instance, text: string, onClick: (() -> ())?, kind: a
 	new("UIStroke", { Color = Color3.fromRGB(20, 26, 48), Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = b })
 	local textStroke = new("UIStroke", { Color = color:Lerp(Color3.new(0, 0, 0), 0.6), Thickness = 1.2, ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual, Parent = b })
 	textStroke.Enabled = false
+	new("Frame", { Name = "Shade", BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.78, Size = UDim2.new(1, 0, 0, 6), Position = UDim2.new(0, 0, 1, -6), Parent = b })
+	new("Frame", { Name = "Shine", BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.6, Size = UDim2.new(1, -16, 0, 3), Position = UDim2.fromOffset(8, 4), Parent = b })
 	local busy = false
 	local applied: Color3? = nil
 	local function setColor(c)
@@ -233,8 +258,17 @@ function UI.scroll(parent: Instance, props: { [string]: any }?)
 	return s
 end
 
--- Drawn icon tile: rounded square with gradient and a glyph made of frames.
+-- Icon: the drawn PNG from our art set (fallback: glyph tile below).
 function UI.icon(parent: Instance, kind: string, color: Color3, size: number)
+	if Assets.icons[kind] then
+		local holder = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(size, size), Parent = parent })
+		new("ImageLabel", { Name = "Img", BackgroundTransparency = 1, Image = Assets.icons[kind], Size = UDim2.fromScale(1, 1), Parent = holder })
+		return holder
+	end
+	return UI.glyphIcon(parent, kind, color, size)
+end
+
+function UI.glyphIcon(parent: Instance, kind: string, color: Color3, size: number)
 	local tile = new("Frame", { Size = UDim2.fromOffset(size, size), BackgroundColor3 = color, Parent = parent })
 	UI.corner(tile, math.floor(size * 0.24))
 	UI.grad(tile, color:Lerp(Color3.new(1, 1, 1), 0.18), color:Lerp(Color3.new(0, 0, 0), 0.2), 90)

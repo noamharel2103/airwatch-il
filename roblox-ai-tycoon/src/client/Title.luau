@@ -13,21 +13,23 @@ local Title = {}
 
 function Title.show(gui: ScreenGui, onPlay: () -> ())
 	local o = new("Frame", { Name = "Title", BackgroundColor3 = Color3.fromRGB(12, 14, 20), Size = UDim2.fromScale(1, 1), ZIndex = 200, Parent = gui })
-	UI.grad(o, Color3.fromRGB(150, 220, 255), Color3.fromRGB(80, 160, 250), 110)
+	local Assets = require(RS.Shared.Assets)
+	new("ImageLabel", { Name = "Bg", BackgroundTransparency = 1, Image = Assets.titleBg, ScaleType = Enum.ScaleType.Crop, Size = UDim2.fromScale(1, 1), ZIndex = 200, Parent = o })
 	local function z()
 		for _, d in ipairs(o:GetDescendants()) do
-			if d:IsA("GuiObject") then
+			if d:IsA("GuiObject") and d.Name ~= "Bg" then
 				d.ZIndex = 201
 			end
 		end
 	end
 	local logo = new("TextLabel", { Text = Config.GAME_TITLE, FontFace = UI.HEAVY, TextSize = 96, TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 90), Size = UDim2.fromOffset(1000, 110), Parent = o })
-	UI.stroke(logo, Color3.fromRGB(28, 36, 64), 4)
+	new("UIStroke", { Color = Color3.fromRGB(28, 36, 64), Thickness = 5, ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual, Parent = logo })
 	logo.TextColor3 = Color3.fromRGB(255, 210, 40)
 	new("TextLabel", { Text = "Build an AI lab from a laptop to the biggest company on Earth. Starts January 2023.", TextSize = 18, TextColor3 = Color3.new(1, 1, 1), TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 200), Size = UDim2.fromOffset(1000, 24), Parent = o })
 	local row = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 280), Size = UDim2.fromOffset(1080, 320), Parent = o })
 	UI.list(row, 30, true, Enum.HorizontalAlignment.Center)
-	local status = new("TextLabel", { Text = "Loading your companies...", TextSize = 14, TextColor3 = T.dim, TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -30), Size = UDim2.fromOffset(900, 20), Parent = o })
+	local status = new("TextLabel", { Text = "Loading your companies...", TextSize = 14, TextColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.25, BackgroundColor3 = Color3.fromRGB(28, 36, 64), TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 620), Size = UDim2.fromOffset(760, 30), Parent = o })
+	UI.corner(status, 10)
 	z()
 
 	local function newCompanyDialog(slot)
@@ -83,6 +85,7 @@ function Title.show(gui: ScreenGui, onPlay: () -> ())
 			local info = slots[tostring(slot)]
 			local f = new("TextButton", { Text = "", BackgroundColor3 = Color3.fromRGB(232, 205, 150), Size = UDim2.fromOffset(330, 240), Parent = row })
 			UI.corner(f, 14)
+			UI.stroke(f, Color3.fromRGB(28, 36, 64), 4)
 			local tab = new("Frame", { BackgroundColor3 = Color3.fromRGB(232, 205, 150), Position = UDim2.fromOffset(180, -22), Size = UDim2.fromOffset(120, 30), Parent = f })
 			UI.corner(tab, 10)
 			local paper = new("Frame", { BackgroundColor3 = Color3.fromRGB(248, 246, 240), Position = UDim2.fromOffset(24, 70), Size = UDim2.new(1, -48, 0, 120), Parent = f })

@@ -27,8 +27,7 @@ workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale
 local hud = new("Frame", { Name = "HUD", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 60, Parent = gui })
 Shell.hud = hud
 local topRight = new("Frame", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, 14), Size = UDim2.fromOffset(330, 96), BackgroundColor3 = T.bg, BackgroundTransparency = 0.12, Parent = hud })
-UI.corner(topRight, 16)
-UI.stroke(topRight, Color3.fromRGB(10, 12, 22), 3)
+UI.skin(topRight)
 local dateL = new("TextLabel", { Text = "Jan 1, 2023", FontFace = UI.HEAVY, TextSize = 26, Position = UDim2.fromOffset(18, 10), Size = UDim2.new(1, -36, 0, 30), TextXAlignment = Enum.TextXAlignment.Right, Parent = topRight })
 local speedRow = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(14, 50), Size = UDim2.new(1, -28, 0, 34), Parent = topRight })
 UI.list(speedRow, 6, true, Enum.HorizontalAlignment.Right)
@@ -43,8 +42,7 @@ end
 local warn = new("TextLabel", { Text = "", TextSize = 12, TextColor3 = T.yellow, Position = UDim2.new(0, 0, 1, 4), Size = UDim2.new(1, 0, 0, 16), TextXAlignment = Enum.TextXAlignment.Right, Parent = topRight })
 
 local topLeft = new("Frame", { Position = UDim2.fromOffset(16, 14), Size = UDim2.fromOffset(300, 96), BackgroundColor3 = T.bg, BackgroundTransparency = 0.12, Parent = hud })
-UI.corner(topLeft, 16)
-UI.stroke(topLeft, Color3.fromRGB(10, 12, 22), 3)
+UI.skin(topLeft)
 local compL = new("TextLabel", { Text = "", FontFace = UI.BOLD, TextSize = 15, TextColor3 = T.sub, Position = UDim2.fromOffset(18, 10), Size = UDim2.new(1, -36, 0, 18), Parent = topLeft })
 local cashL = new("TextLabel", { Text = "$0", FontFace = UI.HEAVY, TextSize = 30, TextColor3 = T.green, Position = UDim2.fromOffset(18, 30), Size = UDim2.new(1, -36, 0, 34), Parent = topLeft })
 local subL = new("TextLabel", { Text = "", TextSize = 13, TextColor3 = T.sub, Position = UDim2.fromOffset(18, 66), Size = UDim2.new(1, -36, 0, 18), Parent = topLeft })
@@ -114,9 +112,8 @@ function Shell.register(app)
 	apps[app.id] = app
 	table.insert(order, app.id)
 	local btn = new("TextButton", { Text = "", BackgroundTransparency = 1, LayoutOrder = #order, ZIndex = 12, Parent = desk })
-	local ic = UI.icon(btn, app.icon, app.color, 72)
-	UI.stroke(ic, Color3.fromRGB(10, 12, 22), 3)
-	ic.Position = UDim2.fromOffset(16, 4)
+	local ic = UI.icon(btn, app.icon, app.color, 80)
+	ic.Position = UDim2.fromOffset(12, 0)
 	ic.ZIndex = 12
 	for _, d in ipairs(ic:GetDescendants()) do
 		if d:IsA("GuiObject") then
