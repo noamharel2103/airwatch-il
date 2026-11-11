@@ -82,9 +82,9 @@ end
 Net.setToast(Shell.toast)
 
 -- ===== Computer =====
-local comp = new("Frame", { Name = "Computer", BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.5, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 10, Parent = gui })
+local comp = new("Frame", { Name = "Computer", BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 10, Parent = gui })
 Shell.computer = comp
-local screen = new("Frame", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -14), Size = UDim2.new(1, -28, 1, -134), BackgroundColor3 = Color3.fromRGB(20, 28, 52), ZIndex = 10, Parent = comp })
+local screen = new("Frame", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -24), Size = UDim2.new(0.84, 0, 1, -150), BackgroundColor3 = Color3.fromRGB(20, 28, 52), ZIndex = 10, Parent = comp })
 UI.corner(screen, 22)
 UI.grad(screen, Color3.fromRGB(120, 190, 250), Color3.fromRGB(80, 150, 235), 90)
 -- blocky city skyline wallpaper
@@ -134,8 +134,7 @@ local function buildWindow(app)
 		appWindow:Destroy()
 	end
 	local w = new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 16), Size = UDim2.new(1, -32, 1, -96), BackgroundColor3 = T.bg, BackgroundTransparency = 0, ZIndex = 20, Parent = winLayer })
-	UI.corner(w, 18)
-	UI.stroke(w, Color3.fromRGB(10, 12, 22), 4)
+	UI.skin(w, T.bg)
 	local bar = new("Frame", { Size = UDim2.new(1, 0, 0, 56), BackgroundColor3 = T.accent, ZIndex = 21, Parent = w })
 	UI.grad(bar, Color3.fromRGB(60, 200, 255), Color3.fromRGB(0, 120, 210), 0)
 	UI.corner(bar, 3)
@@ -187,8 +186,8 @@ end
 function Shell.openComputer(appId: string?)
 	comp.Visible = true
 	hud.Visible = true
-	screen.Size = UDim2.new(1, -100, 1, -200)
-	UI.tween(screen, 0.25, { Size = UDim2.new(1, -28, 1, -134) })
+	screen.Size = UDim2.new(0.8, 0, 1, -190)
+	UI.tween(screen, 0.2, { Size = UDim2.new(0.84, 0, 1, -150) })
 	hint.Visible = false
 	if appId then
 		Shell.open(appId)

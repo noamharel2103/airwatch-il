@@ -5,6 +5,7 @@ return {
 	button = "rbxassetid://74762767240407", -- white 9-slice, tint with ImageColor3
 	panel = "rbxassetid://80425177274191", -- white 9-slice, tint with ImageColor3
 	titleBg = "rbxassetid://71115126259898",
+	studs = "rbxassetid://94493254412370", -- tile, white low alpha
 	icons = {
 		lab = "rbxassetid://110952761663378",
 		parts = "rbxassetid://86518476759580",

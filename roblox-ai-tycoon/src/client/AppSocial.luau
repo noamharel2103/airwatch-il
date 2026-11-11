@@ -18,6 +18,15 @@ function App.add(kind, data, day)
 	selected = 1
 end
 
+function App.selectLaunch(name)
+	for i, f in ipairs(App.feed) do
+		if f.kind == "launch" and f.data.modelName == name then
+			selected = i
+			return
+		end
+	end
+end
+
 function App.mount(ctx, s)
 	if not s then
 		return

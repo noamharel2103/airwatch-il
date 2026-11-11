@@ -21,7 +21,7 @@ R.PLATFORM = PLATFORM
 -- A social post card. Used here and in the Social app.
 function R.postCard(parent: Instance, p, animate: boolean?)
 	local plat = PLATFORM[p.platform] or PLATFORM.x
-	local c = new("Frame", { BackgroundColor3 = p.official and Color3.fromRGB(220, 236, 255) or T.panel2, Size = UDim2.new(1, -8, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = parent })
+	local c = new("Frame", { BackgroundColor3 = p.official and Color3.fromRGB(20, 70, 120) or T.panel2, Size = UDim2.new(1, -8, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = parent })
 	UI.corner(c, 12)
 	UI.pad(c, 10, 14)
 	UI.list(c, 4)
@@ -75,7 +75,7 @@ function R.thread(parent: Instance, t)
 end
 
 function R.play(gui: ScreenGui, result)
-	local o = new("Frame", { BackgroundColor3 = Color3.fromRGB(235, 246, 255), BackgroundTransparency = 0, Size = UDim2.fromScale(1, 1), ZIndex = 100, Parent = gui })
+	local o = new("Frame", { BackgroundColor3 = T.bg, BackgroundTransparency = 0, Size = UDim2.fromScale(1, 1), ZIndex = 100, Parent = gui })
 	local function z(x)
 		for _, d in ipairs(x:GetDescendants()) do
 			if d:IsA("GuiObject") then

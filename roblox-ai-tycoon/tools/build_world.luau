@@ -163,7 +163,7 @@ local function goalsBoard(parent, cf, w, h)
 	local b = p(m, "GoalsBoard", Vector3.new(w, h, 0.3), cf * CFrame.new(0, 0, 0.05), rgb(150, 112, 74), M.Fabric)
 	local g = Instance.new("SurfaceGui")
 	g.Name = "Goals"
-	g.Face = Enum.NormalId.Front
+	g.Face = Enum.NormalId.Back
 	g.CanvasSize = Vector2.new(640, 420)
 	g.LightInfluence = 0.5
 	g.Parent = b
@@ -218,7 +218,42 @@ local function shell(stage, origin, w, d, h, floorCol, floorMat, wallCol, opts)
 		light(lamp, "PointLight", { Brightness = 1.1, Range = math.max(18, w * 0.5), Color = rgb(255, 230, 200), Shadows = true })
 	end
 	-- camera: front, a bit high, looking slightly down and left into the room
-	room:SetAttribute("CameraCFrame", CFrame.lookAt(origin + Vector3.new(w * 0.18, h * 1.25, d * 0.95 + 8), origin + Vector3.new(-w * 0.04, h * 0.25, -d * 0.12)))
+	room:SetAttribute("CameraCFrame", CFrame.lookAt(origin + Vector3.new(w * 0.12, h * 0.95, d * 0.55 + 6), origin + Vector3.new(-w * 0.03, h * 0.28, -d * 0.18)))
+	-- stage backdrop so there is no empty sky around the room
+	p(room, "BackdropWall", Vector3.new(w * 4, h * 4, 2), c * CFrame.new(0, h, -d / 2 - 14), rgb(34, 40, 72), M.SmoothPlastic)
+	p(room, "BackdropFloor", Vector3.new(w * 4, 2, d * 4), c * CFrame.new(0, -6, 0), rgb(26, 30, 56), M.SmoothPlastic)
+	-- delivery box (hidden until you buy parts; click to open)
+	local box = model(room, "DeliveryBox", "openbox", "OPEN the package")
+	local bx = c * CFrame.new(w * 0.18, 0, d * 0.22)
+	local function bp(name, size, cf, col)
+		local part = p(box, name, size, cf, col, M.Cardboard)
+		part.Transparency = 1
+		part.CanQuery = false
+		return part
+	end
+	bp("Box", Vector3.new(4, 3, 3.4), bx * CFrame.new(0, 1.5, 0), rgb(196, 150, 96))
+	bp("Tape", Vector3.new(0.7, 0.06, 3.5), bx * CFrame.new(0, 3.03, 0), rgb(230, 210, 150))
+	bp("Lid", Vector3.new(4.1, 0.25, 3.5), bx * CFrame.new(0, 3, 0), rgb(176, 132, 82))
+	local tag = Instance.new("BillboardGui")
+	tag.Name = "Tag"
+	tag.Size = UDim2.fromOffset(140, 44)
+	tag.StudsOffset = Vector3.new(0, 3.2, 0)
+	tag.AlwaysOnTop = true
+	tag.Enabled = false
+	tag.Parent = box:FindFirstChild("Box")
+	local tl = Instance.new("TextLabel")
+	tl.Size = UDim2.fromScale(1, 1)
+	tl.BackgroundColor3 = rgb(0, 215, 105)
+	tl.BorderSizePixel = 0
+	tl.Text = "OPEN"
+	tl.TextColor3 = rgb(255, 255, 255)
+	tl.TextScaled = true
+	tl.Font = Enum.Font.Arcade
+	tl.Parent = tag
+	local st = Instance.new("UIStroke")
+	st.Thickness = 3
+	st.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	st.Parent = tl
 	local cam = p(room, "CameraAnchor", Vector3.new(1, 1, 1), CFrame.lookAt(origin + Vector3.new(w * 0.18, h * 1.25, d * 0.95 + 8), origin + Vector3.new(-w * 0.04, h * 0.25, -d * 0.12)), rgb(255, 0, 0), M.SmoothPlastic, { Transparency = 1, CanCollide = false, CanQuery = false })
 	return room, c
 end

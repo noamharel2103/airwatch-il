@@ -151,7 +151,14 @@ def title_bg():
         b += f'<rect x="{sx+30}" y="1030" width="60" height="12" rx="6" fill="#FFC21A"/>'
     return svg(1920, 1080, b)
 
+# ---------- stud tile (Roblox brick pattern), white with low alpha: overlay on any colour ----------
+def studs():
+    b = '<rect x="10" y="10" width="44" height="44" rx="3" fill="none" stroke="#FFFFFF" stroke-opacity="0.10" stroke-width="5"/>'
+    b += '<rect x="20" y="20" width="24" height="24" rx="2" fill="#000000" fill-opacity="0.10"/>'
+    return svg(64, 64, b)
+
 ASSETS = {
+    "ui_studs": studs,
     "ui_button": button, "ui_panel": panel,
     "icon_lab": icon_lab, "icon_parts": icon_parts, "icon_team": icon_team, "icon_bank": icon_bank,
     "icon_social": icon_social, "icon_mail": icon_mail, "icon_goals": icon_goals, "icon_company": icon_company,

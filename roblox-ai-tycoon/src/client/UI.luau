@@ -7,15 +7,15 @@ local UI = {}
 -- Blocky retro OS look (Roblox style): navy panels, cyan/green chunky buttons, pixel font.
 -- Bright cartoon theme: white/sky panels, saturated blue/green/yellow/red, thick dark outlines.
 UI.T = {
-	bg = Color3.fromRGB(176, 206, 242),
-	panel = Color3.fromRGB(150, 188, 236),
-	panel2 = Color3.fromRGB(205, 225, 250),
-	line = Color3.fromRGB(28, 36, 64),
-	text = Color3.fromRGB(28, 36, 64),
-	sub = Color3.fromRGB(80, 96, 140),
-	dim = Color3.fromRGB(140, 152, 185),
-	accent = Color3.fromRGB(40, 140, 255),
-	green = Color3.fromRGB(40, 200, 90),
+	bg = Color3.fromRGB(30, 35, 62),
+	panel = Color3.fromRGB(38, 46, 84),
+	panel2 = Color3.fromRGB(50, 60, 104),
+	line = Color3.fromRGB(12, 14, 28),
+	text = Color3.fromRGB(236, 241, 255),
+	sub = Color3.fromRGB(160, 176, 220),
+	dim = Color3.fromRGB(105, 118, 160),
+	accent = Color3.fromRGB(0, 200, 255),
+	green = Color3.fromRGB(0, 215, 105),
 	red = Color3.fromRGB(255, 70, 85),
 	yellow = Color3.fromRGB(255, 196, 30),
 	purple = Color3.fromRGB(150, 90, 255),
@@ -31,11 +31,11 @@ UI.ICON_IMAGES = {
 local T = UI.T
 -- Chunky and readable: rounded blocky font for text, pixel font for titles/buttons.
 UI.FONT = Font.fromEnum(Enum.Font.FredokaOne)
-UI.BOLD = Font.fromEnum(Enum.Font.FredokaOne)
+UI.BOLD = Font.new("rbxasset://fonts/families/PressStart2P.json")
 UI.HEAVY = Font.new("rbxasset://fonts/families/PressStart2P.json")
 UI.MONO = Font.fromEnum(Enum.Font.FredokaOne)
 -- normalise sizes so callers can keep "normal" sizes (everything a bit bigger than default)
-local SIZE_MULT = { [UI.FONT.Family] = 1.25, ["rbxasset://fonts/families/PressStart2P.json"] = 1.0 }
+local SIZE_MULT = { [UI.FONT.Family] = 1.25, ["rbxasset://fonts/families/PressStart2P.json"] = 0.8 }
 
 function UI.new(class: string, props: { [string]: any }?, children: { Instance }?): any
 	local inst = Instance.new(class)
@@ -84,7 +84,7 @@ function UI.corner(parent: Instance, r: number?)
 	-- blocky look: almost square corners (round things like avatars keep big radii)
 	local rr = r or 10
 	if rr < 40 then
-		rr = math.min(rr, 10)
+		rr = math.min(rr, 2)
 	end
 	return new("UICorner", { CornerRadius = UDim.new(0, rr), Parent = parent })
 end
@@ -95,6 +95,11 @@ function UI.pad(parent: Instance, a: number, b: number?, c: number?, d: number?)
 	return new("UIPadding", { PaddingTop = UDim.new(0, a), PaddingBottom = UDim.new(0, c or a), PaddingLeft = UDim.new(0, b or a), PaddingRight = UDim.new(0, d or b or a), Parent = parent })
 end
 function UI.list(parent: Instance, gap: number?, horizontal: boolean?, align: any?)
+	-- a list layout would treat the stud texture as an item, so lists live without it
+	local studs = parent:FindFirstChild("Studs")
+	if studs then
+		studs:Destroy()
+	end
 	return new("UIListLayout", {
 		Padding = UDim.new(0, gap or 8),
 		FillDirection = horizontal and Enum.FillDirection.Horizontal or Enum.FillDirection.Vertical,
@@ -123,33 +128,28 @@ function UI.label(parent: Instance, text: string, size: number?, color: Color3?,
 	return l
 end
 
--- Put our drawn 9-slice panel behind a frame's children (ZIndex 0 keeps it under them).
+-- Square navy panel with a thick outline and the Roblox stud texture behind its children.
+-- (Only use on frames with a fixed size; AutomaticSize frames get a plain fill.)
 function UI.skin(frame: GuiObject, color: Color3?)
-	frame.BackgroundTransparency = 1
-	local img = new("ImageLabel", {
-		Name = "Skin",
-		BackgroundTransparency = 1,
-		Image = Assets.panel,
-		ImageColor3 = color or Color3.new(1, 1, 1),
-		ScaleType = Enum.ScaleType.Slice,
-		SliceCenter = Rect.new(40, 40, 216, 200),
-		SliceScale = 0.45,
-		Size = UDim2.fromScale(1, 1),
-		ZIndex = 0,
-		Parent = frame,
-	})
+	frame.BackgroundTransparency = 0
+	frame.BackgroundColor3 = color or T.panel
 	for _, c in ipairs(frame:GetChildren()) do
-		if c:IsA("UIStroke") then
+		if c:IsA("UIStroke") or c:IsA("UICorner") then
 			c:Destroy()
 		end
 	end
-	return img
+	new("UICorner", { CornerRadius = UDim.new(0, 2), Parent = frame })
+	new("UIStroke", { Color = T.line, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = frame })
+	if frame.AutomaticSize == Enum.AutomaticSize.None then
+		new("ImageLabel", { Name = "Studs", BackgroundTransparency = 1, Image = Assets.studs, ImageTransparency = 0.45, ScaleType = Enum.ScaleType.Tile, TileSize = UDim2.fromOffset(36, 36), Size = UDim2.fromScale(1, 1), ZIndex = 0, Parent = frame })
+	end
+	return frame
 end
 
 function UI.card(parent: Instance, props: { [string]: any }?)
 	local f = new("Frame", { BackgroundColor3 = T.panel2, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = parent })
 	UI.pad(f, 14, 16)
-	UI.skin(f, Color3.fromRGB(236, 244, 255))
+	UI.skin(f, T.panel2)
 	for k, v in pairs(props or {}) do
 		(f :: any)[k] = v
 	end
@@ -183,21 +183,21 @@ function UI.button(parent: Instance, text: string, onClick: (() -> ())?, kind: a
 		Size = UDim2.new(0, math.max(110, #text * 10 + 40), 0, 46),
 		Parent = parent,
 	})
-	new("UICorner", { CornerRadius = UDim.new(0, 10), Parent = b })
-	new("UIStroke", { Color = Color3.fromRGB(20, 26, 48), Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = b })
+	new("UICorner", { CornerRadius = UDim.new(0, 2), Parent = b })
+	new("UIStroke", { Color = Color3.fromRGB(10, 12, 24), Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = b })
 	local textStroke = new("UIStroke", { Color = color:Lerp(Color3.new(0, 0, 0), 0.6), Thickness = 1.2, ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual, Parent = b })
 	textStroke.Enabled = false
-	new("Frame", { Name = "Shade", BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.78, Size = UDim2.new(1, 0, 0, 6), Position = UDim2.new(0, 0, 1, -6), Parent = b })
-	new("Frame", { Name = "Shine", BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.6, Size = UDim2.new(1, -16, 0, 3), Position = UDim2.fromOffset(8, 4), Parent = b })
+	new("Frame", { Name = "Shade", BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.7, Size = UDim2.new(1, 0, 0, 5), Position = UDim2.new(0, 0, 1, -5), Parent = b })
+	new("Frame", { Name = "Shine", BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.55, Size = UDim2.new(1, 0, 0, 3), Parent = b })
 	local busy = false
 	local applied: Color3? = nil
 	local function setColor(c)
 		busy = true
 		local ghost = c == UI.GHOST or c == Color3.fromRGB(150, 170, 205)
 		if ghost then
-			applied = Color3.fromRGB(226, 238, 252)
+			applied = Color3.fromRGB(58, 70, 120)
 			b.BackgroundColor3 = applied
-			b.TextColor3 = T.text
+			b.TextColor3 = Color3.fromRGB(220, 228, 255)
 		else
 			applied = c
 			b.BackgroundColor3 = c

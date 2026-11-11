@@ -373,10 +373,14 @@ function Actions.rent(state, id, n)
 		end
 		n = room
 	end
-	state.gpus.rented[id] = cur + n
 	if n > 0 then
+		-- new parts arrive in a box at home; they start working once you open it
+		state.boxes = state.boxes or {}
+		table.insert(state.boxes, { kind = "rent", id = id, n = n })
 		goalProgress(state, "gpus", n)
+		return true
 	end
+	state.gpus.rented[id] = cur + n
 	return true
 end
 
@@ -398,9 +402,25 @@ function Actions.buy(state, id, n)
 		return false, string.format("Not enough power. Your %s supports %s kW. Rent in the cloud or upgrade.", stage.name, Format.count(stage.kw))
 	end
 	spend(state, price, "compute")
-	state.gpus.owned[id] = (state.gpus.owned[id] or 0) + n
+	state.boxes = state.boxes or {}
+	table.insert(state.boxes, { kind = "buy", id = id, n = n })
 	goalProgress(state, "gpus", n)
 	return true
+end
+
+function Actions.openBoxes(state)
+	local boxes = state.boxes or {}
+	if #boxes == 0 then
+		return false, "No packages"
+	end
+	local got = {}
+	for _, b in ipairs(boxes) do
+		local bucket = b.kind == "buy" and state.gpus.owned or state.gpus.rented
+		bucket[b.id] = (bucket[b.id] or 0) + b.n
+		table.insert(got, b.n .. "x " .. Hardware.byId[b.id].name)
+	end
+	state.boxes = {}
+	return true, table.concat(got, ", ")
 end
 
 function Actions.sell(state, id, n)
@@ -492,6 +512,155 @@ function Actions.cancelTraining(state)
 	return true
 end
 
+-- ===== Simple Lab: six stats (0-100), pick two to train =====
+Game.STATS = { "coding", "writing", "math", "reasoning", "chat", "safety" }
+
+function Game.initStats(m)
+	local a = m.abilities or {}
+	local function st(v)
+		return math.clamp(math.floor(v + 0.5), 1, 100)
+	end
+	m.stats = {
+		coding = st(m.cap + (a.coding or 0) * 1.5),
+		writing = st(m.cap + (a.writing or 0) * 1.2),
+		math = st(m.cap + (a.math or 0) * 1.5),
+		reasoning = st(m.cap + (a.reasoning or 0) * 1.5),
+		chat = st(m.cap + (a.writing or 0) + 4),
+		safety = st(20 + (m.flaws.safety or 15) * 1.4),
+	}
+	m.baseCap = m.cap
+	local sum = 0
+	for _, k in ipairs(Game.STATS) do
+		sum += m.stats[k]
+	end
+	m.baseAvg = sum / #Game.STATS
+end
+
+-- Stats drive the real model numbers used by launches, users and benchmarks.
+function Game.applyStats(m)
+	local s = m.stats
+	local sum = 0
+	for _, k in ipairs(Game.STATS) do
+		if k ~= "safety" then
+			sum += s[k]
+		end
+	end
+	local avg = sum / 5
+	m.cap = m.baseCap + (avg - m.baseAvg) * 0.45
+	m.abilities.coding = (s.coding - avg) / 2
+	m.abilities.math = (s.math - avg) / 2
+	m.abilities.reasoning = (s.reasoning - avg) / 2
+	m.abilities.writing = (s.writing + s.chat) / 2 - avg
+	m.flaws.safety = s.safety / 1.4
+	m.flaws.jailbreak = math.clamp(0.95 - s.safety / 105, 0.05, 0.95)
+	m.flaws.refuse = math.clamp(0.08 + math.max(0, s.safety - 70) / 150, 0, 0.6)
+	m.flaws.halluc = math.clamp(0.4 - s.reasoning / 250, 0.03, 0.6)
+	m.flaws.syco = math.clamp(0.3 - s.safety / 400 + s.chat / 600, 0.02, 0.6)
+	m.flaws.escape = (m.features and m.features.agents and s.safety < 40) and 0.15 or 0
+end
+
+-- One button: the game picks the biggest model your GPUs can train in about a month.
+function Actions.createModel(state, name)
+	if state.training then
+		return false, "Already training a model"
+	end
+	local ctx = Game.trainCtx(state)
+	if ctx.clusterPower <= 0 then
+		return false, "You have no GPUs. Get some in Parts."
+	end
+	local recipe = Opts.defaultRecipe()
+	recipe.name = tostring(name or "")
+	local chosen = Opts.SIZES[1]
+	for _, sz in ipairs(Opts.SIZES) do
+		recipe.size = sz
+		if TM.evaluate(recipe, ctx).days <= 35 then
+			chosen = sz
+		end
+	end
+	recipe.size = chosen
+	-- newer tricks are switched on automatically once your team knows them
+	local d = state.research.done
+	if d.rlhf then
+		recipe.choices.align.rlhf = true
+	end
+	if d.reasoning then
+		recipe.choices.skills.rlvr = true
+		recipe.choices.think = "hybrid"
+		if not d.hybrid then
+			recipe.choices.think = "high"
+		end
+	end
+	if d.tools then
+		recipe.choices.skills.tools = true
+	end
+	if d.moe then
+		recipe.choices.arch = d.finemoe and "finemoe" or "moe"
+	end
+	if d.mla then
+		recipe.choices.attn = "mla"
+	end
+	if d.fp8 then
+		recipe.choices.precision = "fp8"
+	end
+	if d.vision then
+		recipe.choices.modal.vision = true
+	end
+	if d.longctx then
+		recipe.choices.ctx = "1m"
+	elseif d.rope then
+		recipe.choices.ctx = "128k"
+	end
+	return Actions.train(state, recipe)
+end
+
+function Game.boostCost(state, m)
+	return math.floor(1500 * (1 + m.size) ^ 0.75 * (1 + (year(state) - 2023) * 0.3) / 100) * 100
+end
+
+function Game.boostDays(state, m)
+	local power = math.max(Game.clusterPower(state), 0.01)
+	return math.clamp(math.ceil(4 * (m.size / 7) ^ 0.6 / power ^ 0.35), 3, 30)
+end
+
+-- Pick two stats to train.
+function Actions.boost(state, modelId, a, b)
+	local m = state.models[modelId]
+	if not m or not m.stats or m.status == "retired" then
+		return false, "Pick a model"
+	end
+	if m.boosting then
+		return false, "Already training this model"
+	end
+	if not (m.stats[a] and m.stats[b]) or a == b then
+		return false, "Pick 2 different stats"
+	end
+	local cost = Game.boostCost(state, m)
+	if state.cash < cost then
+		return false, "Not enough cash (" .. Format.money(cost) .. ")"
+	end
+	spend(state, cost, "compute")
+	m.boosting = { a = a, b = b, doneDay = state.day + Game.boostDays(state, m), startDay = state.day }
+	return true
+end
+
+local function finishBoost(state, m)
+	local bst = m.boosting
+	m.boosting = nil
+	local fx = Game.staffEffects(state)
+	local gains = {}
+	for _, k in ipairs({ bst.a, bst.b }) do
+		local room = 1 - m.stats[k] / 110
+		local g = math.max(1, math.floor((5 + rng:NextNumber(0, 6) + math.log(1 + fx.research) * 1.5) * room + 0.5))
+		m.stats[k] = math.min(100, m.stats[k] + g)
+		table.insert(gains, "+" .. g .. " " .. k:sub(1, 1):upper() .. k:sub(2))
+	end
+	Game.applyStats(m)
+	state.stats.updates += 1
+	goalProgress(state, "update", 1)
+	Game.chatMsg(state, "research", "Training bot", "Training done: " .. m.name .. " " .. table.concat(gains, ", "))
+	m.lastGain = table.concat(gains, "  ")
+end
+
 local function finishTraining(state)
 	local t = state.training
 	local ev = t.eval
@@ -531,6 +700,7 @@ local function finishTraining(state)
 		end
 	end
 	table.insert(state.models, m)
+	Game.initStats(m)
 	state.training = nil
 	state.stats.trained += 1
 	goalProgress(state, "train", 1)
@@ -1277,6 +1447,9 @@ function Game.tickDay(state)
 		if m.updating and state.day >= m.updating.doneDay then
 			finishUpdate(state, m)
 		end
+		if m.boosting and state.day >= m.boosting.doneDay then
+			finishBoost(state, m)
+		end
 		if m.status == "delayed" and state.day >= m.delayUntil then
 			m.status = "ready"
 			m.flaws.jailbreak = math.max(0.05, m.flaws.jailbreak - 0.18)
@@ -1475,6 +1648,8 @@ function Game.snapshot(state)
 			rank = m.rank, reception = m.reception, benchmarks = m.benchmarks, flaws = flaws, revealed = m.revealed,
 			character = m.character, abilities = m.abilities, updating = m.updating, updates = m.updates, open = m.open,
 			apiPrice = m.apiPrice, delayUntil = m.delayUntil, serve = m.serve, losses = m.losses, speed = m.speed,
+			stats = m.stats, boosting = m.boosting, lastGain = m.lastGain,
+			boostCost = m.stats and Game.boostCost(state, m) or 0, boostDays = m.stats and Game.boostDays(state, m) or 0,
 		})
 	end
 	local leaderboard = {}
@@ -1502,7 +1677,7 @@ function Game.snapshot(state)
 		training = t and { name = t.name, progress = t.progress, days = t.days, daysLeft = t.daysLeft, losses = t.losses, spikes = t.spikes, cap = t.eval.cap } or nil,
 		awayLog = state.awayLog, stats = state.stats,
 		launchCosts = Game.launchCosts(state), bestPrice = (Launch.rivalBest(state, state.day) or { priceOut = 10 }).priceOut,
-		acquired = state.acquired or {}, location = state.location, loans = state.loans, loanLimit = Game.loanLimit(state), gpuCap = Game.gpuCap(state),
+		boxes = #(state.boxes or {}), acquired = state.acquired or {}, location = state.location, loans = state.loans, loanLimit = Game.loanLimit(state), gpuCap = Game.gpuCap(state),
 	}
 end
 

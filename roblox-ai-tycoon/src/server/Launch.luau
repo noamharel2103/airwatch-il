@@ -378,18 +378,22 @@ function Launch.run(state, model, opts)
 	-- Press headlines
 	local press = {}
 	local pl = eligible(parsed.journalist, tags)
+	local usedHead = {}
 	for _ = 1, math.clamp(math.floor(2 + reach * 2), 2, 5) do
 		local l = weighted(pl)
-		if l then
+		if l and not usedHead[l] then
+			usedHead[l] = true
 			local outlet = pick(RT.personas.journalist.handles)
 			table.insert(press, { outlet = outlet, headline = fill(l.text, vars), hour = rng:NextNumber(2, 30) })
 		end
 	end
 	-- Reddit + HN threads
 	local threads = {}
-	for _ = 1, 3 do
+	local usedThread = {}
+	for _ = 1, 4 do
 		local l = weighted(eligible(redditTitles, tags))
-		if l then
+		if l and not usedThread[l] then
+			usedThread[l] = true
 			table.insert(threads, { platform = "reddit", sub = pick({ "r/LocalLLaMA", "r/singularity", "r/ChatGPT", "r/MachineLearning", "r/artificial" }), title = fill(l.text, vars), upvotes = math.floor(rng:NextNumber(200, 6000) * mood * reach), comments = rng:NextInteger(40, 1400) })
 		end
 	end

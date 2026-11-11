@@ -26,6 +26,11 @@ for _, app in ipairs({ Lab, Parts, Team, Bank, Social, MailGoals.Mail, MailGoals
 end
 Lab.setPlayground(Playground)
 Lab.host = Shell.gui
+Lab.social = Social
+Lab.openReviews = function(name)
+	Social.selectLaunch(name)
+	Shell.open("social")
+end
 Lab.onLaunch = function(result)
 	Social.add("launch", result, Net.state and Net.state.day or 0)
 	Reveal.play(Shell.gui, result)
@@ -126,7 +131,18 @@ UIS.InputBegan:Connect(function(input, processed)
 	end
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 		local inst, app = pick()
-		if inst then
+		if inst and app == "openbox" then
+			local ok, got = Net.act("openBoxes")
+			if ok then
+				-- pop the box open
+				for _, part in ipairs(inst:GetDescendants()) do
+					if part:IsA("BasePart") then
+						UI.tween(part, 0.35, { Transparency = 1, Size = part.Size * 1.3 })
+					end
+				end
+				Shell.toast("Unpacked: " .. tostring(got), "good")
+			end
+		elseif inst then
 			Shell.openComputer(app ~= "desktop" and app or nil)
 		end
 	end
@@ -143,6 +159,7 @@ local function totalGpus(s)
 	end
 	return n
 end
+local lastBoxes = 0
 local knownResearch: { [string]: boolean }? = nil
 local Research = require(game:GetService("ReplicatedStorage").Shared.Research)
 Net.onState(function(s)
@@ -161,6 +178,27 @@ Net.onState(function(s)
 	local room = rooms and rooms:FindFirstChild("Stage" .. s.office)
 	if not room then
 		return
+	end
+	if (s.boxes or 0) > lastBoxes then
+		Shell.toast("A package arrived! Leave the desk and click the box to open it.", "good")
+	end
+	lastBoxes = s.boxes or 0
+	-- delivery box shows up when packages are waiting
+	local box = room:FindFirstChild("DeliveryBox")
+	if box then
+		local show = (s.boxes or 0) > 0
+		for _, part in ipairs(box:GetDescendants()) do
+			if part:IsA("BasePart") then
+				if part:GetAttribute("BaseSize") == nil then
+					part:SetAttribute("BaseSize", part.Size)
+				end
+				part.Size = part:GetAttribute("BaseSize")
+				part.Transparency = show and 0 or 1
+				part.CanQuery = show
+			elseif part:IsA("BillboardGui") then
+				part.Enabled = show
+			end
+		end
 	end
 	local gpus = totalGpus(s) - 1 -- the laptop does not count
 	for _, d in ipairs(room:GetDescendants()) do
