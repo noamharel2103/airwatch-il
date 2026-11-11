@@ -56,7 +56,7 @@ local cashL = new("TextLabel", { Text = "$0", FontFace = UI.HEAVY, TextSize = 30
 local subL = new("TextLabel", { Text = "", TextSize = 13, TextColor3 = T.sub, Position = UDim2.fromOffset(18, 66), Size = UDim2.new(1, -36, 0, 18), Parent = topLeft })
 
 -- live problems (servers down, hacked...) with the team's fix progress
-local problemBox = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(16, 120), Size = UDim2.fromOffset(360, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = hud })
+local problemBox = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 70), Size = UDim2.fromOffset(820, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = hud })
 UI.list(problemBox, 8)
 -- the whole screen goes red during a massive jailbreak
 local redAlert = new("Frame", { BackgroundColor3 = Color3.fromRGB(255, 0, 30), BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 1, Parent = hud })
@@ -306,10 +306,10 @@ Net.onState(function(s)
 	end
 	redAlert:SetAttribute("On", massive)
 	if massive then
-		local f = new("Frame", { BackgroundColor3 = Color3.fromRGB(120, 0, 20), Size = UDim2.new(1, 0, 0, 58), Parent = problemBox })
+		local f = new("Frame", { BackgroundColor3 = Color3.fromRGB(120, 0, 20), Size = UDim2.new(1, 0, 0, 44), Parent = problemBox })
 		UI.stroke(f, T.line, 3)
-		new("TextLabel", { Text = string.format("MISUSE %d%%  (100%% = government shutdown)", math.floor(s.misuse or 0)), FontFace = UI.BOLD, TextSize = 12, TextColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 6), Size = UDim2.new(1, -24, 0, 20), Parent = f })
-		local h = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 32), Size = UDim2.new(1, -24, 0, 14), Parent = f })
+		new("TextLabel", { Text = string.format("MISUSE %d%%  (100%% = SHUTDOWN)", math.floor(s.misuse or 0)), FontFace = UI.BOLD, TextSize = 11, TextColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 0), Size = UDim2.new(0, 240, 1, 0), TextXAlignment = Enum.TextXAlignment.Left, Parent = f })
+		local h = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(260, 15), Size = UDim2.new(1, -272, 0, 14), Parent = f })
 		UI.bar(h, (s.misuse or 0) / 100, T.red, 14)
 	end
 	for _, m in ipairs(s.models) do
@@ -321,18 +321,17 @@ Net.onState(function(s)
 		end
 	end
 	for _, p in ipairs(s.problems or {}) do
-		local f = new("Frame", { BackgroundColor3 = T.red, Size = UDim2.new(1, 0, 0, 58), Parent = problemBox })
-		UI.corner(f, 2)
+		-- one compact row per problem, above the computer screen
+		local f = new("Frame", { BackgroundColor3 = T.red, Size = UDim2.new(1, 0, 0, 44), Parent = problemBox })
 		UI.stroke(f, T.line, 3)
-		new("TextLabel", { Text = PROBLEM_LABEL[p.kind] or p.kind, FontFace = UI.HEAVY, TextSize = 13, TextColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 6), Size = UDim2.new(1, -24, 0, 20), Parent = f })
-		local h = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 32), Size = UDim2.new(1, -24, 0, 14), Parent = f })
+		new("TextLabel", { Text = PROBLEM_LABEL[p.kind] or p.kind, FontFace = UI.HEAVY, TextSize = 12, TextColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 0), Size = UDim2.new(0, 240, 1, 0), TextXAlignment = Enum.TextXAlignment.Left, Parent = f })
+		local h = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(260, 15), Size = UDim2.new(1, -490, 0, 14), Parent = f })
 		UI.bar(h, p.progress, T.yellow, 14)
 		if not p.rushed and p.rushCost then
-			f.Size = UDim2.new(1, 0, 0, 100)
 			local kind = p.kind
 			UI.button(f, "FIX IT NOW  " .. Format.money(p.rushCost), function()
 				Net.act("rushFix", kind)
-			end, T.yellow, { Position = UDim2.fromOffset(12, 56), Size = UDim2.new(1, -24, 0, 34), TextSize = 12 })
+			end, T.yellow, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -6, 0.5, 0), Size = UDim2.fromOffset(210, 34), TextSize = 11 })
 		end
 	end
 	afterProblems(s)
@@ -386,7 +385,31 @@ afterProblems = function(s)
 			local k = openApp.key(s)
 			if k ~= openApp.lastKey then
 				openApp.lastKey = k
+				-- remember where each list was scrolled so buying something doesn't jump you to the top
+				local scrolls = {}
+				for _, d in ipairs(openApp.ctx.body:GetDescendants()) do
+					if d:IsA("ScrollingFrame") then
+						local atBottom = d.CanvasPosition.Y >= d.AbsoluteCanvasSize.Y - d.AbsoluteWindowSize.Y - 12 and d.CanvasPosition.Y > 0
+						table.insert(scrolls, atBottom and Vector2.new(d.CanvasPosition.X, 1e6) or d.CanvasPosition)
+					end
+				end
 				openApp.mount(openApp.ctx, s, true)
+				if #scrolls > 0 then
+					local function restore()
+						local i = 0
+						for _, d in ipairs(openApp.ctx.body:GetDescendants()) do
+							if d:IsA("ScrollingFrame") then
+								i += 1
+								if scrolls[i] then
+									d.CanvasPosition = scrolls[i]
+								end
+							end
+						end
+					end
+					restore()
+					task.defer(restore)
+					task.delay(0.05, restore)
+				end
 				return
 			end
 		end

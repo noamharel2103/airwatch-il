@@ -284,7 +284,14 @@ function UI.glyphIcon(parent: Instance, kind: string, color: Color3, size: numbe
 		UI.corner(f, r or 3)
 		return f
 	end
-	if kind == "lab" then -- flask
+	if kind == "linkedin" then -- "in" letters
+		new("TextLabel", { Text = "in", FontFace = Font.fromEnum(Enum.Font.GothamBlack), TextScaled = true, TextColor3 = W, BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.52, 0.5), Size = UDim2.fromScale(0.7, 0.62), Parent = tile })
+	elseif kind == "cameras" then -- CCTV camera on a pole
+		bar(0.46, 0.42, 0.56, 0.26, -15, 4)
+		bar(0.2, 0.36, 0.1, 0.12, -15, 2).BackgroundColor3 = Color3.fromRGB(255, 70, 70)
+		bar(0.7, 0.66, 0.1, 0.34, 0, 2)
+		bar(0.7, 0.84, 0.3, 0.08, 0, 2)
+	elseif kind == "lab" then -- flask
 		bar(0.5, 0.3, 0.16, 0.3)
 		local b = bar(0.5, 0.62, 0.5, 0.36, 0, 8)
 		bar(0.5, 0.7, 0.36, 0.12).BackgroundColor3 = color

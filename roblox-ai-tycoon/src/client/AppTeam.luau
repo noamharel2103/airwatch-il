@@ -20,7 +20,7 @@ function App.mount(ctx, s)
 	end
 	UI.clear(ctx.tabs)
 	UI.clear(ctx.body)
-	for _, p in ipairs({ { "chat", "Chat" }, { "hire", "Hire" } }) do
+	for _, p in ipairs({ { "chat", "Chat" }, { "people", "People" }, { "hire", "Hire" } }) do
 		UI.button(ctx.tabs, p[2], function()
 			page = p[1]
 			App.mount(ctx, Net.state)
@@ -65,6 +65,84 @@ function App.mount(ctx, s)
 		end)
 		return
 	end
+	if page == "people" then
+		local sc = UI.scroll(ctx.body)
+		UI.list(sc, 10)
+		UI.pad(sc, 0, 0, 10, 8)
+		-- mood of the whole team
+		local avg, n = 0, 0
+		for _, p in ipairs(s.people or {}) do
+			avg += p.morale or 70
+			n += 1
+		end
+		avg = n > 0 and avg / n or 70
+		local top = UI.card(sc)
+		UI.list(top, 6)
+		UI.label(top, string.format("Team mood %d%%   |   team works at %d%% speed", math.floor(avg), math.floor((s.teamFactor or 1) * 100)), 18, T.text, { FontFace = UI.HEAVY })
+		local hb = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 12), Parent = top })
+		UI.bar(hb, avg / 100, avg > 55 and T.green or (avg > 30 and T.yellow or T.red), 12)
+		UI.label(top, "Unhappy people work slower and quit. Parties, promotions, days off and good computers keep them happy.", 13, T.sub)
+		local prow = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 40), Parent = top })
+		UI.list(prow, 8, true)
+		local ready = (s.partyReady or 0) <= s.day
+		for _, pk in ipairs({ { "pizza", "Pizza night", 60 }, { "party", "Office party", 400 }, { "retreat", "Team retreat", 3500 } }) do
+			local cost = pk[3] * math.max(s.headcount, 1)
+			UI.button(prow, pk[2] .. "  " .. Format.money(cost), function()
+				Net.act("party", pk[1])
+			end, (ready and s.cash >= cost) and T.purple or "ghost", { Size = UDim2.fromOffset(240, 38), TextSize = 12 })
+		end
+		if not ready then
+			UI.label(top, "Next party possible on " .. Format.date(s.partyReady), 12, T.dim)
+		end
+		-- requests
+		if #(s.requests or {}) > 0 then
+			UI.label(sc, "Requests", 18, T.text, { FontFace = UI.HEAVY })
+			for _, r in ipairs(s.requests) do
+				local c = UI.card(sc)
+				UI.list(c, 6)
+				UI.label(c, r.name .. ":  \"" .. r.text .. "\"", 15, T.text)
+				local rr = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 36), Parent = c })
+				UI.list(rr, 8, true)
+				local id = r.id
+				UI.button(rr, "Yes", function()
+					Net.act("answerRequest", id, true)
+				end, "success", { Size = UDim2.fromOffset(100, 34) })
+				UI.button(rr, "No", function()
+					Net.act("answerRequest", id, false)
+				end, "ghost", { Size = UDim2.fromOffset(100, 34) })
+			end
+		end
+		-- everyone
+		UI.label(sc, "Your people", 18, T.text, { FontFace = UI.HEAVY })
+		if n == 0 then
+			UI.label(sc, "Nobody yet. Hire in the Hire tab or find stars on LinkedIn.", 14, T.dim)
+		end
+		for _, p in ipairs(s.people or {}) do
+			local c = new("Frame", { BackgroundColor3 = T.panel2, Size = UDim2.new(1, -8, 0, 78), Parent = sc })
+			UI.stroke(c, T.line, 3)
+			local role = Staff.byId[p.role]
+			local away = p.offUntil and p.offUntil > s.day
+			new("TextLabel", { Text = p.name .. (away and "   (DAY OFF)" or ""), FontFace = UI.HEAVY, TextSize = 14, TextColor3 = T.text, BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 8), Size = UDim2.new(0.5, 0, 0, 18), TextXAlignment = Enum.TextXAlignment.Left, Parent = c })
+			new("TextLabel", { Text = string.format("%s %s  |  %s  |  skill %d%%", Staff.RANKS[p.rank or 1], role and role.name or p.role, p.from or "", math.floor((p.skill or 1) * 100)), TextSize = 13, TextColor3 = T.sub, BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 30), Size = UDim2.new(0.55, 0, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, Parent = c })
+			new("TextLabel", { Text = "Computer: " .. Staff.PCS[(p.pc or 0) + 1].name, TextSize = 13, TextColor3 = T.sub, BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 50), Size = UDim2.new(0.3, 0, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, Parent = c })
+			local mb = new("Frame", { BackgroundTransparency = 1, Position = UDim2.new(0.3, 0, 0, 54), Size = UDim2.new(0.22, 0, 0, 10), Parent = c })
+			local m = p.morale or 70
+			UI.bar(mb, m / 100, m > 55 and T.green or (m > 30 and T.yellow or T.red), 10)
+			local id = p.id
+			local nextPc = math.min((p.pc or 0) + 1, #Staff.PCS - 1)
+			if (p.pc or 0) < #Staff.PCS - 1 then
+				UI.button(c, "PC: " .. Staff.PCS[nextPc + 1].name .. " " .. Format.money(Staff.PCS[nextPc + 1].price), function()
+					Net.act("givePc", id, nextPc)
+				end, "primary", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -150, 0.5, 0), Size = UDim2.fromOffset(250, 36), TextSize = 10 })
+			end
+			if (p.rank or 1) < #Staff.RANKS then
+				UI.button(c, "Promote", function()
+					Net.act("promote", id)
+				end, "success", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), Size = UDim2.fromOffset(128, 36), TextSize = 11 })
+			end
+		end
+		return
+	end
 	-- hire
 	local sc = UI.scroll(ctx.body)
 	UI.list(sc, 10)
@@ -102,7 +180,12 @@ function App.mount(ctx, s)
 end
 
 function App.key(s)
-	local k = page .. channel .. #s.chat .. s.headcount .. s.year
+	local k = page .. channel .. #s.chat .. s.headcount .. s.year .. #(s.requests or {}) .. tostring((s.partyReady or 0) <= s.day)
+	if page == "people" then
+		for _, p in ipairs(s.people or {}) do
+			k ..= tostring(p.id) .. math.floor((p.morale or 0) / 5) .. (p.rank or 1) .. (p.pc or 0) .. tostring(p.offUntil and p.offUntil > s.day)
+		end
+	end
 	for _, c in ipairs(s.candidates) do
 		k ..= c.name
 	end

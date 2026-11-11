@@ -66,4 +66,39 @@ function Staff.randomCandidate(rng: Random, roleId: string)
 	}
 end
 
+-- Ranks: each step costs a raise but makes them better and happier.
+Staff.RANKS = { "Junior", "Mid", "Senior", "Lead", "Principal" }
+
+-- Computers you can give a person. Better machine = more work done.
+Staff.PCS = {
+	{ name = "Old laptop", price = 0, boost = 1.0 },
+	{ name = "Gaming PC", price = 1500, boost = 1.1 },
+	{ name = "Workstation", price = 6000, boost = 1.2 },
+	{ name = "Dual GPU tower", price = 18000, boost = 1.32 },
+}
+
+-- LinkedIn search: filters change who shows up.
+Staff.SCHOOLS = { "any", "ex-OpenAI", "ex-DeepMind", "ex-Anthropic", "ex-Meta FAIR", "PhD, Stanford", "PhD, MIT", "PhD, Technion", "Kaggle grandmaster", "bootcamp grad" }
+Staff.SKILLS = { "any", "LLM training", "RL", "Inference", "Data", "Safety", "Product", "Sales" }
+
+function Staff.searchCandidate(rng: Random, roleId: string, filters)
+	local c = Staff.randomCandidate(rng, roleId)
+	local minSkill = tonumber(filters.minSkill) or 0.7
+	c.skill = math.floor(math.clamp(rng:NextNumber(minSkill, minSkill + 0.45), 0.6, 1.9) * 100) / 100
+	if filters.school and filters.school ~= "any" then
+		c.from = filters.school
+		if filters.school:sub(1, 3) == "ex-" then
+			c.skill = math.floor((c.skill + 0.15) * 100) / 100
+		end
+	end
+	c.skillTag = (filters.skill and filters.skill ~= "any") and filters.skill or Staff.SKILLS[rng:NextInteger(2, #Staff.SKILLS)]
+	c.hot = filters.hot == true or rng:NextNumber() < 0.12
+	if c.hot then
+		c.skill = math.floor((c.skill + 0.2) * 100) / 100
+	end
+	-- how hard they are to get (0..1): great and in-demand people say no a lot
+	c.demand = math.clamp((c.skill - 0.7) / 1.1 + (c.hot and 0.25 or 0), 0.05, 0.95)
+	return c
+end
+
 return Staff

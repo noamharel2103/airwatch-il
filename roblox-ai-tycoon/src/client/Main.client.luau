@@ -26,7 +26,9 @@ local RigView = require(Modules.RigView)
 local player = Players.LocalPlayer
 local cam = workspace.CurrentCamera
 
-for _, app in ipairs({ Lab, Parts, Team, Bank, Social, MailGoals.Mail, MailGoals.Goals, Company }) do
+local LinkedIn = require(Modules.AppLinkedIn)
+local Cameras = require(Modules.AppCameras)
+for _, app in ipairs({ Lab, Parts, Team, LinkedIn, Bank, Social, MailGoals.Mail, MailGoals.Goals, Company, Cameras }) do
 	Shell.register(app)
 end
 Lab.setPlayground(Playground)
@@ -96,6 +98,10 @@ RunService.RenderStepped:Connect(function(dt)
 		end
 		-- gentle parallax toward the mouse + idle breathing
 		local room = baseCF * CFrame.Angles(math.rad(-my * 2 + math.sin(t * 0.4) * 0.15), math.rad(-mx * 3), 0)
+		-- never get stuck zoomed in once every screen is closed
+		if zoomTarget > 0 and not zooming and not Shell.isOpen() and not overlayBusy() then
+			zoomTarget = 0
+		end
 		zoomA += (zoomTarget - zoomA) * math.min(1, dt * 7)
 		if zoomCF and zoomA > 0.001 then
 			local a = zoomA * zoomA * (3 - 2 * zoomA)
@@ -169,7 +175,7 @@ end
 
 local blocked = true
 RunService.Heartbeat:Connect(function()
-	if blocked or Shell.isOpen() then
+	if blocked or Shell.isOpen() or zooming or overlayBusy() then
 		hl.Adornee = nil
 		tip.Visible = false
 		return

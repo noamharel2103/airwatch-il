@@ -265,7 +265,280 @@ function Game.staffEffects(state)
 	for _, r in ipairs(Staff.roles) do
 		e[r.effect] += (state.staff[r.id] or 0) * r.power
 	end
+	local f = Game.teamFactor(state)
+	for k, v in pairs(e) do
+		e[k] = v * f
+	end
 	return e
+end
+
+-- How well your people work: happy, senior, skilled people on good computers do much more.
+function Game.teamFactor(state): number
+	local people = state.people or {}
+	if #people == 0 then
+		return 1
+	end
+	local t = 0
+	for _, p in ipairs(people) do
+		local mood = 0.55 + (p.morale or 70) / 220
+		local pc = (Staff.PCS[(p.pc or 0) + 1] or Staff.PCS[1]).boost
+		local rank = 1 + 0.12 * ((p.rank or 1) - 1)
+		local away = (p.offUntil and state.day < p.offUntil) and 0.3 or 1
+		t += mood * pc * rank * (p.skill or 1) * away
+	end
+	return t / #people
+end
+
+local function personById(state, id)
+	for i, p in ipairs(state.people or {}) do
+		if p.id == id then
+			return p, i
+		end
+	end
+	return nil
+end
+
+-- every person gets an id, mood, rank and computer
+local function ensurePeople(state)
+	state.people = state.people or {}
+	state.nextPersonId = state.nextPersonId or 1
+	for _, p in ipairs(state.people) do
+		if not p.id then
+			p.id = state.nextPersonId
+			state.nextPersonId += 1
+		end
+		p.morale = p.morale or 70
+		p.rank = p.rank or 1
+		p.pc = p.pc or 0
+	end
+end
+Game.ensurePeople = ensurePeople
+
+local TeamActions = {}
+function TeamActions.party(state, kind)
+	ensurePeople(state)
+	local n = #state.people
+	if n == 0 then
+		return false, "Hire people first"
+	end
+	if (state.partyReady or 0) > state.day then
+		return false, "Another party so soon? Wait until " .. Format.date(state.partyReady)
+	end
+	local KINDS = { pizza = { 60, 10, "Pizza night" }, party = { 400, 22, "Office party" }, retreat = { 3500, 38, "Team retreat in the mountains" } }
+	local k = KINDS[kind]
+	if not k then
+		return false, "Unknown party"
+	end
+	local cost = k[1] * Game.headcount(state)
+	if state.cash < cost then
+		return false, "A " .. k[3]:lower() .. " for everyone costs " .. Format.money(cost)
+	end
+	state.cash -= cost
+	state.month.costs += cost
+	state.month.salaries += cost
+	state.partyReady = state.day + (kind == "retreat" and 60 or 20)
+	for _, p in ipairs(state.people) do
+		p.morale = math.min(100, p.morale + k[2])
+	end
+	Game.chatMsg(state, "general", state.people[rng:NextInteger(1, n)].name, ({ "Best " .. k[3]:lower() .. " ever. Thank you!!", "ok I'm never leaving this company", "who brought the karaoke machine", "I love this team" })[rng:NextInteger(1, 4)])
+	return true
+end
+
+function TeamActions.promote(state, id)
+	ensurePeople(state)
+	local p = personById(state, tonumber(id))
+	if not p then
+		return false, "Not found"
+	end
+	if p.rank >= #Staff.RANKS then
+		return false, p.name .. " is already " .. Staff.RANKS[#Staff.RANKS]
+	end
+	local cost = math.floor(Staff.monthlyCash(p.role, year(state)) * 3 * p.rank)
+	if state.cash < cost then
+		return false, "The raise bonus costs " .. Format.money(cost)
+	end
+	state.cash -= cost
+	state.month.costs += cost
+	state.month.salaries += cost
+	p.rank += 1
+	p.morale = math.min(100, p.morale + 22)
+	p.raise = (p.raise or 0) + Staff.monthlyCash(p.role, year(state)) * 0.15
+	Game.chatMsg(state, "dms", p.name, "Thank you so much for the promotion to " .. Staff.RANKS[p.rank] .. ". I won't let you down.")
+	return true
+end
+
+function TeamActions.givePc(state, id, tier)
+	ensurePeople(state)
+	local p = personById(state, tonumber(id))
+	tier = math.floor(tonumber(tier) or 0)
+	local pc = Staff.PCS[tier + 1]
+	if not p or not pc then
+		return false, "Not found"
+	end
+	if p.pc >= tier then
+		return false, "They already have that or better"
+	end
+	if state.cash < pc.price then
+		return false, "Not enough cash"
+	end
+	state.cash -= pc.price
+	state.month.costs += pc.price
+	state.month.compute += pc.price
+	p.pc = tier
+	p.morale = math.min(100, p.morale + 8)
+	Game.chatMsg(state, "dms", p.name, "A " .. pc.name .. "?? My training scripts are going to fly.")
+	return true
+end
+
+function TeamActions.answerRequest(state, reqId, yes)
+	state.requests = state.requests or {}
+	for i, r in ipairs(state.requests) do
+		if r.id == reqId then
+			table.remove(state.requests, i)
+			local p = personById(state, r.person)
+			if not p then
+				return true
+			end
+			if yes then
+				if r.kind == "dayoff" then
+					p.offUntil = state.day + r.days
+					p.morale = math.min(100, p.morale + 15)
+				elseif r.kind == "raise" then
+					p.raise = (p.raise or 0) + r.amount
+					p.morale = math.min(100, p.morale + 20)
+				elseif r.kind == "pc" then
+					if state.cash < Staff.PCS[3].price then
+						return false, "Not enough cash"
+					end
+					state.cash -= Staff.PCS[3].price
+					p.pc = math.max(p.pc, 2)
+					p.morale = math.min(100, p.morale + 10)
+				end
+				Game.chatMsg(state, "dms", p.name, "Thank you!")
+			else
+				p.morale = math.max(0, p.morale - (r.kind == "raise" and 25 or 15))
+				Game.chatMsg(state, "dms", p.name, ({ "Oh. Okay.", "Fine.", "Got it.", "...right." })[rng:NextInteger(1, 4)])
+			end
+			return true
+		end
+	end
+	return false, "Request expired"
+end
+
+-- LinkedIn: search with filters, then try to hire one person
+function TeamActions.linkedinSearch(state, filters)
+	filters = type(filters) == "table" and filters or {}
+	local role = Staff.byId[filters.role] and filters.role or "junior"
+	local cost = (filters.premium and 300 or 0)
+	if cost > 0 then
+		if state.cash < cost then
+			return false, "LinkedIn Recruiter costs $300"
+		end
+		state.cash -= cost
+	end
+	local results = {}
+	local n = filters.premium and 8 or 5
+	for i = 1, n do
+		local f = table.clone(filters)
+		if not filters.premium then
+			f.minSkill = math.min(tonumber(f.minSkill) or 0.7, 1.0)
+		end
+		local c = Staff.searchCandidate(rng, role, f)
+		c.key = state.day .. "_" .. i .. "_" .. rng:NextInteger(1, 1e6)
+		table.insert(results, c)
+	end
+	state.search = results
+	return true
+end
+
+function TeamActions.recruit(state, key)
+	local c, idx
+	for i, x in ipairs(state.search or {}) do
+		if x.key == key then
+			c, idx = x, i
+		end
+	end
+	if not c then
+		return false, "They are not on the list anymore"
+	end
+	local stage = Catalog.officeStages[state.office]
+	if Game.headcount(state) + 1 > stage.maxStaff then
+		return false, "Office is full. Upgrade in Company (max " .. stage.maxStaff .. ")."
+	end
+	local signing = Staff.monthlyCash(c.role, year(state)) * (0.6 + c.skill ^ 3) * (c.hot and 2 or 1) * locationOf(state).salary
+	if state.cash < signing then
+		return false, "Signing bonus is " .. Format.money(signing)
+	end
+	-- top people say no unless you are hot, famous or rich
+	local pull = state.hype / 100 * 0.4 + state.reputation / 100 * 0.4 + math.min(0.3, math.log10(1 + state.valuation / 1e8) * 0.1)
+	table.remove(state.search, idx)
+	if rng:NextNumber() < c.demand - pull then
+		Game.chatMsg(state, "dms", c.name, ({ "Thanks, but I'm staying where I am.", "I got a better offer from a bigger lab. Sorry!", "Your company is cool, but not yet. Maybe next year." })[rng:NextInteger(1, 3)])
+		return true, "declined"
+	end
+	state.cash -= signing
+	state.month.costs += signing
+	state.month.salaries += signing
+	state.staff[c.role] += 1
+	ensurePeople(state)
+	c.id = state.nextPersonId
+	state.nextPersonId += 1
+	c.morale, c.rank, c.pc = 80, c.skill > 1.3 and 3 or (c.skill > 1.05 and 2 or 1), 0
+	c.key = nil
+	table.insert(state.people, c)
+	state.stats.hired += 1
+	Game._goalProgress(state, "hire", 1)
+	Game.chatMsg(state, "general", c.name, "Hi everyone! Joining from " .. c.from .. ". Let's build something big.")
+	return true, "hired"
+end
+
+-- daily: moods drift, tired people quit, people ask for things
+function Game.tickTeam(state)
+	ensurePeople(state)
+	state.requests = state.requests or {}
+	local busy = state.training and 0.12 or 0
+	local hard = (state.problems and #state.problems > 0) and 0.15 or 0
+	for i = #state.people, 1, -1 do
+		local p = state.people[i]
+		p.morale = math.clamp(p.morale - 0.12 - busy - hard + (p.offUntil and state.day < p.offUntil and 1.5 or 0), 0, 100)
+		if p.morale < 25 and rng:NextNumber() < 0.025 then
+			table.remove(state.people, i)
+			if (state.staff[p.role] or 0) > 0 then
+				state.staff[p.role] -= 1
+			end
+			Game.chatMsg(state, "general", p.name, ({ "I'm out. This place burned me out.", "Today is my last day. Good luck everyone.", "Leaving for a bigger lab. They actually throw parties." })[rng:NextInteger(1, 3)])
+			Game.newsItem(state, p.name .. " leaves " .. state.company, "press")
+		end
+	end
+	-- requests
+	for i = #state.requests, 1, -1 do
+		local r = state.requests[i]
+		if state.day > r.expires then
+			table.remove(state.requests, i)
+			local p = personById(state, r.person)
+			if p then
+				p.morale = math.max(0, p.morale - 10)
+			end
+		end
+	end
+	if #state.people > 0 and #state.requests < 4 and rng:NextNumber() < 0.04 + #state.people * 0.004 then
+		local p = state.people[rng:NextInteger(1, #state.people)]
+		state.nextReq = (state.nextReq or 0) + 1
+		local roll = rng:NextNumber()
+		local r
+		if roll < 0.5 then
+			local days = rng:NextInteger(1, 5)
+			r = { kind = "dayoff", days = days, text = ({ "Can I take " .. days .. " days off? I'm exhausted.", "My sister is getting married, can I have " .. days .. " days off?", "I need " .. days .. " days off to recharge." })[rng:NextInteger(1, 3)] }
+		elseif roll < 0.8 then
+			local amt = math.floor(Staff.monthlyCash(p.role, year(state)) * 0.12)
+			r = { kind = "raise", amount = amt, text = "I got an offer from another lab. Can you raise me " .. Format.money(amt) .. " a month?" }
+		else
+			r = { kind = "pc", text = "My laptop is too slow for real experiments. Can I get a workstation (" .. Format.money(Staff.PCS[3].price) .. ")?" }
+		end
+		r.id, r.person, r.name, r.expires = state.nextReq, p.id, p.name, state.day + 6
+		table.insert(state.requests, r)
+		Game.chatMsg(state, "dms", p.name, r.text)
+	end
 end
 
 function Game.headcount(state): number
@@ -313,6 +586,7 @@ local function goalProgress(state, id, amount)
 		end
 	end
 end
+Game._goalProgress = goalProgress
 
 -- ===== goals =====
 function Game.newGoals(state)
@@ -340,6 +614,9 @@ end
 
 -- ===== actions =====
 local Actions = {}
+for k, v in pairs(TeamActions) do
+	Actions[k] = v
+end
 
 function Actions.buyDecor(state, id)
 	local d = Decor.byId[id]
@@ -439,7 +716,10 @@ function Actions.hire(state, roleId, count)
 			end
 		end
 		c = c or Staff.randomCandidate(rng, roleId)
-		if #state.people < 40 then
+		if #state.people < 200 then
+			state.nextPersonId = state.nextPersonId or 1
+			c.id, c.morale, c.rank, c.pc = state.nextPersonId, 75, 1, 0
+			state.nextPersonId += 1
 			table.insert(state.people, c)
 		end
 		if i == 1 then
@@ -595,7 +875,7 @@ function Actions.train(state, recipe)
 	if state.cash < ev.extraCost then
 		return false, "Not enough cash for data and post-training costs (" .. Format.money(ev.extraCost) .. ")"
 	end
-	ev.extraCost *= Config.DIFFICULTY / 2
+	ev.extraCost *= Config.DIFFICULTY / 2 * Game.smallDiscount(state)
 	if state.cash < ev.extraCost then
 		return false, "Not enough cash for data and post-training (" .. Format.money(ev.extraCost) .. ")"
 	end
@@ -703,6 +983,17 @@ function Actions.createModel(state, name)
 		end
 	end
 	recipe.size = chosen
+	-- a small company trains a smaller first model it can actually pay for
+	for i = #Opts.SIZES, 1, -1 do
+		local sz = Opts.SIZES[i]
+		if sz <= chosen then
+			recipe.size = sz
+			local ev = TM.evaluate(recipe, ctx)
+			if ev.extraCost * Config.DIFFICULTY / 2 * Game.smallDiscount(state) <= state.cash * 0.6 then
+				break
+			end
+		end
+	end
 	-- newer tricks are switched on automatically once your team knows them
 	local d = state.research.done
 	if d.rlhf then
@@ -2412,6 +2703,7 @@ function Game.tickDay(state)
 	Game.tickLawsuits(state)
 	Game.tickOffers(state)
 	Game.tickPeople(state)
+	Game.tickTeam(state)
 	Game.tickAchievements(state)
 	randomEvent(state)
 	autoResolve(state)
@@ -2472,6 +2764,28 @@ function Game.monthly(state, y)
 		l.months -= 1
 		if l.left <= 1 or l.months <= 0 then
 			table.remove(state.loans, i)
+		end
+	end
+	-- being in the red is allowed, but the bank charges you for every dollar under zero
+	if state.cash < 0 then
+		local fee = -state.cash * 0.03
+		state.cash -= fee
+		state.month.costs += fee
+		if state.cash < -math.max(3e6, state.valuation * 0.35) then
+			-- creditors take your owned GPUs to cover part of the debt
+			local taken = 0
+			for id, n in pairs(state.gpus.owned) do
+				if id ~= "laptop" and n > 0 then
+					local h = Hardware.byId[id]
+					local sell = math.ceil(n / 2)
+					state.gpus.owned[id] = n - sell
+					taken += Hardware.buyPrice(h, year(state)) * sell * 0.4
+				end
+			end
+			if taken > 0 then
+				state.cash += taken
+				Game.mail(state, "warning", "Creditors", "We took half your GPUs", "You owe too much. We seized half of your own GPUs and sold them for " .. Format.money(taken) .. ".")
+			end
 		end
 	end
 	-- investors only call once people use your AI
@@ -2559,7 +2873,7 @@ function Game.snapshot(state)
 		company = state.company, day = state.day, speed = state.speed, cash = state.cash, credits = state.credits,
 		valuation = state.valuation, equity = state.equity, users = state.users, brand = state.brand, hype = state.hype,
 		reputation = state.reputation, regulator = state.regulator, office = state.office, staff = state.staff,
-		people = state.people, candidates = state.candidates, gpus = state.gpus, research = state.research,
+		people = state.people, candidates = state.candidates, requests = state.requests or {}, search = state.search or {}, partyReady = state.partyReady or 0, teamFactor = Game.teamFactor(state), gpus = state.gpus, research = state.research,
 		models = models, product = state.product, history = state.history, month = state.month, lastMonth = state.lastMonth,
 		news = state.news, mail = state.mail, chat = state.chat, goals = state.goals, investors = state.investors,
 		leaderboard = leaderboard, frontier = state.world.frontier, marketUsers = state.world.marketUsers,

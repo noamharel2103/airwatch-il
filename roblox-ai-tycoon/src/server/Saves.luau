@@ -14,31 +14,30 @@ local store: DataStore? = nil
 local Http = game:GetService("HttpService")
 local LOCAL = "http://127.0.0.1:34874/"
 local ram = {}
-local memory = setmetatable({}, {
-	__index = function(_, k)
-		if RunService:IsStudio() then
-			local ok, res = pcall(function()
-				return Http:JSONDecode(Http:GetAsync(LOCAL .. "load/" .. k))
-			end)
-			if ok then
-				return res
+local function memGet(k)
+	if RunService:IsStudio() then
+		local ok, res = pcall(function()
+			return Http:JSONDecode(Http:GetAsync(LOCAL .. "load/" .. k .. "?t=" .. os.clock(), true))
+		end)
+		if ok then
+			return res
+		end
+		warn("[Saves] local load failed for " .. k .. ": " .. tostring(res))
+	end
+	return ram[k]
+end
+local function memSet(k, v)
+	ram[k] = v
+	if RunService:IsStudio() then
+		pcall(function()
+			if v == nil then
+				Http:RequestAsync({ Url = LOCAL .. "save/" .. k, Method = "DELETE" })
+			else
+				Http:PostAsync(LOCAL .. "save/" .. k, Http:JSONEncode(v), Enum.HttpContentType.ApplicationJson)
 			end
-		end
-		return ram[k]
-	end,
-	__newindex = function(_, k, v)
-		ram[k] = v
-		if RunService:IsStudio() then
-			pcall(function()
-				if v == nil then
-					Http:RequestAsync({ Url = LOCAL .. "save/" .. k, Method = "DELETE" })
-				else
-					Http:PostAsync(LOCAL .. "save/" .. k, Http:JSONEncode(v), Enum.HttpContentType.ApplicationJson)
-				end
-			end)
-		end
-	end,
-})
+		end)
+	end
+end
 local okStore = pcall(function()
 	store = DataStoreService:GetDataStore(STORE_NAME)
 end)
@@ -101,12 +100,12 @@ end
 function Saves.listSlots(userId: number)
 	if not Saves.available then
 		-- local saves: rebuild the list from the slot files so a lost index never hides a company
-		local idx = memory[key(userId)] or {}
+		local idx = memGet(key(userId)) or {}
 		local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 		local Format = require(Shared.Format)
 		local Catalog = require(Shared.Catalog)
 		for slot = 1, Saves.MAX_SLOTS do
-			local data = memory[key(userId, slot)]
+			local data = memGet(key(userId, slot))
 			if type(data) == "table" and data.company then
 				idx[tostring(slot)] = {
 					company = data.company,
@@ -129,12 +128,12 @@ function Saves.listSlots(userId: number)
 	if not ok then
 		Saves.available = false
 	end
-	return memory[key(userId)] or {}
+	return memGet(key(userId)) or {}
 end
 
 function Saves.load(userId: number, slot: number)
 	if not Saves.available then
-		return memory[key(userId, slot)]
+		return memGet(key(userId, slot))
 	end
 	local ok, res = retry(function()
 		return (store :: DataStore):GetAsync(key(userId, slot))
@@ -145,10 +144,10 @@ end
 function Saves.save(userId: number, slot: number, state, summary)
 	local data = clean(state)
 	if not Saves.available then
-		memory[key(userId, slot)] = data
-		local idx = memory[key(userId)] or {}
+		memSet(key(userId, slot), data)
+		local idx = memGet(key(userId)) or {}
 		idx[tostring(slot)] = summary
-		memory[key(userId)] = idx
+		memSet(key(userId), idx)
 		return true
 	end
 	local ok = retry(function()
@@ -170,10 +169,10 @@ end
 
 function Saves.delete(userId: number, slot: number)
 	if not Saves.available then
-		memory[key(userId, slot)] = nil
-		local idx = memory[key(userId)] or {}
+		memSet(key(userId, slot), nil)
+		local idx = memGet(key(userId)) or {}
 		idx[tostring(slot)] = nil
-		memory[key(userId)] = idx
+		memSet(key(userId), idx)
 		return true
 	end
 	retry(function()

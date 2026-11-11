@@ -21,7 +21,7 @@ class H(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        m = re.match(r"^/load/(.+)$", self.path)
+        m = re.match(r"^/load/([^?]+)", self.path)
         if not m:
             return self._send(404)
         p = path_for(m.group(1))
@@ -31,7 +31,7 @@ class H(BaseHTTPRequestHandler):
             self._send(200, f.read())
 
     def do_POST(self):
-        m = re.match(r"^/save/(.+)$", self.path)
+        m = re.match(r"^/save/([^?]+)", self.path)
         if not m:
             return self._send(404)
         n = int(self.headers.get("Content-Length", 0))
@@ -42,7 +42,7 @@ class H(BaseHTTPRequestHandler):
         self._send(200, b'{"ok":true}')
 
     def do_DELETE(self):
-        m = re.match(r"^/save/(.+)$", self.path)
+        m = re.match(r"^/save/([^?]+)", self.path)
         if m and os.path.exists(path_for(m.group(1))):
             os.remove(path_for(m.group(1)))
         self._send(200, b'{"ok":true}')
