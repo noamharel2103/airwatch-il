@@ -42,11 +42,11 @@ end
 
 local function tabs(ctx)
 	UI.clear(ctx.tabs)
-	for _, p in ipairs({ { "train", "Train" }, { "models", "Models" }, { "research", "Research" }, { "arena", "Arena" } }) do
+	for _, p in ipairs({ { "train", "Train" }, { "models", "Models" }, { "arena", "Leaderboard" } }) do
 		UI.button(ctx.tabs, p[2], function()
 			page = p[1]
 			Lab.mount(ctx, Net.state)
-		end, page == p[1] and "primary" or "ghost", { Size = UDim2.fromOffset(110, 34) })
+		end, page == p[1] and "primary" or "ghost", { Size = UDim2.fromOffset(150, 40) })
 	end
 end
 
@@ -110,17 +110,17 @@ local function updatePreview(s)
 end
 
 local function optionChip(parent, o, selected, onClick, locked)
-	local b = new("TextButton", { Text = "", BackgroundColor3 = selected and T.accent or T.panel2, Size = UDim2.fromOffset(188, 62), Parent = parent })
+	local b = new("TextButton", { Text = "", BackgroundColor3 = selected and T.accent or Color3.fromRGB(255, 255, 255), Size = UDim2.fromOffset(188, 62), Parent = parent })
 	UI.corner(b, 10)
 	if locked then
 		b.BackgroundColor3 = T.bg
 		UI.stroke(b, T.line, 1)
 	end
-	new("TextLabel", { Text = o.name, FontFace = UI.BOLD, TextSize = 13, TextColor3 = locked and T.dim or T.text, Position = UDim2.fromOffset(10, 6), Size = UDim2.new(1, -20, 0, 16), TextTruncate = Enum.TextTruncate.AtEnd, TextWrapped = false, Parent = b })
-	new("TextLabel", { Text = locked and ("Research: " .. (Research.byId[o.req] and Research.byId[o.req].name or o.req)) or o.desc, TextSize = 11, TextColor3 = selected and Color3.fromRGB(225, 232, 255) or T.sub, Position = UDim2.fromOffset(10, 24), Size = UDim2.new(1, -20, 0, 34), TextYAlignment = Enum.TextYAlignment.Top, Parent = b })
+	new("TextLabel", { Text = o.name, FontFace = UI.BOLD, TextSize = 13, TextColor3 = locked and T.dim or (selected and Color3.new(1, 1, 1) or T.text), Position = UDim2.fromOffset(10, 6), Size = UDim2.new(1, -20, 0, 16), TextTruncate = Enum.TextTruncate.AtEnd, TextWrapped = false, Parent = b })
+	new("TextLabel", { Text = locked and ("Locked. Your team figures this out around " .. (Research.byId[o.req] and Format.monthYear(Research.byId[o.req].fromDay) or "later")) or o.desc, TextSize = 11, TextColor3 = selected and Color3.fromRGB(225, 232, 255) or T.sub, Position = UDim2.fromOffset(10, 24), Size = UDim2.new(1, -20, 0, 34), TextYAlignment = Enum.TextYAlignment.Top, Parent = b })
 	b.MouseButton1Click:Connect(function()
 		if locked then
-			Net.toast("Research " .. (Research.byId[o.req] and Research.byId[o.req].name or "it") .. " first (Lab > Research)", "warn")
+			Net.toast("Not invented yet. Hire ML engineers and researchers to get there faster.", "warn")
 			return
 		end
 		onClick()
@@ -130,7 +130,7 @@ end
 
 local function slider(parent, o, getV, setV, onChange, locked)
 	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 40), Parent = parent })
-	new("TextLabel", { Text = o.name, FontFace = UI.BOLD, TextSize = 13, TextColor3 = locked and T.dim or T.text, Size = UDim2.new(0, 210, 0, 18), Parent = row })
+	new("TextLabel", { Text = o.name, FontFace = UI.BOLD, TextSize = 13, TextColor3 = locked and T.dim or (selected and Color3.new(1, 1, 1) or T.text), Size = UDim2.new(0, 210, 0, 18), Parent = row })
 	new("TextLabel", { Text = locked and "locked" or o.desc, TextSize = 11, TextColor3 = T.dim, Position = UDim2.fromOffset(0, 18), Size = UDim2.new(0, 210, 0, 18), TextTruncate = Enum.TextTruncate.AtEnd, TextWrapped = false, Parent = row })
 	local track = new("TextButton", { Text = "", BackgroundColor3 = T.line, Position = UDim2.new(0, 220, 0, 14), Size = UDim2.new(1, -290, 0, 10), Parent = row })
 	UI.corner(track, 5)
@@ -209,7 +209,10 @@ local function buildTrain(body, s)
 	UI.corner(left, 14)
 	UI.pad(left, 10)
 	UI.list(left, 6)
-	UI.label(left, "Recipe", 13, T.dim)
+	UI.button(left, "< Simple", function()
+		Lab.advanced = false
+		Lab.mount(Lab.ctx, Net.state, true)
+	end, "ghost", { Size = UDim2.new(1, 0, 0, 34) })
 	local stages = { { name = "Model", id = "_size" } }
 	for _, st in ipairs(Opts.stages) do
 		table.insert(stages, st)
@@ -222,8 +225,106 @@ local function buildTrain(body, s)
 		UI.pad(b, 0, 12)
 	end
 
+	if not Lab.advanced then
+		left.Visible = false
+		local center = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -370, 1, 0), Parent = body })
+		local sc = UI.scroll(center)
+		UI.list(sc, 12)
+		UI.pad(sc, 0, 4, 10, 10)
+		local box = new("TextBox", { Text = recipe.name, PlaceholderText = "Name it: " .. s.company .. "-" .. (#s.models + 1), PlaceholderColor3 = T.dim, ClearTextOnFocus = false, BackgroundTransparency = 0, BackgroundColor3 = Color3.new(1, 1, 1), Size = UDim2.new(1, 0, 0, 46), TextSize = 20, Parent = sc })
+		UI.corner(box, 4)
+		UI.stroke(box, T.line, 3)
+		UI.pad(box, 0, 14)
+		box:GetPropertyChangedSignal("Text"):Connect(function()
+			recipe.name = box.Text:sub(1, 32)
+		end)
+		UI.label(sc, "1. How big?", 20, T.text, { FontFace = UI.HEAVY })
+		local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = sc })
+		new("UIGridLayout", { CellSize = UDim2.fromOffset(100, 48), CellPadding = UDim2.fromOffset(8, 8), Parent = grid })
+		local sizeColors = { T.green, T.green, T.teal, T.teal, T.accent, T.accent, T.purple, T.purple, T.orange, T.orange, T.red, T.red, T.red }
+		for i, sz in ipairs(Opts.SIZES) do
+			local label = sz >= 1000 and string.format("%gT", sz / 1000) or (string.format("%gB", sz))
+			UI.button(grid, label, function()
+				recipe.size = sz
+				Lab.mount(Lab.ctx, Net.state, true)
+			end, recipe.size == sz and sizeColors[i] or "ghost")
+		end
+		UI.label(sc, "2. What should it be great at?", 20, T.text, { FontFace = UI.HEAVY })
+		local FOCUS = {
+			{ name = "Friendly chat", color = T.pink, mix = { web = 40, books = 20, chats = 20, code = 8, papers = 4, math = 3, multi = 5 } },
+			{ name = "Coder", color = T.accent, mix = { web = 25, code = 45, books = 5, papers = 8, math = 12, multi = 5 } },
+			{ name = "Genius", color = T.purple, mix = { web = 20, code = 20, papers = 25, math = 30, multi = 5 } },
+			{ name = "Polyglot", color = T.green, mix = { web = 35, code = 10, books = 10, multi = 40, chats = 5 } },
+			{ name = "Balanced", color = T.orange, mix = { web = 45, code = 15, books = 10, papers = 8, math = 5, multi = 7, chats = 5, synthetic = 5 } },
+		}
+		local fg = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = sc })
+		new("UIGridLayout", { CellSize = UDim2.fromOffset(200, 56), CellPadding = UDim2.fromOffset(8, 8), Parent = fg })
+		for _, f in ipairs(FOCUS) do
+			local on = recipe.focus == f.name
+			UI.button(fg, f.name, function()
+				recipe.focus = f.name
+				for id in pairs(recipe.mix) do
+					recipe.mix[id] = 0
+				end
+				for id, v in pairs(f.mix) do
+					recipe.mix[id] = v
+				end
+				Lab.mount(Lab.ctx, Net.state, true)
+			end, on and f.color or "ghost", { Size = UDim2.fromOffset(200, 56) })
+		end
+		UI.label(sc, "3. Superpowers (new ones unlock over time)", 20, T.text, { FontFace = UI.HEAVY })
+		local POWERS = {
+			{ group = "align", id = "rlhf", name = "Human feedback", color = T.green },
+			{ group = "skills", id = "rlvr", name = "Thinks before answering", color = T.purple, think = "high" },
+			{ group = "skills", id = "tools", name = "Uses tools", color = T.accent },
+			{ group = "skills", id = "agentrl", name = "Agent mode", color = T.red },
+			{ group = "modal", id = "vision", name = "Can see images", color = T.teal },
+			{ group = "modal", id = "audio", name = "Voice", color = T.pink },
+			{ group = "modal", id = "imagegen", name = "Draws pictures", color = T.orange },
+			{ group = "arch", id = "moe", name = "Mixture of Experts", color = T.yellow, single = true },
+			{ group = "ctx", id = "1m", name = "1M context", color = T.accent, single = true },
+			{ group = "evals", id = "redteam", name = "Red team it", color = T.red },
+			{ group = "precision", id = "fp8", name = "FP8 (train faster)", color = T.orange, single = true },
+		}
+		local pg = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = sc })
+		new("UIGridLayout", { CellSize = UDim2.fromOffset(200, 50), CellPadding = UDim2.fromOffset(8, 8), Parent = pg })
+		local shown = 0
+		for _, pw in ipairs(POWERS) do
+			local o = Opts.optionById[pw.id]
+			if o and (not o.req or s.research.done[o.req]) then
+				shown += 1
+				local on
+				if pw.single then
+					on = recipe.choices[pw.group] == pw.id
+				else
+					on = recipe.choices[pw.group] and recipe.choices[pw.group][pw.id]
+				end
+				UI.button(pg, (on and "ON  " or "") .. pw.name, function()
+					if pw.single then
+						local def = Opts.groupById[pw.group].options[1].id
+						recipe.choices[pw.group] = on and (pw.group == "ctx" and "4k" or def) or pw.id
+					else
+						recipe.choices[pw.group] = recipe.choices[pw.group] or {}
+						recipe.choices[pw.group][pw.id] = (not on) or nil
+						if pw.think then
+							recipe.choices.think = (not on) and pw.think or "none"
+						end
+					end
+					Lab.mount(Lab.ctx, Net.state, true)
+				end, on and pw.color or "ghost", { Size = UDim2.fromOffset(200, 50) })
+			end
+		end
+		if shown == 0 then
+			UI.label(sc, "Nothing unlocked yet. Your team discovers new tricks as time passes.", 14, T.sub)
+		end
+		UI.button(sc, "Advanced", function()
+			Lab.advanced = true
+			Lab.mount(Lab.ctx, Net.state, true)
+		end, "ghost", { Size = UDim2.fromOffset(180, 44) })
+	end
+
 	-- Center: options
-	local center = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(204, 0), Size = UDim2.new(1, -204 - 370, 1, 0), Parent = body })
+	local center = new("Frame", { BackgroundTransparency = 1, Visible = Lab.advanced == true, Position = UDim2.fromOffset(204, 0), Size = UDim2.new(1, -204 - 370, 1, 0), Parent = body })
 	local scroll = UI.scroll(center)
 	UI.list(scroll, 10)
 	UI.pad(scroll, 0, 0, 10, 8)
@@ -345,92 +446,87 @@ local function statusColor(st)
 	return ({ ready = T.yellow, released = T.green, delayed = T.orange, retired = T.dim })[st] or T.sub
 end
 
-local function releaseDialog(body, m, s)
-	local overlay = new("TextButton", { Text = "", BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.4, Size = UDim2.fromScale(1, 1), ZIndex = 40, Parent = body })
-	local d = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(560, 470), BackgroundColor3 = T.panel, ZIndex = 41, Parent = overlay })
+local function releaseDialog(host, m, s)
+	local overlay = new("TextButton", { Text = "", BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.45, Size = UDim2.fromScale(1, 1), ZIndex = 40, Parent = host })
+	local d = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(640, 470), BackgroundColor3 = T.bg, ZIndex = 41, Parent = overlay })
 	UI.corner(d, 16)
-	UI.pad(d, 18)
-	UI.list(d, 10)
-	local function z(x)
-		for _, c in ipairs(x:GetDescendants()) do
-			if c:IsA("GuiObject") then
-				c.ZIndex = 42
-			end
+	UI.stroke(d, T.line, 4)
+	UI.pad(d, 24)
+	UI.list(d, 14)
+	UI.label(d, "Release " .. m.name, 26, T.text, { FontFace = UI.HEAVY })
+	local opts = { price = 10, open = false, campaign = 0 }
+	local lc = s.launchCosts or { campaign = { 0, 0, 0, 0 } }
+	local function choiceRow(title, items, onPick)
+		UI.label(d, title, 18, T.text, { FontFace = UI.BOLD })
+		local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 50), Parent = d })
+		UI.list(row, 10, true)
+		local btns = {}
+		for i, it in ipairs(items) do
+			btns[i] = UI.button(row, it[1], function()
+				onPick(it[2])
+				for j, bb in ipairs(btns) do
+					bb.BackgroundColor3 = j == i and it[3] or Color3.fromRGB(150, 170, 205)
+				end
+			end, i == 1 and it[3] or "ghost", { Size = UDim2.fromOffset(180, 46) })
 		end
 	end
-	UI.label(d, "Release " .. m.name, 22, T.text, { FontFace = UI.HEAVY })
-	local opts = { price = 10, open = false, campaign = 1, reviewers = false, reserve = false }
-	local best = s.leaderboard[1]
-	UI.label(d, "API price per 1M output tokens. The leader charges about $" .. (best and "?" or "10") .. ". Cheaper = more developers, but less money per token.", 12, T.sub)
-	local priceRow = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 36), Parent = d })
-	UI.list(priceRow, 6, true)
-	local priceBtns = {}
-	for _, p in ipairs({ 0.5, 2, 5, 10, 15, 30, 60 }) do
-		priceBtns[p] = UI.button(priceRow, "$" .. p, function()
-			opts.price = p
-			for pp, b in pairs(priceBtns) do
-				b.BackgroundColor3 = pp == p and T.accent or T.panel2
-			end
-		end, p == 10 and "primary" or "ghost", { Size = UDim2.fromOffset(64, 34) })
-	end
-	local function toggle(text, key, cost)
-		local b
-		b = UI.button(d, text .. (cost and ("   " .. cost) or ""), function()
-			opts[key] = not opts[key]
-			b.BackgroundColor3 = opts[key] and T.green or T.panel2
-		end, "ghost", { Size = UDim2.new(1, 0, 0, 38), TextXAlignment = Enum.TextXAlignment.Left })
-		UI.pad(b, 0, 14)
-	end
-	toggle("Open weights (community loves it, competitors copy it)", "open")
-	toggle("Send to tech reviewers first", "reviewers", "$80K")
-	toggle("Reserve extra servers for launch day", "reserve", Format.money(200e3 * (1 + s.users / 1e6)))
-	UI.label(d, "Marketing campaign", 12, T.sub)
-	local campRow = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 36), Parent = d })
-	UI.list(campRow, 6, true)
-	local campBtns = {}
-	for i, c in ipairs({ "Quiet drop", "Teasers", "Big launch", "Super Bowl ad" }) do
-		campBtns[i - 1] = UI.button(campRow, c, function()
-			opts.campaign = i - 1
-			for k, b in pairs(campBtns) do
-				b.BackgroundColor3 = k == i - 1 and T.accent or T.panel2
-			end
-		end, i == 2 and "primary" or "ghost", { Size = UDim2.fromOffset(122, 34) })
-	end
-	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 50), Parent = d })
-	UI.list(row, 10, true)
+	choiceRow("Price", { { "Cheap", 2, T.green }, { "Normal", 10, T.accent }, { "Premium", 30, T.purple } }, function(v)
+		opts.price = v
+	end)
+	choiceRow("Open the weights?", { { "No, keep it closed", false, T.accent }, { "Yes, open source", true, T.green } }, function(v)
+		opts.open = v
+	end)
+	choiceRow("Hype", { { "Quiet drop", 0, T.accent }, { "Teasers " .. Format.money(lc.campaign[2]), 1, T.orange }, { "Big launch " .. Format.money(lc.campaign[3]), 2, T.red } }, function(v)
+		opts.campaign = v
+	end)
+	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 60), Parent = d })
+	UI.list(row, 12, true)
 	UI.button(row, "Cancel", function()
 		overlay:Destroy()
-	end, "ghost", { Size = UDim2.fromOffset(120, 46) })
-	UI.button(row, "RELEASE", function()
+	end, "ghost", { Size = UDim2.fromOffset(150, 56) })
+	UI.button(row, "RELEASE IT", function()
 		local ok, result = Net.act("release", m.id, opts)
 		overlay:Destroy()
 		if ok and result and Lab.onLaunch then
 			Lab.onLaunch(result)
 		end
-	end, T.red, { Size = UDim2.fromOffset(380, 46), TextSize = 20, FontFace = UI.HEAVY })
-	z(overlay)
+	end, T.red, { Size = UDim2.fromOffset(400, 56), TextSize = 24 })
+	for _, c in ipairs(overlay:GetDescendants()) do
+		if c:IsA("GuiObject") then
+			c.ZIndex = 42
+		end
+	end
 end
 
 local function evalPanel(parent, m)
-	local EV = { { "contam", "Contamination audit", 60e3 }, { "halluc", "Hallucination eval", 40e3 }, { "syco", "Sycophancy eval", 40e3 }, { "jailbreak", "Red team", 150e3 }, { "escape", "Dangerous capability eval", 250e3 } }
-	local names = { contam = "Contamination", halluc = "Hallucination", syco = "Sycophancy", jailbreak = "Jailbreak risk", escape = "Escape risk", refuse = "Refusals", safety = "Safety score" }
-	local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = parent })
-	new("UIGridLayout", { CellSize = UDim2.fromOffset(200, 54), CellPadding = UDim2.fromOffset(8, 8), Parent = grid })
-	for _, e in ipairs(EV) do
-		local key = e[1]
-		local v = m.flaws[key]
-		local f = new("Frame", { BackgroundColor3 = T.panel, Parent = grid })
-		UI.corner(f, 10)
-		UI.pad(f, 6, 10)
-		new("TextLabel", { Text = names[key], TextSize = 12, TextColor3 = T.sub, Size = UDim2.new(1, 0, 0, 16), Parent = f })
-		if v ~= nil then
-			local bad = v > (key == "escape" and 0.05 or 0.3)
-			new("TextLabel", { Text = string.format("%d%%", math.floor(v * 100)), FontFace = UI.BOLD, TextSize = 18, TextColor3 = bad and T.red or T.green, Position = UDim2.fromOffset(0, 18), Size = UDim2.new(1, 0, 0, 22), Parent = f })
-		elseif m.status ~= "retired" then
-			local b = UI.button(f, "Run " .. Format.money(e[3]), function()
-				Net.act("runEval", m.id, key)
-			end, "ghost", { Position = UDim2.fromOffset(0, 18), Size = UDim2.new(1, 0, 0, 24), TextSize = 12 })
+	local names = { contam = "Cheated on tests", halluc = "Makes things up", syco = "Too flattering", jailbreak = "Easy to jailbreak", escape = "Might escape" }
+	local any = false
+	for k in pairs(names) do
+		if m.flaws[k] ~= nil then
+			any = true
 		end
+	end
+	if not any then
+		if m.status == "ready" or m.status == "delayed" then
+			local s = Net.state
+			local cost = math.floor(530e3 * math.clamp(m.size / 70, 0.02, 4) * (1 + ((s and s.year or 2023) - 2023) * 0.4) / 100) * 100
+			UI.button(parent, "Run safety check  " .. Format.money(cost), function()
+				Net.act("runAllEvals", m.id)
+			end, T.teal, { Size = UDim2.fromOffset(360, 46) })
+		end
+		return
+	end
+	local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = parent })
+	new("UIGridLayout", { CellSize = UDim2.fromOffset(220, 64), CellPadding = UDim2.fromOffset(10, 10), Parent = grid })
+	for _, k in ipairs({ "contam", "halluc", "syco", "jailbreak", "escape" }) do
+		local v = m.flaws[k] or 0
+		local bad = v > (k == "escape" and 0.05 or 0.3)
+		local f = new("Frame", { BackgroundColor3 = bad and Color3.fromRGB(255, 220, 222) or Color3.fromRGB(214, 246, 224), Parent = grid })
+		UI.corner(f, 10)
+		UI.stroke(f, T.line, 2)
+		UI.pad(f, 8, 12)
+		new("TextLabel", { Text = names[k], FontFace = UI.BOLD, TextSize = 15, TextColor3 = T.text, Size = UDim2.new(1, 0, 0, 20), Parent = f })
+		new("TextLabel", { Text = bad and "PROBLEM" or "OK", FontFace = UI.HEAVY, TextSize = 16, TextColor3 = bad and T.red or T.green, Position = UDim2.fromOffset(0, 24), Size = UDim2.new(1, 0, 0, 22), Parent = f })
 	end
 end
 
@@ -501,14 +597,14 @@ local function buildModels(body, s)
 	UI.list(acts, 8, true)
 	UI.button(acts, "Chat with it", function()
 		if Playground then
-			Playground.open(Lab.ctx.body, m, Net.state)
+			Playground.open(Lab.host or Lab.ctx.body, m, Net.state)
 		end
 	end, T.purple)
 	if m.status == "ready" then
 		UI.button(acts, "RELEASE", function()
-			releaseDialog(Lab.ctx.body, m, Net.state)
+			releaseDialog(Lab.host or Lab.ctx.body, m, Net.state)
 		end, T.red, { FontFace = UI.HEAVY })
-		UI.button(acts, "Delay 2 weeks (more safety work)", function()
+		UI.button(acts, "Delay 2 weeks", function()
 			Net.act("delay", m.id)
 		end, "ghost")
 	elseif m.status == "delayed" then
@@ -519,7 +615,7 @@ local function buildModels(body, s)
 		end, s.product.activeModel == m.id and "success" or "ghost")
 	end
 	-- evals
-	UI.label(sc, "Pre-launch evals (pay to find hidden problems)", 15, T.text, { FontFace = UI.BOLD })
+	UI.label(sc, "Is it safe?", 20, T.text, { FontFace = UI.BOLD })
 	evalPanel(sc, m)
 	-- benchmarks
 	if m.benchmarks then
@@ -549,7 +645,7 @@ local function buildModels(body, s)
 			local b = new("TextButton", { Text = "", BackgroundColor3 = has and T.bg or T.panel2, Parent = grid })
 			UI.corner(b, 10)
 			new("TextLabel", { Text = u.name, FontFace = UI.BOLD, TextSize = 13, TextColor3 = (locked or has) and T.dim or T.text, Position = UDim2.fromOffset(10, 6), Size = UDim2.new(1, -20, 0, 16), Parent = b })
-			new("TextLabel", { Text = has and "Already has it" or (locked and ("Research " .. Research.byId[u.req].name) or (u.desc .. "  " .. u.days .. "d")), TextSize = 11, TextColor3 = T.sub, Position = UDim2.fromOffset(10, 24), Size = UDim2.new(1, -20, 0, 48), TextYAlignment = Enum.TextYAlignment.Top, Parent = b })
+			new("TextLabel", { Text = has and "Already has it" or (locked and "Unlocks later as your team learns more" or (u.desc .. "  " .. u.days .. "d")), TextSize = 11, TextColor3 = T.sub, Position = UDim2.fromOffset(10, 24), Size = UDim2.new(1, -20, 0, 48), TextYAlignment = Enum.TextYAlignment.Top, Parent = b })
 			b.MouseButton1Click:Connect(function()
 				if not has and not locked then
 					Net.act("update", m.id, u.id)

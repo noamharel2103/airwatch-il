@@ -25,6 +25,7 @@ for _, app in ipairs({ Lab, Parts, Team, Bank, Social, MailGoals.Mail, MailGoals
 	Shell.register(app)
 end
 Lab.setPlayground(Playground)
+Lab.host = Shell.gui
 Lab.onLaunch = function(result)
 	Social.add("launch", result, Net.state and Net.state.day or 0)
 	Reveal.play(Shell.gui, result)
@@ -142,7 +143,18 @@ local function totalGpus(s)
 	end
 	return n
 end
+local knownResearch: { [string]: boolean }? = nil
+local Research = require(game:GetService("ReplicatedStorage").Shared.Research)
 Net.onState(function(s)
+	-- breakthroughs pop up as toasts (research runs by itself)
+	if knownResearch then
+		for id in pairs(s.research.done) do
+			if not knownResearch[id] and Research.byId[id] then
+				Shell.toast("Breakthrough: " .. Research.byId[id].name .. ". New options in the Lab.", "good")
+			end
+		end
+	end
+	knownResearch = table.clone(s.research.done)
 	if s.office ~= currentStage then
 		setRoom(s.office)
 	end

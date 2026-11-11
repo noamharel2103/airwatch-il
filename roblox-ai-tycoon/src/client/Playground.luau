@@ -162,7 +162,7 @@ function P.open(body: Instance, m, s)
 		local btn = UI.button(prompts, pr.q, function()
 			bubble(pr.q, true)
 			local typing = bubble("...", false)
-			Net.act("testPrompt", m.id)
+			task.spawn(Net.act, "testPrompt", m.id)
 			task.wait(0.5 + math.random() * 0.6)
 			local full = answer(m, pr.id)
 			typing.Text = ""

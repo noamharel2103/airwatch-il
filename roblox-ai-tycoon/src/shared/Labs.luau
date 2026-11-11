@@ -30,6 +30,38 @@ for _, l in ipairs(Labs.list) do
 	Labs.byId[l.id] = l
 end
 
+-- Approximate valuations in $B by year (research 08 §6; big tech = parent company, very hard to buy).
+Labs.valuationB = {
+	openai = { [2023] = 86, [2024] = 157, [2025] = 500, [2026] = 852 },
+	anthropic = { [2023] = 18, [2024] = 40, [2025] = 183, [2026] = 965 },
+	google = { [2023] = 1500, [2024] = 2100, [2025] = 2800, [2026] = 3600 },
+	meta = { [2023] = 700, [2024] = 1300, [2025] = 1700, [2026] = 1900 },
+	xai = { [2023] = 1, [2024] = 50, [2025] = 200, [2026] = 250 },
+	mistral = { [2023] = 2.1, [2024] = 6.2, [2025] = 13.7, [2026] = 24 },
+	deepseek = { [2023] = 1, [2024] = 3, [2025] = 12, [2026] = 30 },
+	qwen = { [2023] = 8, [2024] = 15, [2025] = 35, [2026] = 70 },
+	moonshot = { [2023] = 0.5, [2024] = 3.3, [2025] = 4.3, [2026] = 35 },
+	zhipu = { [2023] = 1.5, [2024] = 2.8, [2025] = 6.5, [2026] = 7.1 },
+	minimax = { [2023] = 1.2, [2024] = 2.5, [2025] = 4, [2026] = 9.2 },
+	microsoft = { [2023] = 2500, [2024] = 3100, [2025] = 3700, [2026] = 4000 },
+	amazon = { [2023] = 1500, [2024] = 2100, [2025] = 2400, [2026] = 2600 },
+	cohere = { [2023] = 2.2, [2024] = 5.5, [2025] = 7, [2026] = 25 },
+	nvidia = { [2023] = 1100, [2024] = 3200, [2025] = 4300, [2026] = 4800 },
+}
+
+function Labs.valuation(id: string, year: number): number
+	local t = Labs.valuationB[id]
+	if not t then
+		return 1e9
+	end
+	local y = math.clamp(year, 2023, 2026)
+	local v = t[y] * 1e9
+	if year > 2026 then
+		v *= 1.3 ^ (year - 2026)
+	end
+	return v
+end
+
 function Labs.displayName(id: string): string
 	local l = Labs.byId[id]
 	if not l then

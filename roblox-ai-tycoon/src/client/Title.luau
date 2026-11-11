@@ -13,7 +13,7 @@ local Title = {}
 
 function Title.show(gui: ScreenGui, onPlay: () -> ())
 	local o = new("Frame", { Name = "Title", BackgroundColor3 = Color3.fromRGB(12, 14, 20), Size = UDim2.fromScale(1, 1), ZIndex = 200, Parent = gui })
-	UI.grad(o, Color3.fromRGB(30, 40, 80), Color3.fromRGB(10, 10, 18), 110)
+	UI.grad(o, Color3.fromRGB(150, 220, 255), Color3.fromRGB(80, 160, 250), 110)
 	local function z()
 		for _, d in ipairs(o:GetDescendants()) do
 			if d:IsA("GuiObject") then
@@ -22,8 +22,9 @@ function Title.show(gui: ScreenGui, onPlay: () -> ())
 		end
 	end
 	local logo = new("TextLabel", { Text = Config.GAME_TITLE, FontFace = UI.HEAVY, TextSize = 96, TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 90), Size = UDim2.fromOffset(1000, 110), Parent = o })
-	UI.grad(logo, Color3.fromRGB(140, 180, 255), Color3.fromRGB(200, 140, 255), 0)
-	new("TextLabel", { Text = "Build an AI lab from a laptop to the biggest company on Earth. Starts January 2023.", TextSize = 18, TextColor3 = T.sub, TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 200), Size = UDim2.fromOffset(1000, 24), Parent = o })
+	UI.stroke(logo, Color3.fromRGB(28, 36, 64), 4)
+	logo.TextColor3 = Color3.fromRGB(255, 210, 40)
+	new("TextLabel", { Text = "Build an AI lab from a laptop to the biggest company on Earth. Starts January 2023.", TextSize = 18, TextColor3 = Color3.new(1, 1, 1), TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 200), Size = UDim2.fromOffset(1000, 24), Parent = o })
 	local row = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 280), Size = UDim2.fromOffset(1080, 320), Parent = o })
 	UI.list(row, 30, true, Enum.HorizontalAlignment.Center)
 	local status = new("TextLabel", { Text = "Loading your companies...", TextSize = 14, TextColor3 = T.dim, TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -30), Size = UDim2.fromOffset(900, 20), Parent = o })

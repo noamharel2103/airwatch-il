@@ -27,7 +27,7 @@ function App.mount(ctx, s)
 		end, page == p[1] and "primary" or "ghost", { Size = UDim2.fromOffset(100, 34) })
 	end
 	if page == "chat" then
-		local side = new("Frame", { BackgroundColor3 = Color3.fromRGB(40, 22, 52), Size = UDim2.new(0, 220, 1, 0), Parent = ctx.body })
+		local side = new("Frame", { BackgroundColor3 = Color3.fromRGB(236, 226, 255), Size = UDim2.new(0, 220, 1, 0), Parent = ctx.body })
 		UI.corner(side, 12)
 		UI.pad(side, 12)
 		UI.list(side, 4)
@@ -37,7 +37,7 @@ function App.mount(ctx, s)
 			local b = UI.button(side, "# " .. ch, function()
 				channel = ch
 				App.mount(ctx, Net.state)
-			end, channel == ch and Color3.fromRGB(90, 60, 140) or Color3.fromRGB(40, 22, 52), { Size = UDim2.new(1, 0, 0, 32), TextXAlignment = Enum.TextXAlignment.Left })
+			end, channel == ch and T.purple or "ghost", { Size = UDim2.new(1, 0, 0, 32), TextXAlignment = Enum.TextXAlignment.Left })
 			UI.pad(b, 0, 10)
 		end
 		local main = new("Frame", { BackgroundColor3 = T.panel, Position = UDim2.fromOffset(232, 0), Size = UDim2.new(1, -232, 1, 0), Parent = ctx.body })

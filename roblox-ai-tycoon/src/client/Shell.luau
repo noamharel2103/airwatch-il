@@ -18,7 +18,7 @@ local scale = new("UIScale", { Parent = gui })
 local function rescale()
 	local cam = workspace.CurrentCamera
 	local v = cam and cam.ViewportSize or Vector2.new(1600, 900)
-	scale.Scale = math.clamp(math.min(v.X / 1600, v.Y / 900), 0.55, 1.25)
+	scale.Scale = math.clamp(math.min(v.X / 1450, v.Y / 820), 0.6, 1.5)
 end
 rescale()
 workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
@@ -28,7 +28,7 @@ local hud = new("Frame", { Name = "HUD", BackgroundTransparency = 1, Size = UDim
 Shell.hud = hud
 local topRight = new("Frame", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, 14), Size = UDim2.fromOffset(330, 96), BackgroundColor3 = T.bg, BackgroundTransparency = 0.12, Parent = hud })
 UI.corner(topRight, 16)
-UI.stroke(topRight, T.line, 1, 0.3)
+UI.stroke(topRight, Color3.fromRGB(10, 12, 22), 3)
 local dateL = new("TextLabel", { Text = "Jan 1, 2023", FontFace = UI.HEAVY, TextSize = 26, Position = UDim2.fromOffset(18, 10), Size = UDim2.new(1, -36, 0, 30), TextXAlignment = Enum.TextXAlignment.Right, Parent = topRight })
 local speedRow = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(14, 50), Size = UDim2.new(1, -28, 0, 34), Parent = topRight })
 UI.list(speedRow, 6, true, Enum.HorizontalAlignment.Right)
@@ -44,7 +44,7 @@ local warn = new("TextLabel", { Text = "", TextSize = 12, TextColor3 = T.yellow,
 
 local topLeft = new("Frame", { Position = UDim2.fromOffset(16, 14), Size = UDim2.fromOffset(300, 96), BackgroundColor3 = T.bg, BackgroundTransparency = 0.12, Parent = hud })
 UI.corner(topLeft, 16)
-UI.stroke(topLeft, T.line, 1, 0.3)
+UI.stroke(topLeft, Color3.fromRGB(10, 12, 22), 3)
 local compL = new("TextLabel", { Text = "", FontFace = UI.BOLD, TextSize = 15, TextColor3 = T.sub, Position = UDim2.fromOffset(18, 10), Size = UDim2.new(1, -36, 0, 18), Parent = topLeft })
 local cashL = new("TextLabel", { Text = "$0", FontFace = UI.HEAVY, TextSize = 30, TextColor3 = T.green, Position = UDim2.fromOffset(18, 30), Size = UDim2.new(1, -36, 0, 34), Parent = topLeft })
 local subL = new("TextLabel", { Text = "", TextSize = 13, TextColor3 = T.sub, Position = UDim2.fromOffset(18, 66), Size = UDim2.new(1, -36, 0, 18), Parent = topLeft })
@@ -84,15 +84,15 @@ end
 Net.setToast(Shell.toast)
 
 -- ===== Computer =====
-local comp = new("Frame", { Name = "Computer", BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.35, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 10, Parent = gui })
+local comp = new("Frame", { Name = "Computer", BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.5, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 10, Parent = gui })
 Shell.computer = comp
 local screen = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(1, -40, 1, -40), BackgroundColor3 = Color3.fromRGB(20, 28, 52), ZIndex = 10, Parent = comp })
 UI.corner(screen, 22)
-UI.grad(screen, Color3.fromRGB(70, 140, 220), Color3.fromRGB(30, 50, 110), 90)
+UI.grad(screen, Color3.fromRGB(140, 215, 255), Color3.fromRGB(70, 160, 245), 90)
 -- blocky city skyline wallpaper
 for i = 0, 24 do
 	local h = 80 + ((i * 53) % 160)
-	new("Frame", { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(i / 25, 0, 1, 0), Size = UDim2.new(1 / 25, 2, 0, h), BackgroundColor3 = Color3.fromRGB(40, 70, 130), BackgroundTransparency = 0.25, ZIndex = 10, Parent = screen })
+	new("Frame", { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(i / 25, 0, 1, 0), Size = UDim2.new(1 / 25, 2, 0, h), BackgroundColor3 = Color3.fromRGB(255, 255, 255), BackgroundTransparency = 0.55, ZIndex = 10, Parent = screen })
 end
 local desk = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(40, 40), Size = UDim2.new(0, 400, 1, -120), ZIndex = 11, Parent = screen })
 new("UIGridLayout", { CellSize = UDim2.fromOffset(104, 112), CellPadding = UDim2.fromOffset(14, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = desk })
@@ -118,6 +118,7 @@ function Shell.register(app)
 	table.insert(order, app.id)
 	local btn = new("TextButton", { Text = "", BackgroundTransparency = 1, LayoutOrder = #order, ZIndex = 12, Parent = desk })
 	local ic = UI.icon(btn, app.icon, app.color, 72)
+	UI.stroke(ic, Color3.fromRGB(10, 12, 22), 3)
 	ic.Position = UDim2.fromOffset(16, 4)
 	ic.ZIndex = 12
 	for _, d in ipairs(ic:GetDescendants()) do
@@ -138,9 +139,9 @@ local function buildWindow(app)
 	if appWindow then
 		appWindow:Destroy()
 	end
-	local w = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.48), Size = UDim2.new(1, -140, 1, -130), BackgroundColor3 = T.bg, BackgroundTransparency = 0.03, ZIndex = 20, Parent = winLayer })
+	local w = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.48), Size = UDim2.new(1, -140, 1, -130), BackgroundColor3 = T.bg, BackgroundTransparency = 0, ZIndex = 20, Parent = winLayer })
 	UI.corner(w, 18)
-	UI.stroke(w, T.line, 1)
+	UI.stroke(w, Color3.fromRGB(10, 12, 22), 4)
 	local bar = new("Frame", { Size = UDim2.new(1, 0, 0, 56), BackgroundColor3 = T.accent, ZIndex = 21, Parent = w })
 	UI.grad(bar, Color3.fromRGB(60, 200, 255), Color3.fromRGB(0, 120, 210), 0)
 	UI.corner(bar, 3)
@@ -250,7 +251,7 @@ Net.onState(function(s)
 	subL.Text = string.format("%s users   |   last month %s", Format.count(s.users), lm and ((lm.revenue - lm.costs >= 0 and "+" or "") .. Format.money(lm.revenue - lm.costs)) or "-")
 	for sp, b in pairs(speedBtns) do
 		local on = s.speed == sp
-		b.BackgroundColor3 = on and T.accent or T.panel2
+		b.BackgroundColor3 = on and T.accent or Color3.fromRGB(150, 170, 205)
 	end
 	warn.Text = s.speed == 4 and "x4: things break faster when you are not watching" or (s.speed == 2 and "x2: a bit riskier" or "")
 	tbName.Text = s.company .. "   " .. Format.money(s.cash)

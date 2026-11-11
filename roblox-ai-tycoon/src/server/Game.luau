@@ -122,6 +122,9 @@ end
 local LAB_OFFSET = { openai = 0, anthropic = -0.5, google = -0.3, meta = -5, xai = -2, mistral = -9, deepseek = -4, qwen = -5, moonshot = -6, zhipu = -8, minimax = -9, microsoft = -10, amazon = -12, cohere = -14, nvidia = -12 }
 
 local function addRelease(state, r)
+	if state.acquired and state.acquired[r.lab] then
+		return -- you own them now
+	end
 	table.insert(state.world.released, r)
 	if r.cap > state.world.frontier then
 		state.world.frontier = r.cap
@@ -137,7 +140,7 @@ function Game.advanceWorld(state)
 	while Labs.releases[w.idx] and Labs.releases[w.idx].day <= state.day do
 		local r = Labs.releases[w.idx]
 		addRelease(state, r)
-		if state.day - r.day < 10 then
+		if state.day - r.day < 10 and not (state.acquired and state.acquired[r.lab]) then
 			Game.newsItem(state, Labs.displayName(r.lab) .. " releases " .. r.model .. ". " .. r.note, "rival")
 		end
 		w.idx += 1
@@ -146,7 +149,7 @@ function Game.advanceWorld(state)
 	if state.day > Labs.LAST_REAL_DAY then
 		for _, lab in ipairs(Labs.list) do
 			local names = Labs.futureNames[lab.id]
-			if names then
+			if names and not (state.acquired and state.acquired[lab.id]) then
 				local nextDay = w.future[lab.id]
 				if not nextDay then
 					w.future[lab.id] = state.day + rng:NextInteger(20, math.floor(lab.cadence * 30))
@@ -548,6 +551,10 @@ local EVALS = {
 	syco = { name = "Sycophancy eval", cost = 40e3 },
 }
 Game.EVALS = EVALS
+-- small models are cheap to evaluate, frontier models are not
+function Game.evalCost(base: number, size: number, y: number): number
+	return math.floor(base * math.clamp(size / 70, 0.02, 4) * (1 + (y - 2023) * 0.4) / 100) * 100
+end
 
 function Actions.runEval(state, modelId, kind)
 	local m = state.models[modelId]
@@ -555,12 +562,34 @@ function Actions.runEval(state, modelId, kind)
 	if not m or not e then
 		return false, "Bad eval"
 	end
-	local cost = e.cost * (1 + (year(state) - 2023) * 0.4)
+	local cost = Game.evalCost(e.cost, m.size, year(state))
 	if state.cash < cost then
 		return false, "Not enough cash"
 	end
 	spend(state, cost, "compute")
 	m.revealed[kind] = true
+	state.stats.evals += 1
+	goalProgress(state, "eval", 1)
+	return true
+end
+
+-- One button: run every eval at once.
+function Actions.runAllEvals(state, modelId)
+	local m = state.models[modelId]
+	if not m then
+		return false, "No model"
+	end
+	local cost = 0
+	for _, e in pairs(EVALS) do
+		cost += Game.evalCost(e.cost, m.size, year(state))
+	end
+	if state.cash < cost then
+		return false, "Not enough cash (" .. Format.money(cost) .. ")"
+	end
+	spend(state, cost, "compute")
+	for k in pairs(EVALS) do
+		m.revealed[k] = true
+	end
 	state.stats.evals += 1
 	goalProgress(state, "eval", 1)
 	return true
@@ -589,6 +618,16 @@ function Actions.testPrompt(state, modelId)
 	return true
 end
 
+-- Launch extras scale with how big you are (a garage startup can afford teasers).
+function Game.launchCosts(state)
+	local scale = math.max(1, state.valuation / 5e7) ^ 0.6
+	return {
+		campaign = { 0, 15e3 * scale, 250e3 * scale, 4e6 * scale },
+		reviewers = 10e3 * scale,
+		reserve = 5e3 + state.users * 0.2,
+	}
+end
+
 function Actions.release(state, modelId, opts)
 	local m = state.models[modelId]
 	if not m or (m.status ~= "ready") then
@@ -602,9 +641,9 @@ function Actions.release(state, modelId, opts)
 		reviewers = opts.reviewers == true,
 		reserve = opts.reserve == true,
 	}
-	local campaignCost = ({ 0, 150e3, 1.5e6, 12e6 })[o.campaign + 1] * (1 + (year(state) - 2023) * 0.5)
-	local reviewerCost = o.reviewers and 80e3 or 0
-	local reserveCost = o.reserve and (200e3 * (1 + state.users / 1e6)) or 0
+	local campaignCost = Game.launchCosts(state).campaign[o.campaign + 1]
+	local reviewerCost = o.reviewers and Game.launchCosts(state).reviewers or 0
+	local reserveCost = o.reserve and Game.launchCosts(state).reserve or 0
 	local total = campaignCost + reviewerCost + reserveCost
 	if state.cash < total then
 		return false, "Not enough cash for the launch plan (" .. Format.money(total) .. ")"
@@ -830,6 +869,71 @@ function Actions.repayLoan(state, i)
 	end
 	state.cash -= l.left
 	table.remove(state.loans, i)
+	return true
+end
+
+-- Buy a rival lab: pay cash, or pay part in your own stock.
+function Game.acquireCost(state, labId)
+	return Labs.valuation(labId, year(state)) * 1.35
+end
+
+function Actions.acquire(state, labId, withStock)
+	local lab = Labs.byId[labId]
+	state.acquired = state.acquired or {}
+	if not lab or state.acquired[labId] then
+		return false, "Not for sale"
+	end
+	local cost = Game.acquireCost(state, labId)
+	if state.valuation < cost * 1.5 then
+		return false, "They laugh at your offer. You need to be worth at least " .. Format.money(cost * 1.5) .. "."
+	end
+	if withStock then
+		local dilution = cost / (state.valuation + cost)
+		state.equity *= (1 - dilution)
+	else
+		if state.cash < cost then
+			return false, "Not enough cash. Try paying with stock."
+		end
+		spend(state, cost, "office")
+	end
+	state.acquired[labId] = true
+	state.world.labBest[labId] = nil
+	-- you inherit their brand, people and their best model
+	state.brand += lab.brand * 0.25
+	state.staff.senior = (state.staff.senior or 0) + math.floor(10 + lab.brand * 20)
+	state.staff.star = (state.staff.star or 0) + math.max(1, math.floor(lab.brand))
+	local best
+	for _, r in ipairs(state.world.released) do
+		if r.lab == labId and (not best or r.cap > best.cap) then
+			best = r
+		end
+	end
+	if best then
+		local abil = {}
+		for _, d in ipairs(TM.DOMAINS) do
+			abil[d] = 2
+		end
+		table.insert(state.models, {
+			id = #state.models + 1, name = best.model .. " (acquired)", cap = best.cap, predicted = best.cap, size = 400,
+			abilities = abil, features = { tools = true }, context = 128e3, serve = 1, speed = 1, hype = 0,
+			flaws = { safety = 30, halluc = 0.15, syco = 0.15, refuse = 0.15, contam = 0.1, legal = 0, jailbreak = 0.4, escape = 0 },
+			revealed = {}, character = "pro", systemCard = true, recipe = Opts.defaultRecipe(), status = "released",
+			users = 0, trainedDay = state.day, releasedDay = state.day, updates = {}, delays = 0, losses = {},
+		})
+	end
+	-- remove them from the world
+	for i = #state.world.released, 1, -1 do
+		if state.world.released[i].lab == labId then
+			table.remove(state.world.released, i)
+		end
+	end
+	state.world.frontier = 0
+	for _, r in ipairs(state.world.released) do
+		state.world.frontier = math.max(state.world.frontier, r.cap)
+	end
+	state.hype = math.min(100, state.hype + 15)
+	Game.newsItem(state, string.format("%s acquires %s for %s", state.company, Labs.displayName(labId), Format.money(cost)), "you")
+	Game.chatMsg(state, "general", "CEO of " .. Labs.displayName(labId), "Excited to join the family. Our people start Monday.")
 	return true
 end
 
@@ -1107,8 +1211,26 @@ function Game.tickDay(state)
 	Game.advanceWorld(state)
 	local fx = Game.staffEffects(state)
 
-	-- research
-	local rp = 0.6 + fx.research * (state.research.done.selfimprove and 2 or 1)
+	-- research runs by itself: always works on the cheapest idea that already exists in the world
+	if not state.research.current then
+		local best
+		local stars = state.staff.star or 0
+		for _, node in ipairs(Research.nodes) do
+			if not state.research.done[node.id] and state.day >= node.fromDay - math.min(180, stars * 60) then
+				local ok = true
+				for _, req in ipairs(node.req or {}) do
+					if not state.research.done[req] then
+						ok = false
+					end
+				end
+				if ok and (not best or node.cost < best.cost) then
+					best = node
+				end
+			end
+		end
+		state.research.current = best and best.id or nil
+	end
+	local rp = 3 + fx.research * 1.5 * (state.research.done.selfimprove and 2 or 1)
 	if state.research.current then
 		state.research.points += rp
 		local node = Research.byId[state.research.current]
@@ -1379,7 +1501,8 @@ function Game.snapshot(state)
 		staffFx = Game.staffEffects(state), headcount = Game.headcount(state), year = y,
 		training = t and { name = t.name, progress = t.progress, days = t.days, daysLeft = t.daysLeft, losses = t.losses, spikes = t.spikes, cap = t.eval.cap } or nil,
 		awayLog = state.awayLog, stats = state.stats,
-		location = state.location, loans = state.loans, loanLimit = Game.loanLimit(state), gpuCap = Game.gpuCap(state),
+		launchCosts = Game.launchCosts(state), bestPrice = (Launch.rivalBest(state, state.day) or { priceOut = 10 }).priceOut,
+		acquired = state.acquired or {}, location = state.location, loans = state.loans, loanLimit = Game.loanLimit(state), gpuCap = Game.gpuCap(state),
 	}
 end
 

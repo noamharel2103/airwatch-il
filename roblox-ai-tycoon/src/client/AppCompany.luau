@@ -4,6 +4,7 @@ local RS = game:GetService("ReplicatedStorage")
 local Shared = RS:WaitForChild("Shared")
 local Format = require(Shared.Format)
 local Catalog = require(Shared.Catalog)
+local Labs = require(Shared.Labs)
 local UI = require(script.Parent.UI)
 local Net = require(script.Parent.Net)
 local T = UI.T
@@ -18,7 +19,7 @@ function App.mount(ctx, s)
 	end
 	UI.clear(ctx.tabs)
 	UI.clear(ctx.body)
-	for _, p in ipairs({ { "app", "Your AI app" }, { "office", "Office" } }) do
+	for _, p in ipairs({ { "app", "Your AI app" }, { "office", "Office" }, { "acquire", "Buy companies" } }) do
 		UI.button(ctx.tabs, p[2], function()
 			page = p[1]
 			App.mount(ctx, Net.state)
@@ -68,6 +69,39 @@ function App.mount(ctx, s)
 		priceRow("API price per 1M output tokens", { 0.5, 2, 5, 10, 15, 30, 60 }, s.product.apiPrice, function(v)
 			Net.act("setPrices", s.product.subPrice, v, s.product.proPrice)
 		end)
+	elseif page == "acquire" then
+		UI.label(sc, "Buy your rivals", 26, T.text, { FontFace = UI.HEAVY })
+		UI.label(sc, "You get their best model, their researchers and their fans. They disappear from the leaderboard. You must be worth 1.5x the price.", 14, T.sub)
+		local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = sc })
+		new("UIGridLayout", { CellSize = UDim2.new(1 / 3, -8, 0, 150), CellPadding = UDim2.fromOffset(10, 10), Parent = grid })
+		local list = table.clone(Labs.list)
+		table.sort(list, function(a, b)
+			return Labs.valuation(a.id, s.year) < Labs.valuation(b.id, s.year)
+		end)
+		for _, lab in ipairs(list) do
+			local owned = s.acquired and s.acquired[lab.id]
+			local price = Labs.valuation(lab.id, s.year) * 1.35
+			local canAfford = s.valuation >= price * 1.5
+			local c = new("Frame", { BackgroundColor3 = owned and Color3.fromRGB(30, 80, 50) or T.panel2, Parent = grid })
+			UI.corner(c, 4)
+			UI.stroke(c, Color3.fromRGB(10, 12, 22), 3)
+			UI.pad(c, 12)
+			local tag = new("Frame", { BackgroundColor3 = lab.color, Size = UDim2.fromOffset(16, 16), Parent = c })
+			UI.stroke(tag, Color3.fromRGB(10, 12, 22), 2)
+			new("TextLabel", { Text = Labs.displayName(lab.id), FontFace = UI.BOLD, TextSize = 20, Position = UDim2.fromOffset(26, -4), Size = UDim2.new(1, -26, 0, 26), Parent = c })
+			new("TextLabel", { Text = owned and "OWNED BY YOU" or ("Price " .. Format.money(price)), FontFace = UI.BOLD, TextSize = 16, TextColor3 = owned and T.green or T.yellow, Position = UDim2.fromOffset(0, 28), Size = UDim2.new(1, 0, 0, 20), Parent = c })
+			if not owned then
+				new("TextLabel", { Text = canAfford and "They will take your call." or ("Be worth " .. Format.money(price * 1.5) .. " first"), TextSize = 13, TextColor3 = T.sub, Position = UDim2.fromOffset(0, 52), Size = UDim2.new(1, 0, 0, 18), Parent = c })
+				local row = new("Frame", { BackgroundTransparency = 1, Position = UDim2.new(0, 0, 1, -40), Size = UDim2.new(1, 0, 0, 38), Parent = c })
+				UI.list(row, 6, true)
+				UI.button(row, "Pay cash", function()
+					Net.act("acquire", lab.id, false)
+				end, canAfford and "success" or "ghost", { Size = UDim2.fromOffset(120, 36) })
+				UI.button(row, "Pay in stock", function()
+					Net.act("acquire", lab.id, true)
+				end, canAfford and "primary" or "ghost", { Size = UDim2.fromOffset(140, 36) })
+			end
+		end
 	else
 		for i, st in ipairs(Catalog.officeStages) do
 			local c = UI.card(sc, { BackgroundColor3 = i == s.office and Color3.fromRGB(30, 56, 44) or T.panel2 })
@@ -85,7 +119,11 @@ function App.mount(ctx, s)
 end
 
 function App.key(s)
-	return page .. s.office .. s.product.appName .. s.product.subPrice .. s.product.apiPrice .. s.product.proPrice .. tostring(s.product.activeModel)
+	local n = 0
+	for _ in pairs(s.acquired or {}) do
+		n += 1
+	end
+	return page .. n .. s.year .. math.floor(math.log10(math.max(s.valuation, 10)) * 4) .. s.office .. s.product.appName .. s.product.subPrice .. s.product.apiPrice .. s.product.proPrice .. tostring(s.product.activeModel)
 end
 
 return App

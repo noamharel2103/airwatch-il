@@ -4,30 +4,37 @@ local TweenService = game:GetService("TweenService")
 local UI = {}
 
 -- Blocky retro OS look (Roblox style): navy panels, cyan/green chunky buttons, pixel font.
+-- Bright cartoon theme: white/sky panels, saturated blue/green/yellow/red, thick dark outlines.
 UI.T = {
-	bg = Color3.fromRGB(26, 31, 54),
-	panel = Color3.fromRGB(33, 40, 70),
-	panel2 = Color3.fromRGB(44, 54, 92),
-	line = Color3.fromRGB(18, 22, 38),
-	text = Color3.fromRGB(240, 244, 255),
-	sub = Color3.fromRGB(160, 176, 214),
-	dim = Color3.fromRGB(110, 124, 160),
-	accent = Color3.fromRGB(0, 190, 250),
-	green = Color3.fromRGB(0, 214, 100),
-	red = Color3.fromRGB(250, 60, 80),
-	yellow = Color3.fromRGB(255, 214, 40),
-	purple = Color3.fromRGB(160, 110, 255),
-	orange = Color3.fromRGB(255, 150, 70),
-	teal = Color3.fromRGB(50, 200, 210),
-	pink = Color3.fromRGB(240, 110, 180),
+	bg = Color3.fromRGB(214, 228, 246),
+	panel = Color3.fromRGB(196, 214, 240),
+	panel2 = Color3.fromRGB(236, 243, 252),
+	line = Color3.fromRGB(28, 36, 64),
+	text = Color3.fromRGB(28, 36, 64),
+	sub = Color3.fromRGB(80, 96, 140),
+	dim = Color3.fromRGB(140, 152, 185),
+	accent = Color3.fromRGB(40, 140, 255),
+	green = Color3.fromRGB(40, 200, 90),
+	red = Color3.fromRGB(255, 70, 85),
+	yellow = Color3.fromRGB(255, 196, 30),
+	purple = Color3.fromRGB(150, 90, 255),
+	orange = Color3.fromRGB(255, 140, 40),
+	teal = Color3.fromRGB(0, 190, 200),
+	pink = Color3.fromRGB(255, 90, 170),
+}
+-- pack icons (show once the place is published; drawn icons are the fallback)
+UI.ICON_IMAGES = {
+	lab = 71458718634620, parts = 132000942692847, team = 138393293744051, bank = 132123388448433,
+	social = 84020529846826, mail = 71078899575319, goals = 77359789350483, company = 100186608972356,
 }
 local T = UI.T
-UI.FONT = Font.fromEnum(Enum.Font.Arcade)
-UI.BOLD = Font.new("rbxasset://fonts/families/PressStart2P.json")
+-- Chunky and readable: rounded blocky font for text, pixel font for titles/buttons.
+UI.FONT = Font.fromEnum(Enum.Font.FredokaOne)
+UI.BOLD = Font.fromEnum(Enum.Font.FredokaOne)
 UI.HEAVY = Font.new("rbxasset://fonts/families/PressStart2P.json")
-UI.MONO = Font.fromEnum(Enum.Font.Arcade)
--- pixel fonts render at different sizes; normalise so callers can keep "normal" sizes
-local SIZE_MULT = { [UI.FONT.Family] = 1.5, ["rbxasset://fonts/families/PressStart2P.json"] = 0.9 }
+UI.MONO = Font.fromEnum(Enum.Font.FredokaOne)
+-- normalise sizes so callers can keep "normal" sizes (everything a bit bigger than default)
+local SIZE_MULT = { [UI.FONT.Family] = 1.25, ["rbxasset://fonts/families/PressStart2P.json"] = 1.0 }
 
 function UI.new(class: string, props: { [string]: any }?, children: { Instance }?): any
 	local inst = Instance.new(class)
@@ -76,7 +83,7 @@ function UI.corner(parent: Instance, r: number?)
 	-- blocky look: almost square corners (round things like avatars keep big radii)
 	local rr = r or 10
 	if rr < 40 then
-		rr = math.min(rr, 3)
+		rr = math.min(rr, 10)
 	end
 	return new("UICorner", { CornerRadius = UDim.new(0, rr), Parent = parent })
 end
@@ -118,6 +125,7 @@ end
 function UI.card(parent: Instance, props: { [string]: any }?)
 	local f = new("Frame", { BackgroundColor3 = T.panel2, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = parent })
 	UI.corner(f, 12)
+	UI.stroke(f, T.line, 3)
 	UI.pad(f, 12, 14)
 	for k, v in pairs(props or {}) do
 		(f :: any)[k] = v
@@ -125,11 +133,13 @@ function UI.card(parent: Instance, props: { [string]: any }?)
 	return f
 end
 
+UI.GHOST = Color3.fromRGB(150, 170, 205)
 -- kind: "primary" | "ghost" | "danger" | "success" | color
+-- Roblox simulator style: rounded, tall, gradient, thick outline, white outlined text.
 function UI.button(parent: Instance, text: string, onClick: (() -> ())?, kind: any?, props: { [string]: any }?)
 	local color = T.accent
 	if kind == "ghost" then
-		color = T.panel2
+		color = UI.GHOST
 	elseif kind == "danger" then
 		color = T.red
 	elseif kind == "success" then
@@ -140,35 +150,68 @@ function UI.button(parent: Instance, text: string, onClick: (() -> ())?, kind: a
 	local b = new("TextButton", {
 		Text = text,
 		FontFace = UI.BOLD,
-		TextSize = 15,
+		TextSize = 18,
+		TextColor3 = Color3.new(1, 1, 1),
 		TextXAlignment = Enum.TextXAlignment.Center,
+		TextWrapped = false,
+		TextTruncate = Enum.TextTruncate.AtEnd,
 		BackgroundTransparency = 0,
-		BackgroundColor3 = color,
-		Size = UDim2.new(0, math.max(90, #text * 9 + 28), 0, 36),
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		Size = UDim2.new(0, math.max(110, #text * 10 + 40), 0, 46),
 		Parent = parent,
 	})
-	UI.corner(b, 3)
-	UI.stroke(b, T.line, 2)
-	-- chunky 3D bottom edge
-	new("Frame", { Name = "Bevel", BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.7, Size = UDim2.new(1, 0, 0, 4), Position = UDim2.new(0, 0, 1, -4), Parent = b })
-	local base = color
+	new("UICorner", { CornerRadius = UDim.new(0, 10), Parent = b })
+	new("UIStroke", { Color = Color3.fromRGB(20, 26, 48), Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = b })
+	local textStroke = new("UIStroke", { Color = color:Lerp(Color3.new(0, 0, 0), 0.6), Thickness = 1.2, ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual, Parent = b })
+	local grad = new("UIGradient", { Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.28), color), Rotation = 90, Parent = b })
+	local function setColor(c)
+		local ghost = c == UI.GHOST or c == Color3.fromRGB(150, 170, 205)
+		if ghost then
+			grad.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(222, 232, 248))
+			b.TextColor3 = T.text
+			textStroke.Enabled = false
+			b.TextStrokeTransparency = 1
+		else
+			grad.Color = ColorSequence.new(c:Lerp(Color3.new(1, 1, 1), 0.28), c)
+			b.TextColor3 = Color3.new(1, 1, 1)
+			textStroke.Enabled = false
+			b.TextStrokeTransparency = 0.7
+			textStroke.Color = c:Lerp(Color3.new(0, 0, 0), 0.6)
+		end
+	end
+	setColor(color)
 	b.MouseEnter:Connect(function()
-		TweenService:Create(b, TweenInfo.new(0.12), { BackgroundColor3 = base:Lerp(Color3.new(1, 1, 1), 0.12) }):Play()
+		if color ~= UI.GHOST then
+			setColor(color:Lerp(Color3.new(1, 1, 1), 0.12))
+		end
 	end)
 	b.MouseLeave:Connect(function()
-		TweenService:Create(b, TweenInfo.new(0.12), { BackgroundColor3 = base }):Play()
+		setColor(color)
 	end)
 	b.MouseButton1Click:Connect(function()
-		local s = b:FindFirstChildOfClass("UIScale") or new("UIScale", { Parent = b })
-		s.Scale = 0.94
-		TweenService:Create(s, TweenInfo.new(0.18, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+		local sc = b:FindFirstChildOfClass("UIScale") or new("UIScale", { Parent = b })
+		sc.Scale = 0.92
+		TweenService:Create(sc, TweenInfo.new(0.22, Enum.EasingStyle.Back), { Scale = 1 }):Play()
 		if onClick then
 			onClick()
 		end
 	end)
 	for k, v in pairs(props or {}) do
-		(b :: any)[k] = v
+		if k == "BackgroundColor3" then
+			color = v
+			setColor(v)
+		else
+			(b :: any)[k] = v
+		end
 	end
+	-- callers that recolour later via BackgroundColor3 still work
+	b:GetPropertyChangedSignal("BackgroundColor3"):Connect(function()
+		if b.BackgroundColor3 ~= Color3.new(1, 1, 1) then
+			color = b.BackgroundColor3
+			setColor(color)
+			b.BackgroundColor3 = Color3.new(1, 1, 1)
+		end
+	end)
 	return b
 end
 
@@ -249,6 +292,24 @@ function UI.icon(parent: Instance, kind: string, color: Color3, size: number)
 	else
 		bar(0.5, 0.5, 0.4, 0.4, 0, 20)
 	end
+	-- real pack icon on top; drawn glyph stays visible until (unless) the image loads
+	local id = UI.ICON_IMAGES[kind]
+	if id then
+		local img = new("ImageLabel", { BackgroundTransparency = 1, Image = "rbxassetid://" .. id, Size = UDim2.fromScale(1, 1), ZIndex = tile.ZIndex + 2, Parent = tile })
+		task.spawn(function()
+			for _ = 1, 20 do
+				if img.IsLoaded then
+					for _, c in ipairs(tile:GetChildren()) do
+						if c:IsA("Frame") then
+							c.Visible = false
+						end
+					end
+					return
+				end
+				task.wait(0.5)
+			end
+		end)
+	end
 	return tile
 end
 
@@ -268,7 +329,7 @@ end
 
 -- Horizontal progress bar
 function UI.bar(parent: Instance, frac: number, color: Color3?, h: number?)
-	local bg = new("Frame", { Size = UDim2.new(1, 0, 0, h or 8), BackgroundColor3 = T.line, Parent = parent })
+	local bg = new("Frame", { Size = UDim2.new(1, 0, 0, h or 8), BackgroundColor3 = Color3.fromRGB(205, 218, 238), Parent = parent })
 	UI.corner(bg, 4)
 	local fill = new("Frame", { Size = UDim2.fromScale(math.clamp(frac, 0, 1), 1), BackgroundColor3 = color or T.accent, Parent = bg })
 	UI.corner(fill, 4)
