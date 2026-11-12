@@ -84,7 +84,7 @@ end
 
 -- Totals of everything you own (the free laptop parts always count once)
 function PcParts.totals(stock)
-	local t = { gb = 16, cool = 0.3, kw = 0 }
+	local t = { gb = 16, cool = 0.6, kw = 0 }
 	for key, n in pairs(stock or {}) do
 		local cat, id = key:match("^(%w+):(%w+)$")
 		local p = cat and PcParts.byId[cat] and PcParts.byId[cat][id]

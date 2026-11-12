@@ -24,11 +24,19 @@ def shade(hexc, f):
     return "#%02X%02X%02X" % (int(r), int(g), int(b))
 
 def tile(color):
-    top, bot = shade(color, 0.18), shade(color, -0.28)
-    d = f'<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="{top}"/><stop offset="1" stop-color="{bot}"/></linearGradient></defs>'
-    d += f'<rect x="8" y="8" width="240" height="240" rx="14" fill="url(#g)" stroke="{OL}" stroke-width="10"/>'
-    d += f'<rect x="18" y="18" width="220" height="10" rx="5" fill="#FFFFFF" fill-opacity="0.35"/>'
-    d += f'<rect x="13" y="214" width="230" height="29" rx="10" fill="#000000" fill-opacity="0.18"/>'
+    top, mid, bot = shade(color, 0.35), color, shade(color, -0.4)
+    d = (f'<defs><radialGradient id="g" cx="0.35" cy="0.25" r="0.95"><stop offset="0" stop-color="{top}"/>'
+         f'<stop offset="0.55" stop-color="{mid}"/><stop offset="1" stop-color="{bot}"/></radialGradient>'
+         f'<linearGradient id="gl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0.55"/>'
+         f'<stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient></defs>')
+    d += f'<rect x="8" y="8" width="240" height="240" rx="30" fill="url(#g)" stroke="{OL}" stroke-width="10"/>'
+    d += f'<rect x="17" y="17" width="222" height="222" rx="24" fill="none" stroke="{shade(color, 0.45)}" stroke-width="5" stroke-opacity="0.8"/>'
+    # rays behind the symbol (clipped to the tile)
+    d += '<defs><clipPath id="rc"><rect x="13" y="13" width="230" height="230" rx="26"/></clipPath></defs><g clip-path="url(#rc)">'
+    for i in range(8):
+        d += f'<path d="M128 128 L{128 + 200 * __import__("math").cos(i * 0.785):.0f} {128 + 200 * __import__("math").sin(i * 0.785):.0f} L{128 + 200 * __import__("math").cos(i * 0.785 + 0.2):.0f} {128 + 200 * __import__("math").sin(i * 0.785 + 0.2):.0f} Z" fill="#FFFFFF" fill-opacity="0.08"/>'
+    d += '</g>'
+    d += f'<rect x="22" y="22" width="212" height="96" rx="22" fill="url(#gl)"/>'
     return d
 
 def R(x, y, w, h, rx, fill, sw=SW):
@@ -56,9 +64,21 @@ def svg(body):
     return f'<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">{body}</svg>'
 
 ICONS = {}
+import re as _re
+def _shadow(body):
+    # same shapes, solid dark, nudged down-right: a soft drop shadow
+    sh = _re.sub(r'fill="(?!none)[^"]*"', 'fill="#0A0C20"', body)
+    sh = _re.sub(r'stroke="[^"]*"', 'stroke="#0A0C20"', sh)
+    return f'<g transform="translate(6,9)" opacity="0.35">{sh}</g>'
+
 def icon(name, color):
     def deco(fn):
-        ICONS[name] = lambda: svg(tile(color) + fn())
+        def build():
+            body = fn()
+            # clip the shadow to the tile
+            clip = '<clipPath id="c"><rect x="13" y="13" width="230" height="230" rx="26"/></clipPath>'
+            return svg(tile(color) + f'<defs>{clip}</defs><g clip-path="url(#c)">{_shadow(body)}</g>' + body)
+        ICONS[name] = build
         return fn
     return deco
 

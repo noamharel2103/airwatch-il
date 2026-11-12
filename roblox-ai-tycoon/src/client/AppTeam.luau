@@ -247,11 +247,20 @@ function App.mount(ctx, s)
 	else
 		UI.label(sc, "Pick a place and press SEARCH. Rarer people cost more but do the work of a whole team. Your Roblox friends show up too!", 15, T.sub)
 	end
-	UI.button(sc, "LEGEND RECRUIT  (GOLD SHOP)", function()
-		if App.openShop then
-			App.openShop("legendhire")
+	-- Robux: better people right now
+	local rb = new("Frame", { BackgroundColor3 = Color3.fromRGB(255, 185, 0), Size = UDim2.new(1, -8, 0, 96), Parent = sc })
+	UI.corner(rb, 2)
+	UI.stroke(rb, T.line, 4)
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(255, 230, 110), Color3.fromRGB(220, 120, 0)), Parent = rb })
+	local ic = UI.icon(rb, "crown", Color3.fromRGB(255, 185, 0), 70)
+	ic.Position = UDim2.fromOffset(14, 13)
+	new("TextLabel", { Text = "LEGEND RECRUIT", FontFace = UI.HEAVY, TextSize = 18, TextColor3 = Color3.fromRGB(50, 26, 0), Position = UDim2.fromOffset(100, 16), Size = UDim2.new(1, -380, 0, 24), Parent = rb })
+	new("TextLabel", { Text = "4 LEGENDARY or MYTHIC people who all say yes.", TextSize = 16, TextColor3 = Color3.fromRGB(70, 40, 0), Position = UDim2.fromOffset(100, 48), Size = UDim2.new(1, -380, 0, 30), Parent = rb })
+	UI.button(rb, "R$ 99", function()
+		if App.buyProduct then
+			App.buyProduct("legendhire")
 		end
-	end, Color3.fromRGB(255, 185, 0), { Size = UDim2.new(1, -8, 0, 54), TextSize = 14 })
+	end, Color3.fromRGB(0, 200, 90), { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -16, 0.5, 0), Size = UDim2.fromOffset(240, 62), TextSize = 18 })
 end
 
 function App.key(s)

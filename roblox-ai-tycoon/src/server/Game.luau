@@ -211,7 +211,7 @@ end
 
 -- GPU places: your room plus any garages or datacenters you bought
 function Game.gpuSlots(state): number
-	local n = Catalog.officeStages[state.office].slots or 4
+	local n = (Catalog.officeStages[state.office].slots or 4) + (state.bonusSlots or 0)
 	for id, c in pairs(state.storage or {}) do
 		n += Catalog.storageById[id].slots * c
 	end
@@ -219,7 +219,7 @@ function Game.gpuSlots(state): number
 end
 
 function Game.kwCap(state): number
-	local kw = Catalog.officeStages[state.office].kw + PcParts.totals(state.pcStock).kw
+	local kw = Catalog.officeStages[state.office].kw + PcParts.totals(state.pcStock).kw + (state.bonusKw or 0)
 	for id, c in pairs(state.storage or {}) do
 		kw += Catalog.storageById[id].kw * c
 	end
@@ -1106,6 +1106,7 @@ function Actions.train(state, recipe)
 		seed = rng:NextNumber(0, 100),
 		spikes = 0,
 	}
+	state.taps = 0
 	Game.chatMsg(state, "research", "Training bot", string.format("Run %s started: %s params, %s tokens. ETA %d days.", name, Format.count(ev.params), Format.count(ev.tokens), math.ceil(ev.days)))
 	return true
 end
@@ -1327,6 +1328,7 @@ function Actions.boost(state, modelId, a, b)
 	end
 	spend(state, cost, "compute")
 	m.boosting = { a = a, b = b, doneDay = state.day + Game.boostDays(state, m), startDay = state.day }
+	state.taps = 0
 	return true
 end
 
@@ -1545,6 +1547,13 @@ function Actions.release(state, modelId, opts)
 	goalProgress(state, "release", 1)
 	-- effects
 	local eff = result.effects
+	if state.trendyNext then
+		state.trendyNext = nil
+		eff.signups *= 3
+		eff.hype = (eff.hype or 0) + 30
+		eff.brand = (eff.brand or 0) + 0.02
+		Game.newsItem(state, m.name .. " is trending number one worldwide", "you")
+	end
 	if (m.kind or "chat") ~= "chat" then
 		eff.signups = 0
 		Game.chatMsg(state, "general", "Sales", m.name .. " is live as its own product. It earns money every day by itself.")
@@ -2209,6 +2218,45 @@ function Actions.markRead(state, mailId)
 	return true
 end
 
+-- ===== tap to speed up training =====
+-- Each tap takes a little time off whatever is training. After 40 taps the button turns
+-- into the Robux instant finish. Taps are rate limited on the server.
+local lastTap: { [any]: number } = {}
+Game.TAPS_FOR_FINISH = 40
+function Actions.trainTap(state)
+	local now = os.clock()
+	if lastTap[state] and now - lastTap[state] < 0.09 then
+		return false
+	end
+	lastTap[state] = now
+	local key
+	if state.training then
+		key = "t" .. state.training.name
+		state.training.progress = math.min(0.999, state.training.progress + 0.004)
+	else
+		for _, m in ipairs(state.models) do
+			if m.boosting then
+				key = "b" .. m.id .. "_" .. m.boosting.startDay
+				m.boosting.tapCredit = (m.boosting.tapCredit or 0) + 0.004 * math.max(1, m.boosting.doneDay - m.boosting.startDay)
+				if m.boosting.tapCredit >= 1 and m.boosting.doneDay > state.day + 1 then
+					m.boosting.tapCredit -= 1
+					m.boosting.doneDay -= 1
+				end
+				break
+			end
+		end
+	end
+	if not key then
+		return false, "Nothing is training"
+	end
+	if state.tapKey ~= key then
+		state.tapKey = key
+		state.taps = 0
+	end
+	state.taps = (state.taps or 0) + 1
+	return true, state.taps
+end
+
 -- ===== website =====
 function Game.websiteBonus(state)
 	return Website.bonus(state.website)
@@ -2326,6 +2374,33 @@ function Game.grantProduct(state, key: string, modelId: number?)
 		end
 		state.searchPlace = "elite"
 		Game.chatMsg(state, "general", "Recruiting", "The Elite Agency sent 4 LEGENDARY people who want to join. Open Team > Hire.")
+	elseif p.gpuTier then
+		-- GPU packs: tier 1 = cheapest card this year, 3 = the best one, more of them each tier
+		local avail = {}
+		for _, h in ipairs(Hardware.list) do
+			if h.id ~= "laptop" and Hardware.available(h, state.day) then
+				table.insert(avail, h)
+			end
+		end
+		table.sort(avail, function(a, b)
+			return a.power < b.power
+		end)
+		if #avail == 0 then
+			return false, "No GPUs on the market yet"
+		end
+		local idx = p.gpuTier == 1 and 1 or (p.gpuTier == 2 and math.max(1, math.ceil(#avail / 2)) or #avail)
+		local h = avail[idx]
+		local share = ({ 0.05, 0.2, 0.6 })[p.gpuTier]
+		local n = math.max(({ 4, 16, 64 })[p.gpuTier], math.floor(Config.yearValue(Config.GPU_ALLOCATION, y) * share / h.power))
+		state.boxes = state.boxes or {}
+		table.insert(state.boxes, { kind = "buy", id = h.id, n = n })
+		-- the pack comes with the space and power it needs
+		state.bonusSlots = (state.bonusSlots or 0) + n
+		state.bonusKw = (state.bonusKw or 0) + n * h.kw * 1.5
+		Game.chatMsg(state, "infra", "Infra team", p.name .. " delivered: " .. Format.count(n) .. " " .. h.name .. ", with room and power for all of them. Open the boxes!")
+	elseif key == "trendy" then
+		state.trendyNext = true
+		Game.chatMsg(state, "general", "Marketing", "Influencers are booked. Your next launch will trend everywhere.")
 	elseif key == "turbo" then
 		state.turboUntil = math.max(state.turboUntil or 0, state.day) + 60
 		Game.chatMsg(state, "research", "Training bot", "TURBO mode on: every training runs 3x faster for 60 days.")
@@ -3342,6 +3417,7 @@ function Game.snapshot(state)
 			end
 			return nil
 		end)(),
+		taps = state.taps or 0, tapKey = state.tapKey, trendyNext = state.trendyNext,
 		searchPlace = state.searchPlace, earlyKinds = state.earlyKinds or {}, turboUntil = state.turboUntil or 0, website = state.website or { parts = {} }, websiteBonus = Game.websiteBonus(state),
 		perks = state.perks or {}, sideIncome = Game.sideIncome(state), calmUntil = state.calmUntil,
 		eraCeiling = Game.eraCeiling(state), achievements = state.achievements or {}, lastAchievement = state.lastAchievement, boxes = #(state.boxes or {}), problems = state.problems or {}, acquired = state.acquired or {}, location = state.location, loans = state.loans, loanLimit = Game.loanLimit(state), gpuCap = Game.gpuCap(state),

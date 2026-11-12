@@ -161,6 +161,34 @@ function App.mount(ctx, s)
 		gpuCard(best, true)
 	end
 
+	-- Robux GPU packs: cheap rack, mid cluster, mega datacenter (space and power included)
+	local ShopData = require(Shared.Shop)
+	UI.label(sc, "GPU PACKS  (SPACE AND POWER INCLUDED)", 16, T.yellow, { FontFace = UI.HEAVY })
+	local packs = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 250), Parent = sc })
+	new("UIGridLayout", { CellSize = UDim2.new(1 / 3, -8, 1, 0), CellPadding = UDim2.fromOffset(12, 0), Parent = packs })
+	for _, key in ipairs({ "gpuS", "gpuM", "gpuL" }) do
+		local item = ShopData.productByKey[key]
+		local c = new("Frame", { BackgroundColor3 = item.color, Parent = packs })
+		UI.corner(c, 2)
+		UI.stroke(c, item.gpuTier == 3 and Color3.fromRGB(255, 230, 120) or T.line, item.gpuTier == 3 and 5 or 3)
+		new("UIGradient", { Rotation = 90, Color = ColorSequence.new(item.color:Lerp(Color3.new(1, 1, 1), 0.15), item.color:Lerp(Color3.new(0, 0, 0), 0.55)), Parent = c })
+		local ic = UI.icon(c, "gpu", item.color, 84)
+		ic.AnchorPoint = Vector2.new(0.5, 0)
+		ic.Position = UDim2.new(0.5, 0, 0, 12)
+		for i = 2, item.gpuTier do -- stacked look for bigger packs
+			local extra = UI.icon(c, "gpu", item.color, 60)
+			extra.Position = UDim2.new(0.5, 10 + (i - 1) * 26, 0, 40)
+			extra.ZIndex = 0
+		end
+		new("TextLabel", { Text = item.name, FontFace = UI.HEAVY, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Center, Position = UDim2.fromOffset(8, 104), Size = UDim2.new(1, -16, 0, 22), Parent = c })
+		new("TextLabel", { Text = item.desc, TextSize = 15, TextXAlignment = Enum.TextXAlignment.Center, Position = UDim2.fromOffset(12, 130), Size = UDim2.new(1, -24, 0, 44), Parent = c })
+		UI.button(c, "R$ " .. item.robux, function()
+			if App.buyProduct then
+				App.buyProduct(key)
+			end
+		end, Color3.fromRGB(0, 200, 90), { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -12), Size = UDim2.new(1, -24, 0, 52), TextSize = 17 })
+	end
+
 	-- more space: just the next place you can buy
 	local nextPlace
 	for _, st in ipairs(Catalog.storage) do

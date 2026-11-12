@@ -44,6 +44,17 @@ Shell.openShop = function(key: string?)
 		Shell.openComputer("shop")
 	end
 end
+-- buy a Robux product right where you are (no shop needed)
+Shell.buyProduct = function(key: string, target: number?)
+	local ShopData = require(game:GetService("ReplicatedStorage").Shared.Shop)
+	local item = ShopData.productByKey[key] or ShopData.passByKey[key]
+	if item then
+		ShopApp.buy(item, ShopData.passByKey[key] ~= nil, target)
+	end
+end
+Lab.buyProduct = Shell.buyProduct
+Team.buyProduct = Shell.buyProduct
+Parts.buyProduct = Shell.buyProduct
 Team.openShop = function(key: string?)
 	Shell.openShop(key)
 end

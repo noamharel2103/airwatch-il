@@ -222,7 +222,7 @@ function App.mount(ctx, s)
 	local g1 = grid(sc, 4)
 	local n = 0
 	for _, p in ipairs(ShopData.products) do
-		if not p.cash then
+		if not p.cash and not p.hidden then
 			n += 1
 			card(g1, p, s, false, n)
 		end

@@ -106,12 +106,52 @@ end)
 local PROBLEM_LABEL = { massive = "MASSIVE JAILBREAK", outage = "SERVERS DOWN", hack = "WE GOT HACKED", overheat = "GPUS OVERHEATING", jailbreak = "MODEL JAILBROKEN", bug = "MODEL BUG", exploit = "PROMPT INJECTION" }
 
 -- training mini status (bottom left)
-local trainMini = new("Frame", { Position = UDim2.new(0, 16, 1, -86), Size = UDim2.fromOffset(300, 70), BackgroundColor3 = T.bg, BackgroundTransparency = 0.12, Visible = false, Parent = hud })
-UI.corner(trainMini, 14)
-local trainL = new("TextLabel", { Text = "", FontFace = UI.BOLD, TextSize = 14, Position = UDim2.fromOffset(14, 10), Size = UDim2.new(1, -28, 0, 18), Parent = trainMini })
-local trainBarHolder = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(14, 36), Size = UDim2.new(1, -28, 0, 10), Parent = trainMini })
-local _, trainFill = UI.bar(trainBarHolder, 0, T.purple, 10)
-local trainSub = new("TextLabel", { Text = "", TextSize = 12, TextColor3 = T.sub, Position = UDim2.fromOffset(14, 50), Size = UDim2.new(1, -28, 0, 14), Parent = trainMini })
+-- training card (bottom left): tap the big button to speed it up; after enough taps it
+-- becomes the Robux instant finish
+local trainMini = new("Frame", { Position = UDim2.new(0, 16, 1, -126), Size = UDim2.fromOffset(470, 110), BackgroundColor3 = Color3.fromRGB(70, 40, 150), Visible = false, Parent = hud })
+UI.corner(trainMini, 2)
+UI.stroke(trainMini, T.line, 4)
+new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(150, 90, 255), Color3.fromRGB(60, 30, 140)), Parent = trainMini })
+local trainL = new("TextLabel", { Text = "", FontFace = UI.BOLD, TextSize = 14, TextTruncate = Enum.TextTruncate.AtEnd, TextWrapped = false, Position = UDim2.fromOffset(16, 12), Size = UDim2.new(1, -170, 0, 20), Parent = trainMini })
+local trainBarHolder = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(16, 42), Size = UDim2.new(1, -170, 0, 18), Parent = trainMini })
+local _, trainFill = UI.bar(trainBarHolder, 0, T.green, 18)
+local trainSub = new("TextLabel", { Text = "", TextSize = 13, TextColor3 = Color3.fromRGB(225, 215, 255), Position = UDim2.fromOffset(16, 70), Size = UDim2.new(1, -170, 0, 18), Parent = trainMini })
+local tapsL = new("TextLabel", { Text = "", FontFace = UI.BOLD, TextSize = 10, TextColor3 = T.yellow, Position = UDim2.fromOffset(16, 90), Size = UDim2.new(1, -170, 0, 14), Parent = trainMini })
+local tapBtn = new("TextButton", { Text = "TAP!", FontFace = UI.HEAVY, TextSize = 22, TextXAlignment = Enum.TextXAlignment.Center, TextWrapped = true, TextColor3 = Color3.new(1, 1, 1), AutoButtonColor = false, BackgroundColor3 = T.green, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0), Size = UDim2.fromOffset(136, 82), Parent = trainMini })
+UI.corner(tapBtn, 2)
+UI.stroke(tapBtn, T.line, 4)
+local tapGrad = new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(120, 255, 160), Color3.fromRGB(0, 160, 80)), Parent = tapBtn })
+new("UIStroke", { Color = T.line, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual, Parent = tapBtn })
+local tapScale = new("UIScale", { Parent = tapBtn })
+local tapState = { taps = 0, finish = false, progress = 0 }
+local function floaty(text: string)
+	local f = new("TextLabel", { Text = text, FontFace = UI.HEAVY, TextSize = 16, TextColor3 = T.yellow, TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, -82 + math.random(-30, 30), 0, 10), Size = UDim2.fromOffset(120, 24), Parent = trainMini })
+	new("UIStroke", { Color = T.line, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual, Parent = f })
+	UI.tween(f, 0.7, { Position = f.Position - UDim2.fromOffset(0, 50), TextTransparency = 1 })
+	task.delay(0.7, function()
+		f:Destroy()
+	end)
+end
+tapBtn.MouseButton1Down:Connect(function()
+	tapScale.Scale = 0.88
+	UI.tween(tapScale, 0.18, { Scale = 1 }, Enum.EasingStyle.Back)
+	if tapState.finish then
+		if Shell.buyProduct then
+			Shell.buyProduct("finish")
+		end
+		return
+	end
+	-- feel it right away, the server confirms
+	tapState.progress = math.min(0.999, tapState.progress + 0.004)
+	trainFill.Size = UDim2.fromScale(tapState.progress, 1)
+	floaty("+0.4%")
+	task.spawn(function()
+		local ok, n = Net.quiet("trainTap")
+		if ok and typeof(n) == "number" then
+			tapState.taps = n
+		end
+	end)
+end)
 
 -- news ticker (bottom)
 local ticker = new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 14), Size = UDim2.new(1, -700, 0, 40), BackgroundColor3 = T.bg, BackgroundTransparency = 0.15, ClipsDescendants = true, Parent = hud })
@@ -468,13 +508,51 @@ Net.onState(function(s)
 end)
 
 afterProblems = function(s)
-	if s.training then
+	local boosting
+	for _, m in ipairs(s.models) do
+		if m.boosting then
+			boosting = m
+			break
+		end
+	end
+	if s.training or boosting then
 		trainMini.Visible = true
-		trainL.Text = "Training " .. s.training.name
-		trainFill.Size = UDim2.fromScale(s.training.progress, 1)
-		trainSub.Text = string.format("%d%%   about %d days left", math.floor(s.training.progress * 100), math.ceil(s.training.daysLeft or s.training.days))
+		local prog, left
+		if s.training then
+			trainL.Text = "TRAINING " .. s.training.name:upper()
+			prog = s.training.progress
+			left = math.ceil(s.training.daysLeft or s.training.days)
+		else
+			local b = boosting.boosting
+			trainL.Text = "TRAINING STATS  " .. boosting.name:upper()
+			local total = math.max(1, b.doneDay - b.startDay)
+			prog = math.clamp((s.day - b.startDay) / total, 0, 1)
+			left = math.max(0, b.doneDay - s.day)
+		end
+		tapState.progress = prog
+		trainFill.Size = UDim2.fromScale(prog, 1)
+		trainSub.Text = string.format("%d%%   about %d days left", math.floor(prog * 100), left)
+		tapState.taps = s.taps or tapState.taps
+		local need = 40
+		local finish = tapState.taps >= need
+		if finish ~= tapState.finish then
+			tapState.finish = finish
+			if finish then
+				tapBtn.Text = "FINISH NOW  R$ 39"
+				tapBtn.TextSize = 13
+				tapBtn.TextColor3 = Color3.fromRGB(40, 22, 0)
+				tapGrad.Color = ColorSequence.new(Color3.fromRGB(255, 240, 130), Color3.fromRGB(220, 130, 0))
+			else
+				tapBtn.Text = "TAP!"
+				tapBtn.TextSize = 22
+				tapBtn.TextColor3 = Color3.new(1, 1, 1)
+				tapGrad.Color = ColorSequence.new(Color3.fromRGB(120, 255, 160), Color3.fromRGB(0, 160, 80))
+			end
+		end
+		tapsL.Text = finish and "TIRED OF TAPPING? FINISH IT INSTANTLY" or string.format("TAP TO SPEED UP   %d / %d", tapState.taps, need)
 	else
 		trainMini.Visible = false
+		tapState.taps = 0
 	end
 	if #s.news > 0 and tickText.Text == "" then
 		tickText.Text = Format.date(s.news[1].day) .. "   " .. s.news[1].text

@@ -115,8 +115,8 @@ function Promo.start(gui: Instance, shopApp)
 		-- a long model training just started
 		if s.training and s.training.name ~= lastTrainingName then
 			lastTrainingName = s.training.name
-			if (s.training.daysLeft or s.training.days or 0) > 25 and ready("train", 180) then
-				task.delay(1.5, show, "finish", "TOO SLOW?", string.format("%s needs about %d more days. Finish it right now.", s.training.name, math.ceil(s.training.daysLeft or s.training.days)))
+			if (s.training.daysLeft or s.training.days or 0) > 60 and ready("train", 400) then
+				task.delay(1.5, show, "turbo", "TOO SLOW?", string.format("%s needs about %d more days. Train 3x faster for 60 days.", s.training.name, math.ceil(s.training.daysLeft or s.training.days)))
 				return
 			end
 		elseif not s.training then

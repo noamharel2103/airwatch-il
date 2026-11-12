@@ -79,6 +79,17 @@ function Net.shop(kind: string, key: string, target: any?): any
 	return res
 end
 
+-- same as act, but never shows an error toast (for fast repeated taps)
+function Net.quiet(name: string, ...): (boolean, any)
+	local ok, res = pcall(function(...)
+		return ActionRF:InvokeServer(name, ...)
+	end, ...)
+	if not ok or type(res) ~= "table" or not res.ok then
+		return false, nil
+	end
+	return true, res.data
+end
+
 function Net.slots(action: string, ...)
 	local ok, res = pcall(function(...)
 		return SlotsRF:InvokeServer(action, ...)

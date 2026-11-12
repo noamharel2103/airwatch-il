@@ -59,7 +59,7 @@ end
 -- ===== launch dialog (3 simple choices) =====
 local function releaseDialog(host, m, s)
 	local overlay = new("TextButton", { Text = "", BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.45, Size = UDim2.fromScale(1, 1), ZIndex = 40, Parent = host })
-	local d = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(660, 480), ZIndex = 41, Parent = overlay })
+	local d = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(720, 600), ZIndex = 41, Parent = overlay })
 	UI.skin(d, T.bg)
 	local inner = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Parent = d })
 	UI.pad(inner, 26)
@@ -91,6 +91,23 @@ local function releaseDialog(host, m, s)
 	choiceRow("HYPE", { { "QUIET", 0 }, { "TEASERS " .. Format.money(lc.campaign[2]), 1 }, { "BIG SHOW " .. Format.money(lc.campaign[3]), 2 } }, function(v)
 		opts.campaign = v
 	end)
+	-- Robux extras for this launch
+	UI.label(d, "EXTRAS", 14, T.yellow, { FontFace = UI.BOLD })
+	local ex = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 56), Parent = d })
+	UI.list(ex, 10, true)
+	local trendy = s.trendyNext == true
+	local tb = UI.button(ex, trendy and "TRENDY: ON" or "MAKE IT TRENDY  R$ 49", function()
+		if not trendy and Lab.buyProduct then
+			Lab.buyProduct("trendy", nil)
+		end
+	end, trendy and T.green or Color3.fromRGB(255, 60, 130), { Size = UDim2.fromOffset(320, 54), TextSize = 13 })
+	local _ = tb
+	local mid = m.id
+	UI.button(ex, "+10 ALL STATS  R$ 79", function()
+		if Lab.buyProduct then
+			Lab.buyProduct("stats10", mid)
+		end
+	end, Color3.fromRGB(255, 175, 0), { Size = UDim2.fromOffset(300, 54), TextSize = 13 })
 	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 60), Parent = d })
 	UI.list(row, 12, true)
 	UI.button(row, "CANCEL", function()
@@ -136,8 +153,8 @@ local function buildModels(body, s)
 	if s.training then
 		local t = s.training
 		UI.button(list, "FINISH TRAINING NOW", function()
-			if Lab.openShop then
-				Lab.openShop("finish", nil)
+			if Lab.buyProduct then
+				Lab.buyProduct("finish", nil)
 			end
 		end, Color3.fromRGB(0, 200, 90), { Size = UDim2.new(1, -10, 0, 44), TextSize = 12 })
 		local box = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -10, 0, 60), Parent = list })
@@ -258,14 +275,14 @@ local function buildModels(body, s)
 	local mid = m.id
 	if busy then
 		UI.button(trainRow, "FINISH NOW", function()
-			if Lab.openShop then
-				Lab.openShop("finish", mid)
+			if Lab.buyProduct then
+				Lab.buyProduct("finish", mid)
 			end
 		end, Color3.fromRGB(0, 200, 90), { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.fromOffset(220, 52), TextSize = 13 })
 	else
 		UI.button(trainRow, "SUPER BOOST", function()
-			if Lab.openShop then
-				Lab.openShop("stats10", mid)
+			if Lab.buyProduct then
+				Lab.buyProduct("stats10", mid)
 			end
 		end, Color3.fromRGB(255, 60, 130), { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.fromOffset(220, 52), TextSize = 13 })
 	end
