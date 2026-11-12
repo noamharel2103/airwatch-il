@@ -241,16 +241,44 @@ local function topPopup()
 	end)
 end
 
+-- clear message in the middle of the screen when something is not ready yet
+local function notice(text: string)
+	if not host then
+		return
+	end
+	local n = new("TextLabel", { Text = text, FontFace = UI.HEAVY, TextSize = 20, TextColor3 = T.yellow, TextXAlignment = Enum.TextXAlignment.Center, BackgroundTransparency = 0.05, BackgroundColor3 = T.bg, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.3), Size = UDim2.fromOffset(640, 70), ZIndex = 340, Parent = host })
+	new("UICorner", { CornerRadius = UDim.new(0, 10), Parent = n })
+	new("UIStroke", { Color = T.yellow, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = n })
+	local sc = new("UIScale", { Scale = 0.5, Parent = n })
+	UI.tween(sc, 0.25, { Scale = 1 }, Enum.EasingStyle.Back)
+	if Fx then
+		Fx.sound("Notify")
+	end
+	task.delay(2.2, function()
+		UI.tween(n, 0.25, { BackgroundTransparency = 1, TextTransparency = 1 })
+		task.wait(0.3)
+		n:Destroy()
+	end)
+end
+local function clock(sec: number): string
+	sec = math.max(0, math.floor(sec))
+	if sec >= 3600 then
+		return string.format("%d:%02d:%02d", sec // 3600, (sec % 3600) // 60, sec % 60)
+	end
+	return string.format("%d:%02d", sec // 60, sec % 60)
+end
+
 -- ===== side buttons =====
 local bar: Frame? = nil
 local buttons: { [string]: any } = {}
 local function sideButton(id: string, icon: string, color: Color3, label: string, onClick: () -> ())
-	local b = new("TextButton", { Text = "", AutoButtonColor = false, BackgroundTransparency = 1, Size = UDim2.fromOffset(96, 104), Parent = bar })
-	local ic = UI.icon(b, icon, color, 72)
+	local b = new("TextButton", { Text = "", AutoButtonColor = false, BackgroundTransparency = 1, Size = UDim2.fromOffset(150, 122), Parent = bar })
+	local ic = UI.icon(b, icon, color, 80)
 	ic.AnchorPoint = Vector2.new(0.5, 0)
 	ic.Position = UDim2.new(0.5, 0, 0, 0)
-	local l = new("TextLabel", { Text = label, FontFace = UI.HEAVY, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Center, Position = UDim2.fromOffset(-10, 74), Size = UDim2.new(1, 20, 0, 22), Parent = b })
-	new("UIStroke", { Color = T.line, Thickness = 2.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual, Parent = l })
+	local l = new("TextLabel", { Text = label, FontFace = UI.FONT, TextSize = 15, TextXAlignment = Enum.TextXAlignment.Center, BackgroundTransparency = 0.15, BackgroundColor3 = T.bg, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 84), Size = UDim2.new(1, 0, 0, 30), Parent = b })
+	new("UICorner", { CornerRadius = UDim.new(0, 8), Parent = l })
+	new("UIStroke", { Color = color, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = l })
 	local dot = new("Frame", { BackgroundColor3 = T.red, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 30, 0, 6), Size = UDim2.fromOffset(18, 18), Visible = false, Parent = b })
 	UI.corner(dot, 99)
 	UI.stroke(dot, Color3.new(1, 1, 1), 2)
@@ -297,16 +325,24 @@ end
 function Extras.start(gui: Instance, fx)
 	host = gui
 	Fx = fx
-	bar = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, 150), Size = UDim2.fromOffset(100, 560), Parent = (gui :: any).HUD or gui })
+	bar = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -40, 0, 150), Size = UDim2.fromOffset(150, 680), Parent = (gui :: any).HUD or gui })
 	UI.list(bar, 8, false, Enum.HorizontalAlignment.Center)
 	sideButton("daily", "gift", Color3.fromRGB(255, 70, 90), "GIFT", function()
 		if lastInfo and not lastInfo.daily.claimed then
 			dailyPopup(lastInfo.daily)
-		elseif Fx then
-			Fx.float("COME BACK TOMORROW", T.yellow)
+		else
+			notice("NEXT DAILY GIFT IN " .. clock(86400 - os.time() % 86400))
 		end
 	end)
 	sideButton("playtime", "clock", Color3.fromRGB(255, 80, 160), "...", function()
+		local pt = lastInfo and lastInfo.playtime
+		if pt and pt.count >= pt.max then
+			notice("ALL PLAYTIME GIFTS COLLECTED FOR NOW")
+			return
+		elseif pt and (pt.nextIn or 0) > 0 then
+			notice("PLAYTIME GIFT IN " .. clock(pt.nextIn))
+			return
+		end
 		local r = meta("claimPlaytime")
 		if r and r.ok and Fx then
 			Fx.sound("CashRegister")
@@ -319,8 +355,8 @@ function Extras.start(gui: Instance, fx)
 		local ok, can = pcall(SocialService.CanSendGameInviteAsync, SocialService, Players.LocalPlayer)
 		if ok and can then
 			pcall(SocialService.PromptGameInvite, SocialService, Players.LocalPlayer)
-		elseif Fx then
-			Fx.float("+10% MONEY FOR EVERY FRIEND HERE", T.accent)
+		else
+			notice("+10% MONEY FOR EVERY FRIEND IN YOUR SERVER")
 		end
 	end)
 	sideButton("top", "trophy", Color3.fromRGB(150, 80, 255), "WORLD TOP", topPopup)
