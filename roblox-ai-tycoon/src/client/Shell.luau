@@ -67,7 +67,7 @@ local shopBtn = UI.button(hud, "SHOP", function()
 	if Shell.openShop then
 		Shell.openShop(nil)
 	end
-end, Color3.fromRGB(255, 175, 0), { Position = UDim2.fromOffset(16, 122), Size = UDim2.fromOffset(150, 58), TextSize = 20 })
+end, Color3.fromRGB(255, 175, 0), { Position = UDim2.fromOffset(16, 146), Size = UDim2.fromOffset(150, 58), TextSize = 20 })
 do
 	local ic = UI.icon(shopBtn, "shop", Color3.fromRGB(255, 175, 0), 40)
 	ic.Position = UDim2.fromOffset(8, 9)
@@ -109,7 +109,7 @@ local PROBLEM_LABEL = { massive = "MASSIVE JAILBREAK", outage = "SERVERS DOWN", 
 -- training mini status (bottom left)
 -- training card (bottom left): tap the big button to speed it up; after enough taps it
 -- becomes the Robux instant finish
-local trainMini = new("Frame", { Position = UDim2.fromOffset(16, 232), Size = UDim2.fromOffset(196, 226), BackgroundColor3 = T.bg, Visible = false, Parent = hud })
+local trainMini = new("Frame", { Position = UDim2.fromOffset(16, 220), Size = UDim2.fromOffset(196, 226), BackgroundColor3 = T.bg, Visible = false, Parent = hud })
 new("UICorner", { CornerRadius = UDim.new(0, 10), Parent = trainMini })
 new("UIStroke", { Color = T.line, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = trainMini })
 local tmHead = new("Frame", { BackgroundColor3 = T.purple, Size = UDim2.new(1, 0, 0, 30), Parent = trainMini })

@@ -391,12 +391,13 @@ function Extras.start(gui: Instance, fx)
 	end)
 	-- luck + live world events, next to the SHOP button
 	local EventsDef = require(RS.Shared.Events)
-	local strip = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(222, 150), Size = UDim2.fromOffset(900, 52), Parent = (gui :: any).HUD or gui })
-	UI.list(strip, 8, true)
-	local luckChip = new("TextLabel", { Text = "LUCK x1.00", FontFace = UI.HEAVY, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Center, BackgroundTransparency = 0, BackgroundColor3 = Color3.fromRGB(0, 170, 90), Size = UDim2.fromOffset(150, 46), LayoutOrder = 0, Parent = strip })
-	UI.corner(luckChip, 2)
-	UI.stroke(luckChip, T.line, 3)
-	new("UIStroke", { Color = T.line, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual, Parent = luckChip })
+	-- events: centered at the top, under the news line (never on the laptop)
+	local strip = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 72), Size = UDim2.fromOffset(900, 46), Parent = (gui :: any).HUD or gui })
+	UI.list(strip, 8, true, Enum.HorizontalAlignment.Center)
+	-- luck: a small tag tucked under the money panel
+	local luckChip = new("TextLabel", { Text = "LUCK x1.00", FontFace = UI.FONT, TextSize = 14, TextColor3 = Color3.fromRGB(120, 255, 170), TextXAlignment = Enum.TextXAlignment.Center, BackgroundTransparency = 0.1, BackgroundColor3 = T.bg, Position = UDim2.fromOffset(16, 114), Size = UDim2.fromOffset(140, 24), Parent = (gui :: any).HUD or gui })
+	new("UICorner", { CornerRadius = UDim.new(0, 6), Parent = luckChip })
+	new("UIStroke", { Color = Color3.fromRGB(0, 200, 110), Thickness = 1.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = luckChip })
 	local chips: { [string]: TextLabel } = {}
 	local seen: { [string]: boolean } = {}
 	local lastEvents: { any } = {}
@@ -411,7 +412,7 @@ function Extras.start(gui: Instance, fx)
 			live[ev.id] = true
 			local def = EventsDef.byId[ev.id]
 			if def and not chips[ev.id] then
-				local c = new("TextLabel", { Text = def.name, FontFace = UI.HEAVY, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Center, BackgroundTransparency = 0, BackgroundColor3 = def.color, Size = UDim2.fromOffset(210, 46), Parent = strip })
+				local c = new("TextLabel", { Text = def.name, FontFace = UI.HEAVY, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Center, BackgroundTransparency = 0, BackgroundColor3 = def.color, Size = UDim2.fromOffset(230, 42), Parent = strip })
 				UI.corner(c, 2)
 				UI.stroke(c, T.line, 3)
 				new("UIStroke", { Color = T.line, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual, Parent = c })
