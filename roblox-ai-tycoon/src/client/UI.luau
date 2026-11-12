@@ -211,9 +211,17 @@ function UI.button(parent: Instance, text: string, onClick: (() -> ())?, kind: a
 		if color ~= UI.GHOST then
 			setColor(color:Lerp(Color3.new(1, 1, 1), 0.12))
 		end
+		local hs = b:FindFirstChild("HoverScale") or new("UIScale", { Name = "HoverScale", Parent = b })
+		if not b:FindFirstChildOfClass("UIScale") or b:FindFirstChildOfClass("UIScale") == hs then
+			TweenService:Create(hs, TweenInfo.new(0.15, Enum.EasingStyle.Back), { Scale = 1.04 }):Play()
+		end
 	end)
 	b.MouseLeave:Connect(function()
 		setColor(color)
+		local hs = b:FindFirstChild("HoverScale")
+		if hs then
+			TweenService:Create(hs, TweenInfo.new(0.12), { Scale = 1 }):Play()
+		end
 	end)
 	local born = os.clock()
 	b.MouseButton1Click:Connect(function()

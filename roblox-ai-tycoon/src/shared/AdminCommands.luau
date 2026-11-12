@@ -1,0 +1,14 @@
+-- Admin console (F2) command list. Each entry is a Cmdr command definition WITHOUT Run.
+-- The code for each command goes in server/AdminCommandsServer.luau under the same Name.
+-- Example:
+-- {
+-- 	Name = "givemoney",
+-- 	Aliases = { "money" },
+-- 	Description = "Give a player money",
+-- 	Group = "Admin",
+-- 	Args = {
+-- 		{ Type = "player", Name = "player", Description = "Who gets it" },
+-- 		{ Type = "number", Name = "amount", Description = "How much" },
+-- 	},
+-- },
+return {}

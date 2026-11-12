@@ -108,7 +108,7 @@ local PROBLEM_LABEL = { massive = "MASSIVE JAILBREAK", outage = "SERVERS DOWN", 
 -- training mini status (bottom left)
 -- training card (bottom left): tap the big button to speed it up; after enough taps it
 -- becomes the Robux instant finish
-local trainMini = new("Frame", { Position = UDim2.fromOffset(16, 232), Size = UDim2.fromOffset(196, 268), BackgroundColor3 = T.bg, Visible = false, Parent = hud })
+local trainMini = new("Frame", { Position = UDim2.fromOffset(16, 232), Size = UDim2.fromOffset(196, 226), BackgroundColor3 = T.bg, Visible = false, Parent = hud })
 new("UICorner", { CornerRadius = UDim.new(0, 10), Parent = trainMini })
 new("UIStroke", { Color = T.line, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = trainMini })
 local tmHead = new("Frame", { BackgroundColor3 = T.purple, Size = UDim2.new(1, 0, 0, 30), Parent = trainMini })
@@ -133,11 +133,7 @@ new("UIStroke", { Color = T.line, Thickness = 3, ApplyStrokeMode = Enum.ApplyStr
 local tapGrad = new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(120, 255, 160), Color3.fromRGB(0, 160, 80)), Parent = tapBtn })
 new("UIStroke", { Color = T.line, Thickness = 2.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual, Parent = tapBtn })
 local tapScale = new("UIScale", { Parent = tapBtn })
-local tapsL = new("TextLabel", { Text = "", FontFace = UI.BOLD, TextSize = 10, TextColor3 = T.yellow, TextXAlignment = Enum.TextXAlignment.Center, Position = UDim2.fromOffset(8, 220), Size = UDim2.new(1, -16, 0, 14), Parent = trainMini })
-local tapBarBg = new("Frame", { BackgroundColor3 = Color3.fromRGB(14, 16, 32), Position = UDim2.fromOffset(20, 240), Size = UDim2.new(1, -40, 0, 8), Parent = trainMini })
-new("UICorner", { CornerRadius = UDim.new(0, 4), Parent = tapBarBg })
-local tapBar = new("Frame", { BackgroundColor3 = T.yellow, Size = UDim2.fromScale(0, 1), Parent = tapBarBg })
-new("UICorner", { CornerRadius = UDim.new(0, 4), Parent = tapBar })
+
 task.spawn(function()
 	local t0 = os.clock()
 	while true do
@@ -301,9 +297,21 @@ function Shell.register(app)
 	local badge = new("TextLabel", { Text = "", FontFace = UI.BOLD, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Center, BackgroundTransparency = 0, BackgroundColor3 = T.red, Position = UDim2.fromOffset(74, -2), Size = UDim2.fromOffset(22, 22), Visible = false, ZIndex = 14, Parent = btn })
 	UI.corner(badge, 11)
 	badges[app.id] = badge
+	local isc = new("UIScale", { Parent = ic })
+	btn.MouseEnter:Connect(function()
+		UI.tween(isc, 0.18, { Scale = 1.12 }, Enum.EasingStyle.Back)
+	end)
+	btn.MouseLeave:Connect(function()
+		UI.tween(isc, 0.15, { Scale = 1 })
+	end)
 	btn.MouseButton1Click:Connect(function()
 		if os.clock() < UI.guardUntil then
 			return
+		end
+		isc.Scale = 0.85
+		UI.tween(isc, 0.25, { Scale = 1 }, Enum.EasingStyle.Back)
+		if Shell.fx then
+			Shell.fx.sound("Pop", 1.15)
 		end
 		Shell.open(app.id)
 	end)
@@ -606,8 +614,7 @@ afterProblems = function(s)
 				tapGrad.Color = ColorSequence.new(Color3.fromRGB(120, 255, 160), Color3.fromRGB(0, 160, 80))
 			end
 		end
-		tapsL.Text = finish and "OR FINISH IT INSTANTLY" or string.format("TAPS  %d / %d", tapState.taps, need)
-		tapBar.Size = UDim2.fromScale(math.clamp(tapState.taps / need, 0, 1), 1)
+
 	else
 		trainMini.Visible = false
 		tapState.taps = 0

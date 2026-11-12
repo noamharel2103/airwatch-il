@@ -52,7 +52,9 @@ end
 function App.buy(item, isPass: boolean, target: number?)
 	local res = Net.shop(isPass and "pass" or "product", item.key, target)
 	if res and res.ok and res.test then
-		Net.toast(item.name .. " (Studio test, free)", "good")
+		if App.onTestGrant then
+			App.onTestGrant(item)
+		end
 	end
 	return res
 end

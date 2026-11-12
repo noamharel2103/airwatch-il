@@ -62,9 +62,33 @@ Lab.openShop = function(key: string?, modelId: number?)
 	ShopApp.targetModel = modelId
 	Shell.openShop(key)
 end
+-- ===== juice: money bursts, banners and sounds =====
+local Fx = require(Modules.Fx)
+Fx.init(Shell.gui)
+Shell.fx = Fx
+local function robuxCelebration(name: string?)
+	Fx.sound("CashRegister")
+	Fx.banner("PURCHASED!", Color3.fromRGB(255, 200, 40), name)
+	Fx.burst(nil, 24, true)
+	Fx.rain(45)
+end
+ShopApp.onTestGrant = function(item)
+	robuxCelebration(item.name)
+end
 Net.onEvent(function(kind, data)
 	if kind == "purchase" then
-		Shell.toast("PURCHASE COMPLETE. THANK YOU!", "good")
+		local ShopData = require(game:GetService("ReplicatedStorage").Shared.Shop)
+		local item = ShopData.productByKey[data] or ShopData.passByKey[data]
+		robuxCelebration(item and item.name or nil)
+	end
+end)
+-- every in-game buy: coins burst out of the button you pressed
+local BUYS = { buy = true, rent = true, buyStorage = true, buyPcPart = true, autoSupply = true, recruit = true, buildSite = true, buyDecor = true, hire = true, upgradeOffice = true, boost = true, party = true, givePc = true, recruitSearch = true, createModel = true, acquire = true }
+table.insert(Net.actListeners, function(name, data)
+	if BUYS[name] then
+		Fx.sound("Coin")
+		Fx.burst(nil, 12, false)
+		Fx.float(name == "recruit" and "HIRED!" or (name == "createModel" and "TRAINING!" or "BOUGHT!"))
 	end
 end)
 Lab.setPlayground(Playground)
@@ -89,6 +113,7 @@ end)
 local rooms = workspace:WaitForChild("Rooms", 30)
 local currentStage = 0
 local orbit: any
+local lastReady: number? = nil
 local baseCF: CFrame? = nil
 local function setRoom(stage: number)
 	if not rooms then
@@ -362,9 +387,24 @@ Net.onState(function(s)
 		Shell.toast("NEW MESSAGE FROM " .. lastDm.from:upper(), "warn")
 	end
 	seenChat = dmCount
+	-- a model finished training: big banner
+	local readyCount = 0
+	for _, m in ipairs(s.models) do
+		if m.status == "ready" then
+			readyCount += 1
+		end
+	end
+	if lastReady ~= nil and readyCount > lastReady then
+		Fx.banner("MODEL READY!", Color3.fromRGB(0, 230, 120), "Open the AI Lab to launch it")
+		Fx.sound("Pop", 0.9)
+	end
+	lastReady = readyCount
 	-- achievement unlocked
 	if s.lastAchievement and s.lastAchievement.id ~= lastAch then
 		if lastAch ~= nil then
+			Fx.banner("ACHIEVEMENT!", Color3.fromRGB(190, 120, 255), s.lastAchievement.name)
+			Fx.sound("CashRegister", 1.2)
+			Fx.rain(20)
 			Shell.toast("ACHIEVEMENT: " .. s.lastAchievement.name .. "  +" .. require(game:GetService("ReplicatedStorage").Shared.Format).money(s.lastAchievement.reward), "good")
 		end
 		lastAch = s.lastAchievement.id

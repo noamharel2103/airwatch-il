@@ -8,6 +8,7 @@ local StateRE = Remotes:WaitForChild("State") :: RemoteEvent
 local EventRE = Remotes:WaitForChild("Event") :: RemoteEvent
 
 local Net = {}
+Net.actListeners = {} :: { (string, any) -> () }
 Net.state = nil :: any
 local listeners: { (any) -> () } = {}
 local eventListeners: { (string, any) -> () } = {}
@@ -55,6 +56,9 @@ function Net.act(name: string, ...): (boolean, any)
 	if not res.ok then
 		Net.toast(tostring(res.err or "Failed"), "error")
 		return false, nil
+	end
+	for _, fn in ipairs(Net.actListeners) do
+		task.spawn(fn, name, res.data)
 	end
 	return true, res.data
 end
