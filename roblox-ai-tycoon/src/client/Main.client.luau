@@ -348,7 +348,7 @@ Net.onState(function(s)
 		end
 	end
 	if seenChat >= 0 and dmCount > seenChat and lastDm then
-		Shell.toast(lastDm.from .. ": " .. lastDm.text, "warn")
+		Shell.toast("NEW MESSAGE FROM " .. lastDm.from:upper(), "warn")
 	end
 	seenChat = dmCount
 	-- achievement unlocked

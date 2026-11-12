@@ -847,6 +847,39 @@ function Actions.buyPcPart(state, cat, id, n)
 	Game.chatMsg(state, "infra", "Infra", "Installed the " .. part.name .. ". " .. part.blurb)
 	return true
 end
+-- one button: buy the cheapest RAM and cooling that cover what your GPUs need
+function Actions.autoSupply(state)
+	local have, need = Game.pcSupply(state)
+	local bought = 0
+	for _, cat in ipairs({ "ram", "cooling" }) do
+		local field = cat == "ram" and "gb" or "cool"
+		local missing = need[field] - have[field]
+		if missing > 0 then
+			-- best value part available this year
+			local pick
+			for _, part in ipairs(PcParts.list[cat]) do
+				local amount = part.gb or part.cool or 0
+				if part.tier > 1 and year(state) >= part.year and amount > 0 then
+					if not pick or part.price / amount < pick.price / (pick.gb or pick.cool) then
+						pick = part
+					end
+				end
+			end
+			if pick then
+				local amount = pick.gb or pick.cool
+				local n = math.ceil(missing / amount)
+				local ok = Actions.buyPcPart(state, cat, pick.id, n)
+				if ok then
+					bought += 1
+				end
+			end
+		end
+	end
+	if bought == 0 then
+		return false, "Nothing to buy, or not enough cash"
+	end
+	return true
+end
 Actions.buyStorage = function(...) return Game.buyStorage(...) end
 Game.Actions = Actions
 

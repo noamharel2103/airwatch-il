@@ -133,9 +133,31 @@ function App.mount(ctx, s)
 	end
 	UI.clear(ctx.tabs)
 	UI.clear(ctx.body)
-	local bg = new("Frame", { BackgroundColor3 = Color3.fromRGB(60, 30, 6), Size = UDim2.fromScale(1, 1), Parent = ctx.body })
-	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(110, 60, 10), Color3.fromRGB(40, 16, 4)), Parent = bg })
-	new("UIStroke", { Color = GOLD, Thickness = 4, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = bg })
+	-- bright gold backdrop: warm gradient, moving diagonal stripes, twinkling sparkles
+	local bg = new("Frame", { BackgroundColor3 = Color3.fromRGB(255, 170, 20), ClipsDescendants = true, Size = UDim2.fromScale(1, 1), Parent = ctx.body })
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 214, 70)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 150, 20)), ColorSequenceKeypoint.new(1, Color3.fromRGB(220, 90, 0)) }), Parent = bg })
+	new("UIStroke", { Color = INK, Thickness = 4, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = bg })
+	local stripes = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(2, 0, 3, 0), Rotation = 35, Parent = bg })
+	for i = 0, 40 do
+		new("Frame", { BackgroundColor3 = Color3.fromRGB(255, 255, 255), BackgroundTransparency = 0.86, Position = UDim2.new(i / 40, 0, 0, 0), Size = UDim2.new(1 / 80, 0, 1, 0), Parent = stripes })
+	end
+	local sparkles = {}
+	for _ = 1, 22 do
+		local sz = math.random(6, 14)
+		local sp = new("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), Position = UDim2.fromScale(math.random(), math.random()), Size = UDim2.fromOffset(sz, sz), Rotation = 45, Parent = bg })
+		table.insert(sparkles, sp)
+	end
+	task.spawn(function()
+		local t0 = os.clock()
+		while bg.Parent do
+			local t = os.clock() - t0
+			stripes.Position = UDim2.new(0.5, (t * 30) % 60, 0.5, 0)
+			for i, sp in ipairs(sparkles) do
+				sp.BackgroundTransparency = 0.2 + 0.8 * math.abs(math.sin(t * 1.3 + i))
+			end
+			task.wait(1 / 30)
+		end
+	end)
 	local sc = UI.scroll(bg)
 	sc.ScrollBarImageColor3 = GOLD
 	sc.ScrollBarThickness = 10
@@ -170,7 +192,31 @@ function App.mount(ctx, s)
 			task.wait(1 / 30)
 		end
 	end)
-	new("TextLabel", { Text = "EVERYTHING HERE IS INSTANT. MOST POPULAR THIS WEEK: INSTANT FINISH AND 2X CASH", FontFace = UI.BOLD, TextSize = 12, TextColor3 = Color3.fromRGB(255, 230, 160), TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.new(1, 0, 0, 20), LayoutOrder = 2, Parent = sc })
+	new("TextLabel", { Text = "EVERYTHING HERE IS INSTANT. MOST POPULAR THIS WEEK: INSTANT FINISH AND 2X CASH", FontFace = UI.BOLD, TextSize = 12, TextColor3 = Color3.fromRGB(90, 40, 0), TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.new(1, 0, 0, 20), LayoutOrder = 2, Parent = sc })
+	-- featured deal: the best pass, big and loud
+	local feat = ShopData.passByKey.cash2x
+	if feat and not (s.perks and s.perks.cash2x) then
+		local fb = new("Frame", { BackgroundColor3 = Color3.fromRGB(0, 200, 100), Size = UDim2.new(1, -8, 0, 210), LayoutOrder = 2, Parent = sc })
+		new("UICorner", { CornerRadius = UDim.new(0, 6), Parent = fb })
+		new("UIStroke", { Color = INK, Thickness = 5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = fb })
+		new("UIGradient", { Rotation = 20, Color = ColorSequence.new(Color3.fromRGB(60, 255, 140), Color3.fromRGB(0, 140, 70)), Parent = fb })
+		local big = UI.icon(fb, "cash", feat.color, 170)
+		big.AnchorPoint = Vector2.new(0, 0.5)
+		big.Position = UDim2.new(0, 30, 0.5, 0)
+		big.Rotation = -8
+		fancy(fb, "BEST DEAL: 2X CASH FOREVER", 30, Color3.new(1, 1, 1), Color3.fromRGB(255, 240, 150), { TextXAlignment = Enum.TextXAlignment.Left, Position = UDim2.fromOffset(230, 30), Size = UDim2.new(1, -520, 0, 80) })
+		new("TextLabel", { Text = "Every dollar your company earns is doubled, in every company you ever make.", TextSize = 18, TextColor3 = Color3.new(1, 1, 1), Position = UDim2.fromOffset(230, 116), Size = UDim2.new(1, -520, 0, 60), Parent = fb })
+		App.goldButton(fb, priceText(feat.robux, feat.id), function()
+			App.buy(feat, true, nil)
+		end, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -30, 0.5, 0), Size = UDim2.fromOffset(250, 90), TextSize = 22 })
+		task.spawn(function()
+			local t0 = os.clock()
+			while fb.Parent do
+				big.Rotation = -8 + math.sin((os.clock() - t0) * 2) * 6
+				task.wait(1 / 30)
+			end
+		end)
+	end
 	-- 1) instant boosts, 2) cash, 3) passes: all on one page
 	ribbon(sc, "INSTANT POWER", 3)
 	local g1 = grid(sc, 4)

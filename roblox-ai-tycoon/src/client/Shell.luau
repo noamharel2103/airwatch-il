@@ -122,19 +122,48 @@ local tickText = new("TextLabel", { Text = "", TextSize = 14, Position = UDim2.f
 local hint = new("TextLabel", { Visible = false, Text = "Click the laptop to open the computer", TextSize = 14, TextColor3 = T.sub, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -56), Size = UDim2.fromOffset(500, 18), TextXAlignment = Enum.TextXAlignment.Center, Parent = hud })
 
 -- toasts
-local toasts = new("Frame", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, 130), Size = UDim2.fromOffset(360, 400), BackgroundTransparency = 1, Parent = gui, ZIndex = 50 })
-UI.list(toasts, 8)
+-- toasts: small pills at the bottom middle, never more than 3, they slide in and fade out
+local toasts = new("Frame", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -90), Size = UDim2.fromOffset(560, 200), BackgroundTransparency = 1, Parent = gui, ZIndex = 50 })
+UI.list(toasts, 6, false, Enum.HorizontalAlignment.Center)
+toasts:FindFirstChildOfClass("UIListLayout").VerticalAlignment = Enum.VerticalAlignment.Bottom
+local toastN = 0
 function Shell.toast(text: string, kind: string?)
 	local color = kind == "error" and T.red or (kind == "good" and T.green or (kind == "warn" and T.yellow or T.accent))
-	local f = new("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = T.bg, BackgroundTransparency = 0.05, ZIndex = 50, Parent = toasts })
-	UI.corner(f, 12)
-	UI.stroke(f, color, 1.5)
-	UI.pad(f, 10, 14)
-	new("TextLabel", { Text = text, TextSize = 14, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, ZIndex = 51, Parent = f })
-	task.delay(4.5, function()
-		UI.tween(f, 0.3, { BackgroundTransparency = 1 })
-		task.wait(0.3)
-		f:Destroy()
+	toastN += 1
+	local pills = {}
+	for _, c in ipairs(toasts:GetChildren()) do
+		if c:IsA("Frame") then
+			table.insert(pills, c)
+		end
+	end
+	table.sort(pills, function(a, b)
+		return a.LayoutOrder < b.LayoutOrder
+	end)
+	while #pills >= 3 do
+		table.remove(pills, 1):Destroy()
+	end
+	local f = new("Frame", { Size = UDim2.fromOffset(0, 34), AutomaticSize = Enum.AutomaticSize.X, BackgroundColor3 = T.bg, BackgroundTransparency = 0.08, LayoutOrder = toastN, ZIndex = 50, Parent = toasts })
+	UI.corner(f, 2)
+	UI.stroke(f, color, 2)
+	new("Frame", { BackgroundColor3 = color, Size = UDim2.new(0, 6, 1, 0), ZIndex = 51, Parent = f })
+	local label = new("TextLabel", { Text = #text > 70 and (text:sub(1, 68) .. "...") or text, TextSize = 13, TextWrapped = false, Position = UDim2.fromOffset(16, 0), Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, ZIndex = 51, Parent = f })
+	new("UIPadding", { PaddingRight = UDim.new(0, 16), Parent = f })
+	local _ = label
+	local sc = new("UIScale", { Scale = 0.6, Parent = f })
+	UI.tween(sc, 0.25, { Scale = 1 }, Enum.EasingStyle.Back)
+	task.delay(kind == "warn" and 3 or 3.5, function()
+		if f.Parent then
+			UI.tween(f, 0.3, { BackgroundTransparency = 1 })
+			for _, d in ipairs(f:GetDescendants()) do
+				if d:IsA("TextLabel") then
+					UI.tween(d, 0.3, { TextTransparency = 1 })
+				elseif d:IsA("UIStroke") then
+					UI.tween(d, 0.3, { Transparency = 1 })
+				end
+			end
+			task.wait(0.3)
+			f:Destroy()
+		end
 	end)
 end
 Net.setToast(Shell.toast)
@@ -482,7 +511,9 @@ afterProblems = function(s)
 	setBadge("bank", #s.investors)
 	-- app refresh
 	if openApp and openApp.ctx then
-		if openApp.key then
+		-- never rebuild the screen while you are typing (it would kick you out of the text box)
+		local typing = game:GetService("UserInputService"):GetFocusedTextBox() ~= nil
+		if openApp.key and not typing then
 			local k = openApp.key(s)
 			if k ~= openApp.lastKey then
 				openApp.lastKey = k
