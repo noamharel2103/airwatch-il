@@ -120,31 +120,57 @@ function App.mount(ctx, s)
 			UI.label(sc, "Nobody yet. Find people in the Hire tab.", 14, T.dim)
 		end
 		for _, p in ipairs(s.people or {}) do
-			local c = new("Frame", { BackgroundColor3 = T.panel2, Size = UDim2.new(1, -8, 0, 78), Parent = sc })
-			UI.stroke(c, T.line, 3)
+			-- one tidy card per person: face, name, job, mood bar, and three buttons on the right
 			local rr = Staff.RARITIES[p.rarity or 1]
-			new("Frame", { BackgroundColor3 = rr.color, Size = UDim2.new(0, 8, 1, 0), Parent = c })
-			new("TextLabel", { Text = rr.name, FontFace = UI.HEAVY, TextSize = 10, TextColor3 = rr.color, TextXAlignment = Enum.TextXAlignment.Right, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -410, 0, 8), Size = UDim2.fromOffset(140, 16), Parent = c })
+			local c = new("Frame", { BackgroundColor3 = T.panel2, Size = UDim2.new(1, -8, 0, 88), Parent = sc })
+			new("UICorner", { CornerRadius = UDim.new(0, 10), Parent = c })
+			new("UIStroke", { Color = rr.color, Thickness = 2, Transparency = 0.2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = c })
+			new("UIGradient", { Rotation = 0, Color = ColorSequence.new(rr.color:Lerp(T.panel2, 0.78), T.panel2), Parent = c })
+			local face = new("ImageLabel", { BackgroundColor3 = rr.color, Image = p.userId and ("rbxthumb://type=AvatarHeadShot&id=" .. p.userId .. "&w=150&h=150") or "", Position = UDim2.fromOffset(14, 14), Size = UDim2.fromOffset(60, 60), Parent = c })
+			new("UICorner", { CornerRadius = UDim.new(1, 0), Parent = face })
+			new("UIStroke", { Color = T.line, Thickness = 2, Parent = face })
+			if not p.userId then
+				new("TextLabel", { Text = p.name:sub(1, 1), FontFace = UI.HEAVY, TextSize = 24, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromScale(1, 1), Parent = face })
+			end
 			local role = Staff.byId[p.role]
 			local away = p.offUntil and p.offUntil > s.day
-			new("TextLabel", { Text = p.name .. (away and "   (DAY OFF)" or ""), FontFace = UI.HEAVY, TextSize = 14, TextColor3 = T.text, BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 8), Size = UDim2.new(0.5, 0, 0, 18), TextXAlignment = Enum.TextXAlignment.Left, Parent = c })
-			new("TextLabel", { Text = string.format("%s %s  |  %s  |  skill %d%%", Staff.RANKS[p.rank or 1], role and role.name or p.role, p.from or "", math.floor((p.skill or 1) * 100)), TextSize = 13, TextColor3 = T.sub, BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 30), Size = UDim2.new(0.55, 0, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, Parent = c })
-			new("TextLabel", { Text = "Computer: " .. Staff.PCS[(p.pc or 0) + 1].name, TextSize = 13, TextColor3 = T.sub, BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 50), Size = UDim2.new(0.3, 0, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, Parent = c })
-			local mb = new("Frame", { BackgroundTransparency = 1, Position = UDim2.new(0.3, 0, 0, 54), Size = UDim2.new(0.22, 0, 0, 10), Parent = c })
+			new("TextLabel", { Text = p.name .. (away and "   (DAY OFF)" or ""), FontFace = UI.FONT, TextSize = 18, TextColor3 = T.text, Position = UDim2.fromOffset(88, 10), Size = UDim2.new(1, -560, 0, 24), TextTruncate = Enum.TextTruncate.AtEnd, TextWrapped = false, Parent = c })
+			new("TextLabel", { Text = rr.name .. "  " .. Staff.RANKS[p.rank or 1] .. " " .. (role and role.name or p.role), FontFace = UI.BOLD, TextSize = 10, TextColor3 = rr.color:Lerp(Color3.new(1, 1, 1), 0.3), Position = UDim2.fromOffset(88, 38), Size = UDim2.new(1, -560, 0, 16), Parent = c })
 			local m = p.morale or 70
-			UI.bar(mb, m / 100, m > 55 and T.green or (m > 30 and T.yellow or T.red), 10)
+			local mb = new("Frame", { BackgroundColor3 = Color3.fromRGB(14, 16, 32), Position = UDim2.fromOffset(88, 62), Size = UDim2.new(0, 160, 0, 10), Parent = c })
+			new("UICorner", { CornerRadius = UDim.new(0, 5), Parent = mb })
+			local mf = new("Frame", { BackgroundColor3 = m > 55 and T.green or (m > 30 and T.yellow or T.red), Size = UDim2.fromScale(m / 100, 1), Parent = mb })
+			new("UICorner", { CornerRadius = UDim.new(0, 5), Parent = mf })
+			new("TextLabel", { Text = "MOOD", FontFace = UI.BOLD, TextSize = 9, TextColor3 = T.sub, Position = UDim2.fromOffset(256, 58), Size = UDim2.fromOffset(60, 16), Parent = c })
 			local id = p.id
 			local nextPc = math.min((p.pc or 0) + 1, #Staff.PCS - 1)
 			if (p.pc or 0) < #Staff.PCS - 1 then
-				UI.button(c, "PC: " .. Staff.PCS[nextPc + 1].name .. " " .. Format.money(Staff.PCS[nextPc + 1].price), function()
+				UI.button(c, "NEW PC " .. Format.money(Staff.PCS[nextPc + 1].price), function()
 					Net.act("givePc", id, nextPc)
-				end, "primary", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -150, 0.5, 0), Size = UDim2.fromOffset(250, 36), TextSize = 10 })
+				end, T.accent, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -262, 0.5, 0), Size = UDim2.fromOffset(170, 44), TextSize = 10 })
 			end
 			if (p.rank or 1) < #Staff.RANKS then
-				UI.button(c, "Promote", function()
+				UI.button(c, "PROMOTE", function()
 					Net.act("promote", id)
-				end, "success", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), Size = UDim2.fromOffset(128, 36), TextSize = 11 })
+				end, T.green, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -116, 0.5, 0), Size = UDim2.fromOffset(138, 44), TextSize = 10 })
 			end
+			-- let go: asks once before it happens
+			local sure = false
+			local fire
+			fire = UI.button(c, "LET GO", function()
+				if not sure then
+					sure = true
+					fire.Text = "SURE?"
+					task.delay(2.5, function()
+						if fire.Parent then
+							sure = false
+							fire.Text = "LET GO"
+						end
+					end)
+					return
+				end
+				Net.act("letGo", id)
+			end, T.red, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), Size = UDim2.fromOffset(96, 44), TextSize = 10 })
 		end
 		return
 	end
