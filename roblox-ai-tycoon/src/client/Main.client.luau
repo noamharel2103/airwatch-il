@@ -335,8 +335,8 @@ Net.onState(function(s)
 			d.Transparency = slot <= shown and 0 or 1
 		end
 		local w = d:GetAttribute("WorkerSlot")
-		if w and d:IsA("BasePart") then
-			d.Transparency = w <= s.headcount and 0 or 1
+		if w and (d:IsA("BasePart") or d:IsA("Decal")) then
+			(d :: any).Transparency = w <= s.headcount and 0 or 1
 		end
 	end
 	local board = room:FindFirstChild("GoalsBoard", true)

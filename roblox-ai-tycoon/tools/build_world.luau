@@ -77,64 +77,137 @@ rooms.Parent = W
 -- ===== reusable furniture =====
 local WOOD = rgb(132, 96, 64)
 local DARK = rgb(38, 40, 46)
-local function deskWithPC(parent, cf, laptop, app)
-	local m = model(parent, "Desk", app, app and "Computer" or nil)
-	p(m, "Top", Vector3.new(6, 0.35, 3), cf * CFrame.new(0, 3, 0), WOOD, M.Wood)
-	p(m, "LegL", Vector3.new(0.3, 3, 2.8), cf * CFrame.new(-2.7, 1.5, 0), DARK, M.Metal)
-	p(m, "LegR", Vector3.new(0.3, 3, 2.8), cf * CFrame.new(2.7, 1.5, 0), DARK, M.Metal)
-	local scr
-	if laptop then
-		p(m, "Base", Vector3.new(2.4, 0.12, 1.6), cf * CFrame.new(0, 3.24, 0.3), rgb(60, 62, 70), M.Metal)
-		scr = p(m, "Screen", Vector3.new(2.4, 1.6, 0.1), cf * CFrame.new(0, 4, -0.55) * CFrame.Angles(math.rad(-10), 0, 0), rgb(18, 20, 26))
-	else
-		p(m, "Stand", Vector3.new(0.3, 1, 0.3), cf * CFrame.new(0, 3.6, -0.9), DARK, M.Metal)
-		scr = p(m, "Screen", Vector3.new(3, 1.8, 0.12), cf * CFrame.new(0, 4.6, -0.9), rgb(18, 20, 26))
-		p(m, "Keyboard", Vector3.new(1.8, 0.1, 0.6), cf * CFrame.new(0, 3.22, 0.3), rgb(230, 230, 230))
-	end
+local function screenGui(scr, accent)
 	local g = Instance.new("SurfaceGui")
 	g.Face = Enum.NormalId.Back
 	g.LightInfluence = 0
-	g.Brightness = 1.6
+	g.Brightness = 1.8
+	g.CanvasSize = Vector2.new(300, 180)
 	g.Parent = scr
 	local f = Instance.new("Frame")
 	f.Size = UDim2.fromScale(1, 1)
 	f.BorderSizePixel = 0
-	f.BackgroundColor3 = rgb(60, 90, 170)
+	f.BackgroundColor3 = rgb(16, 20, 44)
 	f.Parent = g
-	local gr = Instance.new("UIGradient")
-	gr.Color = ColorSequence.new(rgb(90, 130, 230), rgb(40, 30, 90))
-	gr.Rotation = 120
-	gr.Parent = f
-	light(scr, "SurfaceLight", { Face = Enum.NormalId.Back, Brightness = 0.6, Range = 5, Color = rgb(140, 170, 255) })
-	-- chair
-	p(m, "Seat", Vector3.new(2.2, 0.4, 2.2), cf * CFrame.new(0, 1.9, 2.6), rgb(40, 42, 48), M.Fabric)
-	p(m, "Back", Vector3.new(2.2, 2.4, 0.35), cf * CFrame.new(0, 3.3, 3.6), rgb(40, 42, 48), M.Fabric)
-	p(m, "Pole", Vector3.new(0.3, 1.7, 0.3), cf * CFrame.new(0, 0.85, 2.6), DARK, M.Metal)
+	-- fake code / dashboard lines in bright colours
+	local cols = { rgb(0, 220, 255), rgb(255, 90, 170), rgb(120, 255, 120), rgb(255, 210, 40), rgb(170, 120, 255) }
+	local rnd = Random.new(math.floor(math.abs(scr.Position.X) * 7 + math.abs(scr.Position.Z) * 13))
+	for i = 0, 7 do
+		local l = Instance.new("Frame")
+		l.BorderSizePixel = 0
+		l.BackgroundColor3 = cols[rnd:NextInteger(1, #cols)]
+		l.Position = UDim2.fromOffset(16 + rnd:NextInteger(0, 3) * 18, 18 + i * 20)
+		l.Size = UDim2.fromOffset(rnd:NextInteger(40, 200), 8)
+		l.Parent = f
+	end
+	local bar = Instance.new("Frame")
+	bar.BorderSizePixel = 0
+	bar.BackgroundColor3 = accent
+	bar.Size = UDim2.new(1, 0, 0, 10)
+	bar.Parent = f
+	return g
+end
+
+local function deskWithPC(parent, cf, laptop, app)
+	local m = model(parent, "Desk", app, app and "Computer" or nil)
+	p(m, "Top", Vector3.new(6, 0.35, 3), cf * CFrame.new(0, 3, 0), WOOD, M.Wood)
+	p(m, "TopEdge", Vector3.new(6.1, 0.12, 3.1), cf * CFrame.new(0, 2.8, 0), rgb(96, 68, 44), M.Wood)
+	p(m, "LegL", Vector3.new(0.3, 2.8, 2.8), cf * CFrame.new(-2.7, 1.4, 0), DARK, M.Metal)
+	-- drawer unit on the right
+	p(m, "Drawers", Vector3.new(1.6, 2.6, 2.6), cf * CFrame.new(2.1, 1.35, 0), rgb(225, 228, 235), M.SmoothPlastic)
+	for i = 0, 2 do
+		p(m, "Handle", Vector3.new(0.7, 0.12, 0.1), cf * CFrame.new(2.1, 0.5 + i * 0.85, 1.32), DARK, M.Metal)
+	end
+	local scr
+	if laptop then
+		p(m, "Base", Vector3.new(2.4, 0.12, 1.6), cf * CFrame.new(0, 3.24, 0.3), rgb(60, 62, 70), M.Metal)
+		p(m, "Keys", Vector3.new(2.1, 0.03, 0.8), cf * CFrame.new(0, 3.31, 0.15), rgb(25, 26, 32))
+		p(m, "Lid", Vector3.new(2.5, 1.7, 0.08), cf * CFrame.new(0, 4, -0.62) * CFrame.Angles(math.rad(-10), 0, 0), rgb(60, 62, 70), M.Metal)
+		scr = p(m, "Screen", Vector3.new(2.3, 1.5, 0.1), cf * CFrame.new(0, 4, -0.55) * CFrame.Angles(math.rad(-10), 0, 0), rgb(18, 20, 26))
+	else
+		p(m, "StandBase", Vector3.new(1.2, 0.1, 0.8), cf * CFrame.new(0, 3.22, -0.9), DARK, M.Metal)
+		p(m, "Stand", Vector3.new(0.25, 1.1, 0.25), cf * CFrame.new(0, 3.75, -1.05), DARK, M.Metal)
+		p(m, "Bezel", Vector3.new(3.3, 2.05, 0.14), cf * CFrame.new(0, 4.65, -0.98), rgb(22, 23, 28), M.SmoothPlastic)
+		scr = p(m, "Screen", Vector3.new(3.05, 1.8, 0.12), cf * CFrame.new(0, 4.68, -0.9), rgb(18, 20, 26))
+		p(m, "Keyboard", Vector3.new(1.9, 0.1, 0.6), cf * CFrame.new(-0.2, 3.22, 0.3), rgb(40, 42, 50))
+		p(m, "KeyLight", Vector3.new(1.75, 0.02, 0.46), cf * CFrame.new(-0.2, 3.28, 0.3), rgb(0, 200, 255), M.Neon)
+		p(m, "Mouse", Vector3.new(0.3, 0.12, 0.45), cf * CFrame.new(1.1, 3.23, 0.35), rgb(40, 42, 50))
+	end
+	screenGui(scr, ({ rgb(0, 200, 255), rgb(255, 90, 170), rgb(0, 220, 120) })[(math.floor(math.abs(cf.Position.X)) % 3) + 1])
+	light(scr, "SurfaceLight", { Face = Enum.NormalId.Back, Brightness = 0.8, Range = 6, Color = rgb(140, 190, 255) })
+	-- mug
+	p(m, "Mug", Vector3.new(0.4, 0.45, 0.45), cf * CFrame.new(-2.3, 3.4, 0.4) * CFrame.Angles(0, 0, math.rad(90)), ({ rgb(255, 80, 80), rgb(255, 200, 40), rgb(80, 160, 255) })[(math.floor(math.abs(cf.Position.Z)) % 3) + 1], M.SmoothPlastic, { Shape = Enum.PartType.Cylinder })
+	-- office chair: 5-leg base, gas lift, seat, back, armrests
+	local chairCol = rgb(36, 38, 46)
+	p(m, "Seat", Vector3.new(2.2, 0.4, 2.2), cf * CFrame.new(0, 1.9, 2.6), chairCol, M.Fabric)
+	p(m, "Back", Vector3.new(2.1, 2.3, 0.35), cf * CFrame.new(0, 3.35, 3.65) * CFrame.Angles(math.rad(-6), 0, 0), chairCol, M.Fabric)
+	p(m, "BackTrim", Vector3.new(2.15, 0.2, 0.4), cf * CFrame.new(0, 4.5, 3.77) * CFrame.Angles(math.rad(-6), 0, 0), rgb(0, 170, 255), M.SmoothPlastic)
+	p(m, "ArmRestL", Vector3.new(0.25, 0.15, 1.4), cf * CFrame.new(-1.2, 2.75, 2.7), DARK, M.Metal)
+	p(m, "ArmRestR", Vector3.new(0.25, 0.15, 1.4), cf * CFrame.new(1.2, 2.75, 2.7), DARK, M.Metal)
+	p(m, "ArmPostL", Vector3.new(0.18, 0.7, 0.18), cf * CFrame.new(-1.2, 2.35, 2.9), DARK, M.Metal)
+	p(m, "ArmPostR", Vector3.new(0.18, 0.7, 0.18), cf * CFrame.new(1.2, 2.35, 2.9), DARK, M.Metal)
+	p(m, "Pole", Vector3.new(0.3, 1.5, 0.3), cf * CFrame.new(0, 0.95, 2.6), DARK, M.Metal)
+	for i = 0, 4 do
+		local a = math.rad(i * 72)
+		p(m, "ChairLeg", Vector3.new(0.22, 0.15, 1.2), cf * CFrame.new(0, 0.25, 2.6) * CFrame.Angles(0, a, 0) * CFrame.new(0, 0, 0.55), DARK, M.Metal)
+		p(m, "Wheel", Vector3.new(0.25, 0.25, 0.25), cf * CFrame.new(0, 0.12, 2.6) * CFrame.Angles(0, a, 0) * CFrame.new(0, 0, 1.1), rgb(20, 20, 24), M.SmoothPlastic, { Shape = Enum.PartType.Ball })
+	end
 	return m
 end
 
-local SHIRTS = { rgb(220, 80, 80), rgb(80, 140, 220), rgb(240, 190, 70), rgb(90, 180, 120), rgb(160, 110, 220), rgb(240, 240, 240), rgb(50, 50, 55) }
-local SKIN = { rgb(255, 220, 180), rgb(230, 180, 140), rgb(190, 140, 100), rgb(140, 95, 65) }
+local SHIRTS = { rgb(230, 70, 80), rgb(40, 140, 240), rgb(255, 190, 40), rgb(40, 190, 110), rgb(160, 100, 240), rgb(240, 240, 245), rgb(40, 42, 50), rgb(255, 120, 40) }
+local PANTS = { rgb(40, 55, 100), rgb(30, 32, 38), rgb(90, 70, 50), rgb(60, 70, 80) }
+local SKIN = { rgb(255, 220, 180), rgb(234, 184, 146), rgb(198, 140, 100), rgb(140, 95, 65) }
+local HAIR = { rgb(40, 30, 25), rgb(120, 80, 40), rgb(20, 20, 20), rgb(220, 180, 90), rgb(170, 60, 40) }
 local workerN = 0
--- simple seated person (shown when you have enough staff)
+-- seated Roblox-style person typing (shown when you have enough staff)
 local function worker(parent, cf)
 	workerN += 1
 	local m = model(parent, "Worker")
 	local idx = workerN
 	local shirt = SHIRTS[(idx % #SHIRTS) + 1]
+	local pants = PANTS[(idx % #PANTS) + 1]
 	local skin = SKIN[(idx % #SKIN) + 1]
+	local hair = HAIR[(idx % #HAIR) + 1]
 	local function wp(name, size, c, col, mat)
 		local part = p(m, name, size, c, col, mat or M.SmoothPlastic, { CanCollide = false })
 		part:SetAttribute("WorkerSlot", idx)
 		part.Transparency = 1
 		return part
 	end
-	wp("Torso", Vector3.new(1.8, 2, 1), cf * CFrame.new(0, 3.2, 2.7), shirt, M.Fabric)
-	wp("Head", Vector3.new(1.2, 1.2, 1.2), cf * CFrame.new(0, 4.85, 2.7), skin)
-	wp("Hair", Vector3.new(1.25, 0.4, 1.25), cf * CFrame.new(0, 5.5, 2.75), ({ rgb(40, 30, 25), rgb(120, 80, 40), rgb(20, 20, 20), rgb(200, 160, 90) })[(idx % 4) + 1])
-	wp("ArmL", Vector3.new(0.6, 0.6, 1.8), cf * CFrame.new(-1, 3.4, 1.6), shirt, M.Fabric)
-	wp("ArmR", Vector3.new(0.6, 0.6, 1.8), cf * CFrame.new(1, 3.4, 1.6), shirt, M.Fabric)
-	wp("Legs", Vector3.new(1.6, 0.6, 2), cf * CFrame.new(0, 2.3, 2), rgb(50, 60, 90), M.Fabric)
+	local z = 2.75
+	-- legs sitting: thighs forward, shins down, shoes
+	for _, sx in ipairs({ -0.5, 0.5 }) do
+		wp("Thigh", Vector3.new(0.95, 0.8, 1.9), cf * CFrame.new(sx, 2.5, z - 0.85), pants, M.Fabric)
+		wp("Shin", Vector3.new(0.95, 1.9, 0.9), cf * CFrame.new(sx, 1.4, z - 1.45), pants, M.Fabric)
+		wp("Shoe", Vector3.new(1, 0.4, 1.25), cf * CFrame.new(sx, 0.3, z - 1.6), rgb(30, 30, 34))
+	end
+	wp("Torso", Vector3.new(2, 2, 1), cf * CFrame.new(0, 3.5, z), shirt, M.Fabric)
+	wp("Collar", Vector3.new(1, 0.15, 0.6), cf * CFrame.new(0, 4.52, z - 0.2), shirt:Lerp(Color3.new(0, 0, 0), 0.25), M.Fabric)
+	-- arms reaching to the keyboard
+	for _, sx in ipairs({ -1.5, 1.5 }) do
+		wp("UpperArm", Vector3.new(1, 1, 1.5), cf * CFrame.new(sx, 4.0, z - 0.3) * CFrame.Angles(math.rad(20), 0, 0), shirt, M.Fabric)
+		wp("Forearm", Vector3.new(0.9, 0.9, 1.5), cf * CFrame.new(sx * 0.8, 3.55, z - 1.55) * CFrame.Angles(math.rad(5), math.rad(sx > 0 and 15 or -15), 0), skin)
+	end
+	local head = wp("Head", Vector3.new(2, 1, 1), cf * CFrame.new(0, 5.15, z), skin)
+	local mesh = Instance.new("SpecialMesh")
+	mesh.MeshType = Enum.MeshType.Head
+	mesh.Scale = Vector3.new(1.25, 1.25, 1.25)
+	mesh.Parent = head
+	local face = Instance.new("Decal")
+	face.Texture = "rbxasset://textures/face.png"
+	face.Face = Enum.NormalId.Front
+	face.Transparency = 1
+	face:SetAttribute("WorkerSlot", idx)
+	face.Parent = head
+	-- hair: top + back
+	wp("Hair", Vector3.new(1.35, 0.45, 1.35), cf * CFrame.new(0, 5.82, z + 0.05), hair, M.Fabric)
+	wp("HairBack", Vector3.new(1.35, 0.9, 0.35), cf * CFrame.new(0, 5.4, z + 0.55), hair, M.Fabric)
+	if idx % 3 == 0 then -- headphones on some people
+		wp("Headphones", Vector3.new(1.55, 0.18, 0.3), cf * CFrame.new(0, 5.95, z), rgb(30, 30, 36))
+		wp("EarL", Vector3.new(0.25, 0.6, 0.6), cf * CFrame.new(-0.72, 5.2, z), rgb(0, 190, 255), M.Neon)
+		wp("EarR", Vector3.new(0.25, 0.6, 0.6), cf * CFrame.new(0.72, 5.2, z), rgb(0, 190, 255), M.Neon)
+	end
 end
 
 local gpuN = 0
@@ -143,6 +216,11 @@ local function gpuRack(parent, cf, slots, label)
 	local h = math.max(4, math.ceil(slots / 2) * 0.9 + 1.2)
 	p(m, "Frame", Vector3.new(3, h, 2.4), cf * CFrame.new(0, h / 2, 0), rgb(26, 28, 32), M.Metal)
 	p(m, "Glass", Vector3.new(2.6, h - 0.4, 0.1), cf * CFrame.new(0, h / 2, 1.22), rgb(160, 190, 220), M.Glass, { Transparency = 0.6 })
+	-- top vent, feet, glowing edge strips
+	p(m, "TopVent", Vector3.new(2.6, 0.12, 2), cf * CFrame.new(0, h + 0.06, 0), rgb(50, 52, 60), M.DiamondPlate)
+	p(m, "Feet", Vector3.new(3.1, 0.2, 2.5), cf * CFrame.new(0, 0.1, 0), rgb(15, 16, 20), M.Metal)
+	p(m, "StripL", Vector3.new(0.1, h - 0.3, 0.1), cf * CFrame.new(-1.45, h / 2, 1.22), rgb(0, 200, 255), M.Neon)
+	p(m, "StripR", Vector3.new(0.1, h - 0.3, 0.1), cf * CFrame.new(1.45, h / 2, 1.22), rgb(0, 200, 255), M.Neon)
 	for i = 0, slots - 1 do
 		gpuN += 1
 		local row, col = math.floor(i / 2), i % 2
@@ -152,8 +230,11 @@ local function gpuRack(parent, cf, slots, label)
 		local led = p(m, "Led", Vector3.new(1.1, 0.12, 0.05), card.CFrame * CFrame.new(0, 0.15, 0.92), rgb(90, 255, 140), M.Neon)
 		led:SetAttribute("GpuSlot", i + 1)
 		led.Transparency = 1
+		local fan = p(m, "Fan", Vector3.new(0.05, 0.42, 0.42), card.CFrame * CFrame.new(0, -0.07, 0.93) * CFrame.Angles(0, math.rad(90), 0), rgb(30, 32, 38), M.SmoothPlastic, { Shape = Enum.PartType.Cylinder })
+		fan:SetAttribute("GpuSlot", i + 1)
+		fan.Transparency = 1
 	end
-	light(m:FindFirstChild("Frame"), "PointLight", { Color = rgb(90, 255, 160), Brightness = 0.5, Range = 7 })
+	light(m:FindFirstChild("Frame"), "PointLight", { Color = rgb(90, 220, 255), Brightness = 0.6, Range = 8 })
 	return m
 end
 
