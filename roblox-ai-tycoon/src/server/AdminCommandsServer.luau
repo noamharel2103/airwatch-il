@@ -137,6 +137,31 @@ Commands.troll = function(_context, players: { Player }, kind: string, seconds: 
 	return "Trolled " .. names(players) .. " with " .. kind .. " for " .. t .. "s"
 end
 
+-- World events: tell every server (MessagingService); each server applies it in Main.server
+local MessagingService = game:GetService("MessagingService")
+local Events = require(RS.Shared.Events)
+local function broadcast(msg)
+	Game.applyWorldEvent(msg)
+	pcall(function()
+		MessagingService:PublishAsync("FrontierWorldEvents", msg)
+	end)
+end
+
+Commands.event = function(_context, id: string, minutes: number?)
+	local e = Events.byId[id]
+	if not e then
+		return "Unknown event " .. tostring(id)
+	end
+	local m = math.clamp(minutes or 15, 1, 24 * 60)
+	broadcast({ op = "start", id = id, ends = os.time() + math.floor(m * 60) })
+	return e.name .. " started for " .. m .. " minutes in every server"
+end
+
+Commands.endevent = function(_context, id: string)
+	broadcast({ op = "stop", id = id })
+	return "Stopped " .. id
+end
+
 Commands.untroll = function(_context, players: { Player })
 	for _, p in ipairs(players) do
 		fx():FireClient(p, "untroll", {})

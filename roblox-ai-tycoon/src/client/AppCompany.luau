@@ -107,7 +107,12 @@ function App.mount(ctx, s)
 		UI.label(sc, "Make an offer. Bigger offers get a yes more often. Strong labs rarely sell, and regulators can block big deals. If you lack cash you pay in stock.", 14, T.sub)
 		local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = sc })
 		new("UIGridLayout", { CellSize = UDim2.new(1 / 3, -8, 0, 150), CellPadding = UDim2.fromOffset(10, 10), Parent = grid })
-		local list = table.clone(Labs.list)
+		local list = {}
+		for _, l in ipairs(Labs.list) do
+			if Labs.isFounded(l.id, s.day) then
+				table.insert(list, l)
+			end
+		end
 		table.sort(list, function(a, b)
 			return Labs.valuation(a.id, s.year) < Labs.valuation(b.id, s.year)
 		end)

@@ -178,6 +178,34 @@ def _():
     b += R(150, 150, 78, 56, 8, "#FFD21F") + T(189, 190, "www", 22, "#121530").replace('stroke="#121530"', 'stroke="none"')
     return b
 
+@icon("gift", "#FF3B4E")
+def _():
+    b = R(46, 110, 164, 104, 8, "#FFD21F")
+    b += R(36, 84, 184, 40, 8, "#FFE680")
+    b += R(114, 84, 28, 130, 0, "#FF3B4E", 8)
+    b += P("M128 84 c-20 -40 -64 -40 -60 -12 c4 20 40 14 60 12 z", "#FF3B4E", 8)
+    b += P("M128 84 c20 -40 64 -40 60 -12 c-4 20 -40 14 -60 12 z", "#FF3B4E", 8)
+    return b
+
+@icon("gear", "#4C5577")
+def _():
+    import math
+    b = ""
+    for i in range(8):
+        a = i * math.pi / 4
+        x, y = 128 + 74 * math.cos(a), 128 + 74 * math.sin(a)
+        b += f'<rect x="{x-17:.0f}" y="{y-17:.0f}" width="34" height="34" rx="6" fill="#C7CCE6" stroke="{OL}" stroke-width="8" transform="rotate({i*45} {x:.0f} {y:.0f})"/>'
+    b += C(128, 128, 66, "#C7CCE6") + C(128, 128, 26, "#4C5577")
+    return b
+
+@icon("trophy", "#A35BFF")
+def _():
+    b = P("M84 50 h88 v50 a44 44 0 0 1 -88 0 z", "#FFD21F")
+    b += P("M84 66 h-26 a26 26 0 0 0 30 40 M172 66 h26 a26 26 0 0 1 -30 40", "none", 10)
+    b += R(116, 140, 24, 34, 0, "#E5A800") + R(84, 172, 88, 26, 6, "#FFD21F")
+    b += T(128, 106, "1", 48, "#FFFFFF")
+    return b
+
 # ---------- shop items ----------
 @icon("cash", G)
 def _():

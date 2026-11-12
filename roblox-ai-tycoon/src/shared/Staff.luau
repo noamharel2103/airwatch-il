@@ -55,7 +55,7 @@ end
 
 local FIRST = { "Maya", "Daniel", "Noa", "Arjun", "Lena", "Omar", "Priya", "Jonah", "Sofia", "Kenji", "Tal", "Elena", "Marcus", "Yuki", "Amir", "Chloe", "Ravi", "Ines", "Leo", "Hana", "Felix", "Zara", "Ethan", "Mei", "Dov", "Aisha", "Lucas", "Nadia", "Theo", "Ivy" }
 local LAST = { "Chen", "Levi", "Okafor", "Patel", "Novak", "Haddad", "Silva", "Kim", "Rossi", "Weiss", "Tanaka", "Cohen", "Garcia", "Moreau", "Singh", "Berg", "Park", "Azoulay", "Kowalski", "Mendes" }
-local FROM = { "ex-Google Brain", "ex-OpenAI", "ex-Meta FAIR", "PhD, Stanford", "PhD, Berkeley", "PhD, Technion", "ex-DeepMind", "Kaggle grandmaster", "ex-Nvidia", "PhD, CMU", "ex-Stripe", "ex-Apple", "bootcamp grad", "ex-Anthropic", "PhD, MIT", "ex-Microsoft Research" }
+local FROM = { "ex-big search lab", "ex-OpenMind", "ex-social giant lab", "PhD, Stanford", "PhD, Berkeley", "PhD, Technion", "ex-DeepThink", "Kaggle grandmaster", "ex-Volta", "PhD, CMU", "ex-payments startup", "ex-phone giant", "bootcamp grad", "ex-safety lab", "PhD, MIT", "ex-software giant" }
 
 function Staff.randomCandidate(rng: Random, roleId: string)
 	return {
@@ -78,7 +78,7 @@ Staff.PCS = {
 }
 
 -- LinkedIn search: filters change who shows up.
-Staff.SCHOOLS = { "any", "ex-OpenAI", "ex-DeepMind", "ex-Anthropic", "ex-Meta FAIR", "PhD, Stanford", "PhD, MIT", "PhD, Technion", "Kaggle grandmaster", "bootcamp grad" }
+Staff.SCHOOLS = { "any", "ex-OpenMind", "ex-DeepThink", "ex-safety lab", "ex-social giant lab", "PhD, Stanford", "PhD, MIT", "PhD, Technion", "Kaggle grandmaster", "bootcamp grad" }
 Staff.SKILLS = { "any", "LLM training", "RL", "Inference", "Data", "Safety", "Product", "Sales" }
 
 function Staff.searchCandidate(rng: Random, roleId: string, filters)

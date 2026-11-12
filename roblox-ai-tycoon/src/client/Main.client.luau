@@ -66,6 +66,28 @@ end
 local Fx = require(Modules.Fx)
 Fx.init(Shell.gui)
 Shell.fx = Fx
+UI.sound = Fx.sound
+require(Modules.Extras).start(Shell.gui, Fx)
+-- crisis alarm, launch cheer, level up on office upgrades
+local lastProblems, lastOffice, lastLaunches = 0, nil, nil
+Net.onState(function(st)
+	local n = #(st.problems or {})
+	if n > lastProblems then
+		Fx.sound("Alarm")
+		Fx.banner("EMERGENCY!", Color3.fromRGB(255, 60, 70), "Something is on fire")
+	end
+	lastProblems = n
+	if lastOffice and st.office > lastOffice then
+		Fx.sound("LevelUp")
+		Fx.banner("NEW OFFICE!", Color3.fromRGB(0, 200, 255))
+		Fx.rain(40)
+	end
+	lastOffice = st.office
+	if lastLaunches and st.launches > lastLaunches then
+		Fx.sound("Cheer")
+	end
+	lastLaunches = st.launches
+end)
 local function robuxCelebration(name: string?)
 	Fx.sound("CashRegister")
 	Fx.banner("PURCHASED!", Color3.fromRGB(255, 200, 40), name)
@@ -396,7 +418,7 @@ Net.onState(function(s)
 	end
 	if lastReady ~= nil and readyCount > lastReady then
 		Fx.banner("MODEL READY!", Color3.fromRGB(0, 230, 120), "Open the AI Lab to launch it")
-		Fx.sound("Pop", 0.9)
+		Fx.sound("LevelUp")
 	end
 	lastReady = readyCount
 	-- achievement unlocked

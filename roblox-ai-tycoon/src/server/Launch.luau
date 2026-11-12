@@ -1,5 +1,7 @@
 --!strict
 -- Builds the launch reaction: benchmarks vs rivals, tags, a timed feed of posts, press, and effects.
+-- Scale: the launch tier (gap to the world frontier, guarded by the score) decides how loud the world gets.
+-- Chaos: from 1 billion users everyone piles in; from 5 billion it is the whole planet.
 local RS = game:GetService("ReplicatedStorage")
 local Shared = RS:WaitForChild("Shared")
 local Labs = require(Shared.Labs)
@@ -19,8 +21,37 @@ local incident = {}
 for persona, block in pairs(IT.lines) do
 	incident[persona] = RT.parse(block)
 end
+local chaosBank = {}
+for persona, block in pairs(RT.chaos) do
+	chaosBank[persona] = RT.parse(block)
+end
 local redditTitles = RT.parse(RT.reddit)
 local hnTitles = RT.parse(RT.hnTitles)
+
+-- Knobs per launch tier. Bad launches get almost nothing, great ones get a flood.
+local TIER_VOLUME: { [string]: number } = { insane = 2.0, great = 1.5, ok = 1, meh = 0.4, flop = 0.15 }
+local TIER_HOT: { [string]: number } = { insane = 4, great = 2, ok = 1, meh = 0.5, flop = 0.2 }
+local TIER_PRESS: { [string]: number } = { insane = 9, great = 5, ok = 3, meh = 2, flop = 1 }
+local TIER_REDDIT: { [string]: number } = { insane = 9, great = 6, ok = 4, meh = 2, flop = 1 }
+local TIER_HN: { [string]: number } = { insane = 3, great = 2, ok = 1, meh = 1, flop = 0 }
+local TIER_REVIEWS: { [string]: number } = { insane = 6, great = 4, ok = 3, meh = 2, flop = 1 }
+local TIER_VIDEOS: { [string]: number } = { insane = 7, great = 4, ok = 2, meh = 1, flop = 0 }
+local TIER_VIEWS: { [string]: number } = { insane = 30, great = 4, ok = 1, meh = 0.5, flop = 0.5 }
+local TIER_SIGNUP: { [string]: number } = { insane = 1.8, great = 1.25, ok = 1, meh = 0.6, flop = 0.4 }
+local TIER_WAITLIST: { [string]: number } = { insane = 6, great = 2, ok = 0.8, meh = 0.3, flop = 0.05 }
+
+-- Personas and how many posts each gets, by reach of the launch
+local MIX = {
+	{ "hype", 4 }, { "researcher", 3 }, { "skeptic", 3 }, { "dev", 4 }, { "memer", 5 }, { "nerd", 2 }, { "tinkerer", 3 },
+	{ "safety", 2 }, { "vc", 2 }, { "poweruser", 2 }, { "rivalemp", 1 }, { "fanboy", 2 }, { "student", 3 }, { "intl", 1 },
+	{ "purist", 1 }, { "vibecoder", 2 }, { "doomer", 1 }, { "insider", 1 }, { "cto", 2 }, { "hn", 2 },
+}
+
+-- Extra voices that only show up once the company has billions of users.
+local CHAOS_MIX = {
+	{ "celeb", 3 }, { "leader", 3 }, { "hype", 3 }, { "memer", 4 }, { "vibecoder", 3 }, { "student", 3 },
+	{ "dev", 3 }, { "intl", 3 }, { "insider", 2 }, { "doomer", 2 }, { "rivalemp", 2 }, { "poweruser", 2 },
+}
 
 local function fill(text: string, v: { [string]: any }): string
 	return (text:gsub("{(%w+)}", function(k)
@@ -74,6 +105,51 @@ local function weighted(items)
 	return items[#items].l
 end
 
+-- Up to `count` different lines from a bank, weighted by the launch tags.
+local function pickMany(lines, tags, count: number)
+	local out = {}
+	local pool = eligible(lines, tags)
+	if #pool == 0 or count <= 0 then
+		return out
+	end
+	local used = {}
+	for _ = 1, count * 4 do
+		if #out >= count then
+			break
+		end
+		local l = weighted(pool)
+		if l and not used[l] then
+			used[l] = true
+			table.insert(out, l)
+		end
+	end
+	return out
+end
+
+-- 0 = normal, 1 = billions of users, 2 = five billion or more (the whole planet).
+function Launch.chaosLevel(users: number): number
+	if users >= 5e9 then
+		return 2
+	elseif users >= 1e9 then
+		return 1
+	end
+	return 0
+end
+
+-- Launch tier: how far the model sits above the world frontier, guarded by the score.
+function Launch.tierOf(gap: number, score: number): string
+	if gap >= 7 and score >= 70 then
+		return "insane"
+	elseif score < 25 or gap < -12 then
+		return "flop"
+	elseif gap >= 1 then
+		return "great"
+	elseif gap >= -6 then
+		return "ok"
+	end
+	return "meh"
+end
+
 -- Best rival model (by cap) released before `day`, excluding none.
 function Launch.rivalBest(state, day)
 	local best
@@ -99,13 +175,6 @@ function Launch.benchmarks(model, state)
 	end
 	return out
 end
-
--- personas and how many posts each gets, by reach of the launch
-local MIX = {
-	{ "hype", 4 }, { "researcher", 3 }, { "skeptic", 3 }, { "dev", 4 }, { "memer", 5 }, { "nerd", 2 }, { "tinkerer", 3 },
-	{ "safety", 2 }, { "vc", 2 }, { "poweruser", 2 }, { "rivalemp", 1 }, { "fanboy", 2 }, { "student", 3 }, { "intl", 1 },
-	{ "purist", 1 }, { "vibecoder", 2 }, { "doomer", 1 }, { "insider", 1 }, { "cto", 2 }, { "hn", 2 },
-}
 
 local function likesFor(followers, mood)
 	local rate = rng:NextNumber(0.005, 0.03) * (followers > 2e5 and 0.5 or 1)
@@ -146,6 +215,7 @@ function Launch.run(state, model, opts)
 	local rb = Launch.rivalBest(state, state.day)
 	local bench = Launch.benchmarks(model, state)
 	local gap = model.cap - frontier
+	local chaos = Launch.chaosLevel(state.users)
 	local tags = {} :: { [string]: number }
 	local why = {}
 
@@ -178,7 +248,7 @@ function Launch.run(state, model, opts)
 	model.rank = rank
 	if rank == 1 then
 		tags.ARENA_KING = 1
-		table.insert(why, "Number one on the Arena")
+		table.insert(why, "Number one on the leaderboard")
 	end
 
 	local refPrice = rb and rb.priceOut or 10
@@ -284,10 +354,10 @@ function Launch.run(state, model, opts)
 	if prev and prev.status == "released" and prev.cap > model.cap + 3 then
 		tags.NERFED = 1
 	end
-	-- demand > capacity
-	local demand = math.max(0, gap + 20) * (1 + hype / 40)
+	-- demand > capacity. Billions of users multiply demand far past any server room.
+	local demand = math.max(0, gap + 20) * (1 + hype / 40) * (1 + 1.5 * chaos)
 	local capacity = 20 + 8 * (state.staff.infra or 0) + (opts.reserve and 25 or 0)
-	local meltdown = demand > capacity and rng:NextNumber() < 0.75
+	local meltdown = demand > capacity and rng:NextNumber() < (chaos > 0 and 0.92 or 0.75)
 	if meltdown then
 		tags.MELTDOWN = 1
 		table.insert(why, "Servers melted under demand: some signups lost")
@@ -302,6 +372,9 @@ function Launch.run(state, model, opts)
 	end
 	if model.character == "witty" or model.character == "warm" then
 		tags.GOOD_VIBES = (tags.GOOD_VIBES or 0) + 0.4
+	end
+	if chaos > 0 then
+		tags.CHAOS = chaos
 	end
 
 	-- Sentiment
@@ -325,20 +398,25 @@ function Launch.run(state, model, opts)
 	s += rng:NextNumber(-4, 4)
 	local score = math.clamp(math.floor(s), 3, 99)
 	model.reception = score
+	local tier = Launch.tierOf(gap, score)
+	tags["TIER_" .. tier:upper()] = 1
+	if tier == "insane" then
+		table.insert(why, string.format("Far ahead of the world frontier (+%d cap)", math.floor(gap)))
+	end
 	if #why == 0 then
 		table.insert(why, gap > -5 and "Solid model at a fair price" or "Behind the frontier, so few people noticed")
 	end
 
 	-- Variables for templates
-	local rival = rb and Labs.displayName(rb.lab) or "OpenAI"
+	local rival = rb and Labs.displayName(rb.lab) or "Vaultmind"
 	local vars = {
 		model = model.name,
 		lab = state.company,
-		bench = sotaBench and sotaBench.name or (bench[1] and bench[1].name or "MMLU"),
+		bench = sotaBench and sotaBench.name or (bench[1] and bench[1].name or "the main test"),
 		score = sotaBench and string.format("%.1f", sotaBench.score) or (bench[1] and string.format("%.1f", bench[1].score) or "0"),
 		delta = string.format("%.1f", math.max(sotaDelta, rng:NextNumber(1, 4))),
 		rival = rival,
-		rivalModel = rb and rb.model or "GPT-4",
+		rivalModel = rb and rb.model or "Beacon 4",
 		price = string.format("%.2f", opts.price),
 		pricePct = tostring(math.max(5, math.floor((1 - math.min(priceRatio, 0.95)) * 100))),
 		tps = tostring(math.floor(40 * (model.speed or 1) * (opts.open and 0.8 or 1.5))),
@@ -348,59 +426,57 @@ function Launch.run(state, model, opts)
 		nextYear = select(1, Format.dateFromDay(state.day)) + 1,
 		elo = tostring(elo),
 		rank = tostring(rank),
+		users = Format.count(state.users),
+		waitlist = Format.count(math.floor(2e6 * TIER_WAITLIST[tier] * rng:NextNumber(0.7, 1.3) * (chaos == 2 and 40 or (chaos == 1 and 12 or 1)))),
 	}
 
-	-- Build feed
+	-- Feed: how many posts each persona writes scales with reach, tier and chaos
 	local posts = {}
 	local mood = 0.6 + score / 60
 	local reach = math.clamp(0.4 + (score / 100) + hype / 100 + math.log10(1 + state.users) / 12, 0.4, 2.2)
+	local volume = TIER_VOLUME[tier] * (1 + 0.6 * chaos)
 	local hourByPersona = { hype = 0.2, memer = 1, researcher = 3, dev = 2, skeptic = 4, tinkerer = 5, nerd = 18, safety = 8, journalist = 6, vc = 2 }
-	for _, mx in ipairs(MIX) do
-		local persona, n = mx[1], math.max(1, math.floor(mx[2] * reach + 0.5))
-		local lines = parsed[persona]
-		if lines then
-			local used = {}
-			for _ = 1, n do
-				local cands = eligible(lines, tags)
-				local l = weighted(cands)
-				if l and not used[l] then
-					used[l] = true
+	local function feedPosts(mix, mult: number)
+		for _, mx in ipairs(mix) do
+			local persona = mx[1]
+			-- stochastic rounding so small tiers still get the odd post
+			local n = math.floor(mx[2] * reach * mult + rng:NextNumber())
+			local lines = parsed[persona]
+			if lines and n > 0 then
+				local personaMood = mood
+				if persona == "skeptic" or persona == "fanboy" then
+					personaMood = 1.6 - mood * 0.5
+				end
+				for _, l in ipairs(pickMany(lines, tags, n)) do
 					local h = (hourByPersona[persona] or 6) * rng:NextNumber(0.3, 3)
-					local personaMood = mood
-					if persona == "skeptic" or persona == "fanboy" then
-						personaMood = 1.6 - mood * 0.5
-					end
 					table.insert(posts, makePost(persona, fill(l.text, vars), h, personaMood))
 				end
 			end
 		end
 	end
+	feedPosts(MIX, volume)
+	if chaos > 0 then
+		feedPosts(CHAOS_MIX, chaos == 2 and 2.2 or 1.2)
+	end
+
 	-- Press headlines
 	local press = {}
-	local pl = eligible(parsed.journalist, tags)
-	local usedHead = {}
-	for _ = 1, math.clamp(math.floor(2 + reach * 2), 2, 5) do
-		local l = weighted(pl)
-		if l and not usedHead[l] then
-			usedHead[l] = true
-			local outlet = pick(RT.personas.journalist.handles)
-			table.insert(press, { outlet = outlet, headline = fill(l.text, vars), hour = rng:NextNumber(2, 30) })
-		end
+	local pressN = TIER_PRESS[tier] + 3 * chaos
+	for _, l in ipairs(pickMany(parsed.journalist, tags, pressN)) do
+		table.insert(press, { outlet = pick(RT.personas.journalist.handles), headline = fill(l.text, vars), hour = rng:NextNumber(2, 30) })
 	end
+
 	-- Reddit + HN threads
 	local threads = {}
-	local usedThread = {}
-	for _ = 1, 4 do
-		local l = weighted(eligible(redditTitles, tags))
-		if l and not usedThread[l] then
-			usedThread[l] = true
-			table.insert(threads, { platform = "reddit", sub = pick({ "r/LocalLLaMA", "r/singularity", "r/ChatGPT", "r/MachineLearning", "r/artificial" }), title = fill(l.text, vars), upvotes = math.floor(rng:NextNumber(200, 6000) * mood * reach), comments = rng:NextInteger(40, 1400) })
-		end
+	local hot = TIER_HOT[tier] * (1 + chaos)
+	local subs = { "r/localmodels", "r/singularity", "r/chatbots", "r/researchnotes", "r/artificial", "r/technology", "r/worldnews" }
+	for _, l in ipairs(pickMany(redditTitles, tags, TIER_REDDIT[tier] + 3 * chaos)) do
+		table.insert(threads, { platform = "reddit", sub = pick(subs), title = fill(l.text, vars), upvotes = math.floor(rng:NextNumber(200, 6000) * mood * reach * hot), comments = math.floor(rng:NextInteger(40, 1400) * hot) })
 	end
-	local hl = weighted(eligible(hnTitles, tags))
-	if hl then
-		table.insert(threads, { platform = "hn", title = fill(hl.text, vars), upvotes = math.floor(rng:NextNumber(80, 1500) * reach), comments = rng:NextInteger(30, 700) })
+	for _, l in ipairs(pickMany(hnTitles, tags, TIER_HN[tier] + chaos)) do
+		table.insert(threads, { platform = "hn", title = fill(l.text, vars), upvotes = math.floor(rng:NextNumber(80, 1500) * reach * hot), comments = math.floor(rng:NextInteger(30, 700) * hot) })
 	end
+
 	-- Community note on the most-liked hype post if contamination or overhype
 	if tags.OVERHYPED or (tags.BIG_JUMP and fl.contam > 0.3) then
 		for _, p in ipairs(posts) do
@@ -420,42 +496,87 @@ function Launch.run(state, model, opts)
 			end
 		end
 	end
-	-- Critic reviews with scores (out of 10)
-	local OUTLETS = { "TechWire", "The Verge-ish", "AI Weekly", "Silicon Daily", "ModelWatch", "ByteReview" }
+
+	-- Critic reviews with scores (out of 10). More outlets and better quotes as the launch gets bigger.
+	local OUTLETS = { "TechWire", "Frontline Weekly", "AI Weekly", "Silicon Daily", "ModelWatch", "ByteReview", "The Daily Compute", "Global Tech Herald", "Neon Gazette" }
+	local LEGEND = { "{model} is the reason people are buying new computers. Nothing else this year comes close.", "A once in a decade release. {lab} just moved the whole field.", "Every other model now looks like a preview of {model}.", "Stunning, fast and frighteningly good at everything we threw at it." }
 	local GOOD = { "The best {model} moments feel like magic.", "Fast, smart and surprisingly funny.", "{lab} is now a serious player.", "A must-try for developers.", "Quietly excellent." }
 	local MID = { "Good, not great. Wait for the next version.", "Solid basics, nothing new.", "Fine for homework, shaky for work.", "Promising, but {rivalModel} is still ahead." }
 	local BAD = { "Confidently wrong too often.", "Feels a year behind.", "Hard to recommend at this price.", "Skip this one." }
 	local reviews = {}
 	local usedOutlet = {}
-	for _ = 1, 4 do
+	local wantReviews = TIER_REVIEWS[tier] + chaos
+	local tries = 0
+	while #reviews < wantReviews and tries < 40 do
+		tries += 1
 		local o = pick(OUTLETS)
 		if not usedOutlet[o] then
 			usedOutlet[o] = true
 			local sc = math.clamp(score / 10 + rng:NextNumber(-1.2, 1.2), 1, 10)
-			local pool = sc >= 7.5 and GOOD or (sc >= 5 and MID or BAD)
+			local pool = sc >= 9 and LEGEND or (sc >= 7.5 and GOOD or (sc >= 5 and MID or BAD))
 			table.insert(reviews, { outlet = o, score = math.floor(sc * 10) / 10, quote = fill(pick(pool), vars) })
 		end
 	end
-	-- YouTube videos
+
+	-- YouTube videos. Each title only fits certain tiers; views scale with tier and chaos.
 	local YT = {
-		{ "{model} is INSANE (I tested it for 24 hours)", 0.9 },
-		{ "I let {model} run my life for a week", 0.8 },
-		{ "{model} vs {rivalModel}: the honest truth", 0.7 },
-		{ "Is {lab} the next OpenAI?", 0.6 },
-		{ "{model} FAILED my test (watch till the end)", 0.4 },
-		{ "Why everyone is wrong about {model}", 0.5 },
-		{ "I built a game with {model} in 10 minutes", 0.8 },
+		{ "{model} is INSANE (I tested it for 24 hours)", 0.9, "insane,great" },
+		{ "I let {model} run my life for a week", 0.8, "insane,great,ok" },
+		{ "{model} vs {rivalModel}: the honest truth", 0.7, "great,ok,meh" },
+		{ "Is {lab} the next big thing?", 0.6, "great,ok" },
+		{ "{model} FAILED my test (watch till the end)", 0.4, "meh,flop" },
+		{ "Why everyone is wrong about {model}", 0.5, "ok,meh,flop" },
+		{ "I built a game with {model} in 10 minutes", 0.8, "great,ok" },
+		{ "{model} ended my job in 4 minutes (I am not okay)", 1.0, "insane" },
+		{ "The {model} launch is the biggest thing since the internet", 0.9, "insane" },
+		{ "{model} made me cry. Honest review", 0.8, "insane,great" },
+		{ "Every single thing {model} can do, ranked", 0.7, "insane,great" },
+		{ "I gave {model} my whole channel. It made a better one", 0.8, "insane,great" },
+		{ "{rivalModel} is finished. Here is why", 0.9, "insane,great" },
+		{ "{model} broke the internet (a short documentary)", 0.9, "insane" },
+		{ "We tested {model} with the entire office", 0.6, "great,ok" },
+		{ "{lab} vs everyone: the {model} recap", 0.5, "great,ok" },
+		{ "{model} in 60 seconds, no hype", 0.5, "ok,meh" },
+		{ "Is {model} the last model we will ever need?", 0.8, "insane" },
+		{ "Nobody is talking about {model}. Why?", 0.4, "meh,flop" },
+		{ "{model} review: I expected nothing and got a lot", 0.5, "great,ok" },
+		{ "{lab} just ruined my weekend ({model})", 0.7, "insane,great" },
+		{ "My honest {model} review after 3 weeks of use", 0.6, "ok,meh,great" },
 	}
-	local CHANNELS = { "TechWithTim-ish", "AI Explained-ish", "Fireship-ish", "MKBHD-ish", "Two Minute Papers-ish", "a 14 year old with 3M subs" }
+	local CHANNELS = { "Channel Alpha", "Deep Dive Daily", "The Fast Code Show", "Big Chip Reviews", "Papers Explained Live", "a 14 year old with 3M subs" }
 	local videos = {}
-	for i = 1, math.clamp(math.floor(1 + reach * 2), 1, 4) do
-		local t = YT[rng:NextInteger(1, #YT)]
-		table.insert(videos, { channel = CHANNELS[rng:NextInteger(1, #CHANNELS)], title = fill(t[1], vars), views = math.floor(rng:NextNumber(2e4, 2e6) * reach * t[2] * (score / 60)) })
+	local usedVideo = {}
+	local viewMult = TIER_VIEWS[tier] * (chaos == 2 and 25 or (chaos == 1 and 8 or 1))
+	for _ = 1, TIER_VIDEOS[tier] + 2 * chaos do
+		local choices = {}
+		for _, y in ipairs(YT) do
+			if not usedVideo[y] and string.find(y[3], tier, 1, true) then
+				table.insert(choices, y)
+			end
+		end
+		if #choices == 0 then
+			break
+		end
+		local t = pick(choices)
+		usedVideo[t] = true
+		table.insert(videos, { channel = pick(CHANNELS), title = fill(t[1], vars), views = math.floor(rng:NextNumber(2e4, 2e6) * reach * t[2] * (score / 60) * viewMult) })
+	end
+
+	-- Chaos: the company's own posts go wild once billions are on it
+	if chaos > 0 then
+		for _ = 1, chaos do
+			table.insert(posts, makePost("hype", fill(pick(RT.officialChaos), vars), rng:NextNumber(0, 3), mood, { official = true, handle = state.company, personaName = state.company }))
+		end
 	end
 
 	table.sort(posts, function(a, b)
 		return a.hour < b.hour
 	end)
+	-- keep the feed readable: cap the total, dropping the latest posts first
+	local postCap = 150 + 90 * chaos
+	while #posts > postCap do
+		table.remove(posts)
+	end
 	local official = makePost("hype", fill(pick(RT.official), vars), 0, mood)
 	official.handle = state.company
 	official.personaName = state.company
@@ -479,7 +600,7 @@ function Launch.run(state, model, opts)
 	-- even a weak first model gets some curious hobbyists
 	local userBoost = math.max(0.08, (score - 30) / 70) * reach
 	local eff = {
-		signups = math.floor((5e3 + math.min(state.users * 0.15, 2e7) + (state.world.marketUsers * 1e6) * 0.004 * math.exp(math.min(gap, 6) / 6)) * userBoost * (meltdown and 0.6 or 1)),
+		signups = math.floor((5e3 + math.min(state.users * 0.15, 2e7) + (state.world.marketUsers * 1e6) * 0.004 * math.exp(math.min(gap, 6) / 6)) * userBoost * (meltdown and 0.6 or 1) * TIER_SIGNUP[tier] * (1 + 0.5 * chaos)),
 		brand = (score - 50) / 600 + 0.01 * reach,
 		hype = (tags.IMAGEGEN or tags.VOICE) and 10 or (score > 70 and 6 or -4),
 		reputation = (score - 50) / 5,
@@ -493,6 +614,8 @@ function Launch.run(state, model, opts)
 		elo = elo,
 		rank = rank,
 		score = score,
+		tier = tier,
+		chaos = chaos,
 		why = why,
 		tags = tags,
 		posts = posts,
@@ -509,18 +632,21 @@ function Launch.run(state, model, opts)
 end
 
 -- Small burst of posts for an incident (delay, jailbreak, escape, outage, patch, rollback, leak...)
+-- Once the company has billions of users, the incident also pulls in the chaos bank.
 function Launch.incident(state, kind: string, modelName: string)
 	local rb = Launch.rivalBest(state, state.day)
+	local chaos = Launch.chaosLevel(state.users)
 	local vars = {
 		model = modelName,
 		lab = state.company,
-		rival = rb and Labs.displayName(rb.lab) or "OpenAI",
-		rivalModel = rb and rb.model or "GPT-4",
+		rival = rb and Labs.displayName(rb.lab) or "Vaultmind",
+		rivalModel = rb and rb.model or "Beacon 4",
 		year = select(1, Format.dateFromDay(state.day)),
-		bench = "the benchmark",
+		bench = "the main test",
 		delta = "6",
+		users = Format.count(state.users),
+		waitlist = Format.count(math.max(1e6, state.users * 0.2)),
 	}
-	local tags = { [kind] = 1 }
 	local posts, press = {}, nil
 	for persona, lines in pairs(incident) do
 		local cands = {}
@@ -548,6 +674,25 @@ function Launch.incident(state, kind: string, modelName: string)
 					break
 				end
 			end
+		end
+	end
+	-- chaos: billions of users, so the whole world piles in on the incident
+	if chaos > 0 then
+		local bank = {}
+		for persona, lines in pairs(chaosBank) do
+			for _, l in ipairs(lines) do
+				if l.tags.ANY or l.tags[kind] or l.tags.CHAOS then
+					table.insert(bank, { persona = persona, l = l })
+				end
+			end
+		end
+		local extra = chaos == 2 and 28 or 12
+		for _ = 1, extra do
+			if #bank == 0 then
+				break
+			end
+			local b = table.remove(bank, rng:NextInteger(1, #bank))
+			table.insert(posts, makePost(b.persona, fill(b.l.text, vars), rng:NextNumber(0, 18), 1 + 0.2 * chaos))
 		end
 	end
 	table.sort(posts, function(a, b)

@@ -10,13 +10,72 @@ local layer: Frame? = nil
 
 function Fx.init(gui: ScreenGui)
 	layer = new("Frame", { Name = "Fx", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 400, Parent = gui })
+	-- load every sound now so the first play is instant (no delay after a purchase)
+	task.spawn(function()
+		local folder = SoundService:FindFirstChild("Sfx")
+		if not folder then
+			folder = Instance.new("Folder")
+			folder.Name = "Sfx"
+			folder.Parent = SoundService
+		end
+		local list = {}
+		for name, def in pairs(Fx.IDS) do
+			local s = folder:FindFirstChild(name)
+			if not s then
+				s = Instance.new("Sound")
+				s.Name = name
+				s.SoundId = "rbxassetid://" .. def[1]
+				s.Volume = def[2]
+				s.Parent = folder
+			end
+			table.insert(list, s)
+		end
+		pcall(function()
+			game:GetService("ContentProvider"):PreloadAsync(list)
+		end)
+	end)
 end
 
+-- every sound the game uses (the real Sound objects live in SoundService.Sfx;
+-- if one is missing it is created from this list so nothing goes silent)
+local IDS = {
+	CashRegister = { 90531793028786, 0.7 }, Coin = { 1169806635, 0.45 }, Pop = { 72264591133889, 0.5 },
+	Click = { 87437544236708, 0.45 }, Hover = { 139719503904449, 0.18 }, LevelUp = { 112485797063762, 0.6 },
+	Alarm = { 3165700530, 0.35 }, Cheer = { 126615573673174, 0.55 }, Key = { 127105730240202, 0.5 },
+	Notify = { 127205266270030, 0.45 },
+}
+local lastPlay: { [string]: number } = {}
+Fx.IDS = IDS
+Fx.volume = 1
+Fx.hover = true
+
 function Fx.sound(name: string, pitch: number?)
+	-- the same sound at most every 50 ms, so fast clicking never becomes noise
+	if lastPlay[name] and os.clock() - lastPlay[name] < 0.05 then
+		return
+	end
+	if Fx.volume <= 0 or (name == "Hover" and not Fx.hover) then
+		return
+	end
+	lastPlay[name] = os.clock()
 	local folder = SoundService:FindFirstChild("Sfx")
-	local s = folder and folder:FindFirstChild(name)
+	if not folder then
+		folder = Instance.new("Folder")
+		folder.Name = "Sfx"
+		folder.Parent = SoundService
+	end
+	local s = folder:FindFirstChild(name)
+	if not s and IDS[name] then
+		local snd = Instance.new("Sound")
+		snd.Name = name
+		snd.SoundId = "rbxassetid://" .. IDS[name][1]
+		snd.Volume = IDS[name][2]
+		snd.Parent = folder
+		s = snd
+	end
 	if s and s:IsA("Sound") then
 		local c = s:Clone()
+		c.Volume = s.Volume * Fx.volume
 		c.PlaybackSpeed = pitch or (0.95 + math.random() * 0.1)
 		c.Parent = SoundService
 		c:Play()

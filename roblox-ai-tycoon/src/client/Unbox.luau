@@ -54,7 +54,7 @@ function Unbox.play(host: Instance, items, onDone: (() -> ())?)
 	if #items > 6 then
 		UI.label(o, "+" .. (#items - 6) .. " more", 18, T.text, { TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.62, 0), Size = UDim2.fromOffset(400, 30), ZIndex = 61 })
 	end
-	UI.label(o, string.format("+%.1f H100s of compute", total), 22, T.green, { FontFace = UI.HEAVY, TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.66, 0), Size = UDim2.fromOffset(800, 34), ZIndex = 61 })
+	UI.label(o, string.format("+%.1f H1 chips of compute", total), 22, T.green, { FontFace = UI.HEAVY, TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.66, 0), Size = UDim2.fromOffset(800, 34), ZIndex = 61 })
 	local btn = UI.button(o, "INSTALL ALL", function()
 		o:Destroy()
 		if onDone then

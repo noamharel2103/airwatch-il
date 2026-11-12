@@ -217,6 +217,7 @@ local function buildModels(body, s)
 		status = mk.name .. "   " .. earns
 	end
 	UI.label(right, m.name, 26, mk.id == "chat" and T.accent or mk.color, { FontFace = UI.HEAVY })
+	UI.label(right, "TO RUN IT: " .. Lab.runNeeds(m.size or 1), 11, T.yellow, { FontFace = UI.BOLD, Position = UDim2.fromOffset(0, 66), Size = UDim2.new(1, 0, 0, 14) })
 	UI.label(right, "QUALITY " .. quality(m, s) .. "%  OF TODAY'S BEST      " .. status, 14, m.status == "released" and T.green or T.sub, { FontFace = UI.BOLD, Position = UDim2.fromOffset(0, 44) })
 	local rows = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 82), Size = UDim2.new(1, 0, 0, 6 * 46), Parent = right })
 	UI.list(rows, 6)
@@ -314,19 +315,136 @@ local function buildModels(body, s)
 	end, "ghost", { Size = UDim2.fromOffset(150, 64), TextSize = 16 })
 end
 
+local MEDAL_COLOR = { Color3.fromRGB(255, 196, 40), Color3.fromRGB(200, 210, 225), Color3.fromRGB(205, 127, 50) }
+local MEDAL_BG = { Color3.fromRGB(70, 56, 18), Color3.fromRGB(46, 50, 62), Color3.fromRGB(64, 40, 22) }
+
+-- What computer you need to run a model of this size (billions of parameters)
+local function runNeeds(sizeB: number): string
+	local q4 = sizeB * 0.6
+	local fp16 = sizeB * 2
+	if q4 <= 8 then
+		return "RUNS ON A GAMING LAPTOP"
+	elseif q4 <= 24 then
+		return "NEEDS A GAMER CARD WITH 24GB"
+	elseif q4 <= 80 then
+		return "NEEDS ONE VOLTA H1 (80GB)"
+	end
+	return string.format("NEEDS %d VOLTA H1 CHIPS (%d AT FULL QUALITY)", math.ceil(q4 / 80), math.ceil(fp16 / 80))
+end
+Lab.runNeeds = runNeeds
+
+local function buildOpen(body, s)
+	local bg = new("Frame", { Size = UDim2.fromScale(1, 1), Parent = body })
+	UI.skin(bg, T.panel)
+	local sc = UI.scroll(bg)
+	UI.pad(sc, 14)
+	UI.list(sc, 10)
+	local mine = selected and s.models[selected]
+	local head = new("Frame", { BackgroundColor3 = Color3.fromRGB(20, 90, 70), Size = UDim2.new(1, -12, 0, 70), Parent = sc })
+	UI.corner(head, 2)
+	UI.stroke(head, T.line, 3)
+	new("TextLabel", { Text = "OPEN SOURCE MODELS", FontFace = UI.HEAVY, TextSize = 18, Position = UDim2.fromOffset(16, 10), Size = UDim2.new(1, -32, 0, 24), Parent = head })
+	new("TextLabel", { Text = mine and ("Your model " .. mine.name .. " can study any of these. Better ones teach more.") or "Pick one of your models in MODELS first.", TextSize = 15, TextColor3 = Color3.fromRGB(200, 240, 220), Position = UDim2.fromOffset(16, 38), Size = UDim2.new(1, -32, 0, 22), Parent = head })
+	local list = s.openModels or {}
+	if #list == 0 then
+		UI.label(sc, "Nobody has shared open weights yet.", 16, T.sub)
+		return
+	end
+	local myAvg = 0
+	if mine and mine.stats then
+		for k, v in pairs(mine.stats) do
+			if k ~= "safety" then
+				myAvg += v / 5
+			end
+		end
+	end
+	for _, r in ipairs(list) do
+		local better = r.cap > myAvg
+		local c = new("Frame", { BackgroundColor3 = T.panel2, Size = UDim2.new(1, -12, 0, 104), Parent = sc })
+		UI.corner(c, 2)
+		UI.stroke(c, better and T.green or T.line, better and 3 or 2)
+		new("TextLabel", { Text = r.model, FontFace = UI.HEAVY, TextSize = 16, Position = UDim2.fromOffset(16, 10), Size = UDim2.new(1, -320, 0, 22), Parent = c })
+		new("TextLabel", { Text = r.lab .. "   |   " .. Format.monthYear(r.day) .. "   |   about " .. Format.count(r.size * 1e9) .. " parameters", TextSize = 14, TextColor3 = T.sub, Position = UDim2.fromOffset(16, 36), Size = UDim2.new(1, -320, 0, 20), Parent = c })
+		new("TextLabel", { Text = "TO RUN IT: " .. runNeeds(r.size), FontFace = UI.BOLD, TextSize = 11, TextColor3 = T.yellow, Position = UDim2.fromOffset(16, 62), Size = UDim2.new(1, -320, 0, 18), Parent = c })
+		local track = new("Frame", { BackgroundColor3 = Color3.fromRGB(14, 16, 32), Position = UDim2.fromOffset(16, 84), Size = UDim2.new(1, -320, 0, 8), Parent = c })
+		new("Frame", { BackgroundColor3 = better and T.green or T.orange, Size = UDim2.fromScale(math.clamp(r.cap / math.max(s.frontier, 1), 0, 1), 1), Parent = track })
+		local idx = r.idx
+		UI.button(c, better and "LEARN FROM IT" or "WEAKER THAN YOURS", function()
+			if mine then
+				Net.act("learnFrom", mine.id, idx)
+			end
+		end, (better and mine and not mine.boosting) and T.green or "ghost", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0), Size = UDim2.fromOffset(280, 60), TextSize = 13 })
+	end
+end
+
 local function buildArena(body, s)
 	local bg = new("Frame", { Size = UDim2.fromScale(1, 1), Parent = body })
 	UI.skin(bg, T.panel)
 	local sc = UI.scroll(bg)
 	UI.pad(sc, 16)
 	UI.list(sc, 10)
-	for i, e in ipairs(s.leaderboard) do
-		local r = new("Frame", { Size = UDim2.new(1, -12, 0, 56), Parent = sc })
-		UI.skin(r, e.you and Color3.fromRGB(20, 110, 70) or T.panel2)
-		new("TextLabel", { Text = "#" .. i, FontFace = UI.BOLD, TextSize = 18, TextColor3 = i <= 3 and T.yellow or T.sub, Position = UDim2.fromOffset(18, 0), Size = UDim2.new(0, 70, 1, 0), Parent = r })
-		new("TextLabel", { Text = e.model, FontFace = UI.BOLD, TextSize = 15, TextColor3 = T.text, Position = UDim2.fromOffset(96, 0), Size = UDim2.new(0.42, 0, 1, 0), Parent = r })
-		new("TextLabel", { Text = e.lab, TextSize = 18, TextColor3 = T.sub, Position = UDim2.new(0.5, 0, 0, 0), Size = UDim2.new(0.28, 0, 1, 0), Parent = r })
-		new("TextLabel", { Text = tostring(e.elo), FontFace = UI.BOLD, TextSize = 15, TextColor3 = T.accent, TextXAlignment = Enum.TextXAlignment.Right, Position = UDim2.new(1, -140, 0, 0), Size = UDim2.new(0, 120, 1, 0), Parent = r })
+	-- sort by ELO (highest first) so the rank numbers are always right
+	local ranked = table.clone(s.leaderboard or {})
+	table.sort(ranked, function(a, b)
+		return (tonumber(a.elo) or 0) > (tonumber(b.elo) or 0)
+	end)
+	if #ranked == 0 then
+		new("TextLabel", { Text = "No models on the leaderboard yet.", FontFace = UI.BOLD, TextSize = 18, TextColor3 = T.sub, BackgroundTransparency = 1, Size = UDim2.new(1, -12, 0, 60), Parent = sc })
+		return
+	end
+	local top = math.max(tonumber(ranked[1].elo) or 0, 1)
+	local you
+	for _, e in ipairs(ranked) do
+		if e.you then
+			you = e
+		end
+	end
+	-- banner: the player's gap to #1 (or lead over #2 when on top)
+	if you then
+		local yElo = tonumber(you.elo) or 0
+		local banner = new("Frame", { Size = UDim2.new(1, -12, 0, 52), Parent = sc })
+		local text, color
+		if ranked[1] == you then
+			local second = ranked[2] and (tonumber(ranked[2].elo) or 0) or 0
+			text = "YOU ARE #1   LEAD: +" .. tostring(math.floor(yElo - second + 0.5)) .. " ELO"
+			color = Color3.fromRGB(20, 110, 70)
+		else
+			text = "GAP TO #1: " .. tostring(math.floor(top - yElo + 0.5)) .. " ELO"
+			color = Color3.fromRGB(110, 60, 20)
+		end
+		UI.skin(banner, color)
+		new("TextLabel", { Text = text, FontFace = UI.HEAVY, TextSize = 20, TextColor3 = T.yellow, BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Parent = banner })
+	end
+	for i, e in ipairs(ranked) do
+		local v = tonumber(e.elo) or 0
+		local isYou = e.you == true
+		local medal = i <= 3 and i or nil
+		local h = isYou and 76 or (medal and 66 or 56)
+		local r = new("Frame", { Size = UDim2.new(1, -12, 0, h), Parent = sc })
+		UI.skin(r, isYou and Color3.fromRGB(20, 110, 70) or (medal and MEDAL_BG[medal]) or T.panel2)
+		if medal then
+			UI.stroke(r, MEDAL_COLOR[medal], 2)
+		end
+		if isYou then
+			UI.stroke(r, T.green, 3)
+		end
+		-- rank badge (gold, silver, bronze for the top 3)
+		local badge = new("Frame", { AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 10, 0.5, 0), Size = UDim2.fromOffset(isYou and 46 or 40, isYou and 46 or 40), BackgroundColor3 = medal and MEDAL_COLOR[medal] or (isYou and T.green or Color3.fromRGB(12, 16, 30)), Parent = r })
+		UI.corner(badge, 2)
+		new("TextLabel", { Text = tostring(i), FontFace = UI.HEAVY, TextSize = isYou and 22 or 19, TextColor3 = medal and Color3.fromRGB(20, 20, 26) or T.text, BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Parent = badge })
+		-- model and lab
+		new("TextLabel", { Text = e.model .. (isYou and "  (YOU)" or ""), FontFace = UI.BOLD, TextSize = isYou and 19 or 16, TextColor3 = isYou and Color3.fromRGB(190, 255, 215) or T.text, TextXAlignment = Enum.TextXAlignment.Left, BackgroundTransparency = 1, Position = UDim2.new(0, 66, 0, isYou and 10 or 8), Size = UDim2.new(0.5, -66, 0, 26), Parent = r })
+		new("TextLabel", { Text = tostring(e.lab), TextSize = 13, TextColor3 = T.sub, TextXAlignment = Enum.TextXAlignment.Left, BackgroundTransparency = 1, Position = UDim2.new(0, 66, 0, isYou and 38 or 34), Size = UDim2.new(0.5, -66, 0, 18), Parent = r })
+		-- ELO bar, relative to the top score
+		local track = new("Frame", { BackgroundColor3 = Color3.fromRGB(18, 22, 40), AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0.5, 10, 0.5, 0), Size = UDim2.new(0.5, -170, 0, 14), Parent = r })
+		UI.corner(track, 2)
+		local ratio = math.clamp(v / top, 0, 1)
+		local barColor = isYou and T.green or (medal and MEDAL_COLOR[medal]) or T.accent
+		new("Frame", { BackgroundColor3 = barColor, BorderSizePixel = 0, Size = UDim2.fromScale(ratio, 1), Parent = track })
+		new("TextLabel", { Text = tostring(math.floor(v + 0.5)) .. " ELO", FontFace = UI.BOLD, TextSize = 15, TextColor3 = isYou and T.green or T.text, TextXAlignment = Enum.TextXAlignment.Right, BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), Size = UDim2.new(0, 120, 0, 24), Parent = r })
+		if e.new == true then
+			new("TextLabel", { Text = "NEW", FontFace = UI.HEAVY, TextSize = 11, TextColor3 = Color3.fromRGB(20, 20, 26), BackgroundColor3 = T.yellow, BackgroundTransparency = 0, AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -12, 1, -4), Size = UDim2.fromOffset(44, 16), Parent = r })
+		end
 	end
 end
 
@@ -336,7 +454,7 @@ function Lab.mount(ctx, s)
 		return
 	end
 	UI.clear(ctx.tabs)
-	for _, p in ipairs({ { "models", "MODELS" }, { "arena", "LEADERBOARD" } }) do
+	for _, p in ipairs({ { "models", "MODELS" }, { "open", "OPEN MODELS" }, { "arena", "LEADERBOARD" } }) do
 		UI.button(ctx.tabs, p[2], function()
 			page = p[1]
 			Lab.mount(ctx, Net.state)
@@ -346,6 +464,8 @@ function Lab.mount(ctx, s)
 	live = {}
 	if page == "models" then
 		buildModels(ctx.body, s)
+	elseif page == "open" then
+		buildOpen(ctx.body, s)
 	else
 		buildArena(ctx.body, s)
 	end
@@ -354,6 +474,13 @@ end
 function Lab.key(s)
 	if page == "arena" then
 		return "a" .. #s.leaderboard .. math.floor(s.frontier)
+	end
+	if page == "open" then
+		local k = "o" .. #(s.openModels or {}) .. tostring(selected)
+		for _, m in ipairs(s.models) do
+			k ..= (m.boosting and "b" or "") .. (m.lastGain or "")
+		end
+		return k
 	end
 	local k = "m" .. (s.training and "t" or "") .. tostring(s.product.activeModel) .. tostring(s.day // 30)
 	for _, m in ipairs(s.models) do

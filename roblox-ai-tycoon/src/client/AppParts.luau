@@ -104,7 +104,7 @@ function App.mount(ctx, s)
 	local bar = new("Frame", { BackgroundColor3 = T.panel2, Size = UDim2.new(1, -8, 0, 56), Parent = sc })
 	UI.corner(bar, 2)
 	UI.stroke(bar, T.line, 3)
-	new("TextLabel", { Text = string.format("POWER  %s H100      SPACE  %s / %s", Format.count(math.floor(s.clusterPower)), Format.count(s.gpuUsed or 0), Format.count(s.gpuSlots or 4)), FontFace = UI.BOLD, TextSize = 14, Position = UDim2.fromOffset(16, 0), Size = UDim2.new(1, -300, 1, 0), Parent = bar })
+	new("TextLabel", { Text = string.format("POWER  %s H1      SPACE  %s / %s", Format.count(math.floor(s.clusterPower)), Format.count(s.gpuUsed or 0), Format.count(s.gpuSlots or 4)), FontFace = UI.BOLD, TextSize = 14, Position = UDim2.fromOffset(16, 0), Size = UDim2.new(1, -300, 1, 0), Parent = bar })
 	if okSupply then
 		new("TextLabel", { Text = "RAM + COOLING OK", FontFace = UI.BOLD, TextSize = 12, TextColor3 = T.green, TextXAlignment = Enum.TextXAlignment.Right, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, 0), Size = UDim2.fromOffset(260, 56), Parent = bar })
 	else
@@ -135,7 +135,7 @@ function App.mount(ctx, s)
 		ic.Position = UDim2.fromOffset(12, 12)
 		new("TextLabel", { Text = hw.name .. (best and "   BEST" or ""), FontFace = UI.HEAVY, TextSize = 16, Position = UDim2.fromOffset(98, 16), Size = UDim2.new(1, -520, 0, 24), Parent = c })
 		local own = (s.gpus.owned[hw.id] or 0) + (s.gpus.rented[hw.id] or 0)
-		new("TextLabel", { Text = string.format("= %g H100      you have %s", hw.power, Format.count(own)), TextSize = 15, TextColor3 = T.sub, Position = UDim2.fromOffset(98, 50), Size = UDim2.new(1, -520, 0, 22), Parent = c })
+		new("TextLabel", { Text = string.format("= %g H1 chips      you have %s", hw.power, Format.count(own)), TextSize = 15, TextColor3 = T.sub, Position = UDim2.fromOffset(98, 50), Size = UDim2.new(1, -520, 0, 22), Parent = c })
 		local price = Hardware.buyPrice(hw, s.year) * qty
 		local id = hw.id
 		UI.button(c, "BUY " .. Format.count(qty) .. "  " .. Format.money(price), function()

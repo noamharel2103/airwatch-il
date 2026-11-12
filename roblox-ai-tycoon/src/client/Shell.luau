@@ -161,6 +161,9 @@ tapBtn.MouseButton1Down:Connect(function()
 		end
 		return
 	end
+	if Shell.fx then
+		Shell.fx.sound("Key", 0.9 + math.random() * 0.3)
+	end
 	-- feel it right away, the server confirms
 	tapState.progress = math.min(0.999, tapState.progress + 0.004)
 	trainFill.Size = UDim2.fromScale(math.max(tapState.progress, 0.06), 1)
@@ -189,6 +192,9 @@ UI.list(toasts, 6, false, Enum.HorizontalAlignment.Center)
 toasts:FindFirstChildOfClass("UIListLayout").VerticalAlignment = Enum.VerticalAlignment.Bottom
 local toastN = 0
 function Shell.toast(text: string, kind: string?)
+	if Shell.fx then
+		Shell.fx.sound(kind == "error" and "Hover" or (kind == "warn" and "Notify" or "Pop"), kind == "error" and 0.5 or 1)
+	end
 	local color = kind == "error" and T.red or (kind == "good" and T.green or (kind == "warn" and T.yellow or T.accent))
 	toastN += 1
 	local pills = {}

@@ -28,7 +28,7 @@ Config.LOAN_BASE_LIMIT = 30e6 -- banks lend up to $30M at the start, at a steep 
 Config.LOCATIONS = {
 	{ id = "paloalto", name = "Garage in Palo Alto", city = "Silicon Valley", salary = 1.0, investors = 1.4, power = 1.15, talent = 1.2, rent = 1.3, desc = "Where legends start. Investors drive past every day. Everything is expensive." },
 	{ id = "telaviv", name = "Apartment in Tel Aviv", city = "Tel Aviv", salary = 0.65, investors = 1.0, power = 1.0, talent = 1.1, rent = 0.8, desc = "Cheap brilliant engineers, great hummus, investors fly in." },
-	{ id = "london", name = "Flat in London", city = "London", salary = 0.75, investors = 1.1, power = 1.3, talent = 1.1, rent = 1.1, desc = "DeepMind's hometown. Research talent everywhere." },
+	{ id = "london", name = "Flat in London", city = "London", salary = 0.75, investors = 1.1, power = 1.3, talent = 1.1, rent = 1.1, desc = "Home of famous AI labs. Research talent everywhere." },
 	{ id = "paris", name = "Studio in Paris", city = "Paris", salary = 0.7, investors = 0.95, power = 0.8, talent = 1.0, rent = 0.9, desc = "Cheap nuclear power and a government that loves AI champions." },
 	{ id = "nyc", name = "Loft in Brooklyn", city = "New York", salary = 0.95, investors = 1.2, power = 1.2, talent = 1.0, rent = 1.25, desc = "Enterprise customers are one subway ride away. +sales." },
 	{ id = "bangalore", name = "Co-living in Bangalore", city = "Bangalore", salary = 0.35, investors = 0.75, power = 0.9, talent = 1.0, rent = 0.5, desc = "Huge talent pool at a fraction of the cost. Investors are harder to reach." },

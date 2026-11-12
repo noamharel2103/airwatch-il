@@ -167,6 +167,84 @@ function Saves.save(userId: number, slot: number, state, summary)
 	return ok
 end
 
+-- Account-wide data that is not part of a company: settings, daily gift streak.
+function Saves.loadMeta(userId: number)
+	local k = "player_" .. userId .. "_meta"
+	if not Saves.available then
+		return memGet(k) or {}
+	end
+	local ok, res = retry(function()
+		return (store :: DataStore):GetAsync(k)
+	end)
+	return (ok and type(res) == "table") and res or {}
+end
+
+function Saves.saveMeta(userId: number, meta)
+	local k = "player_" .. userId .. "_meta"
+	local data = clean(meta)
+	if not Saves.available then
+		memSet(k, data)
+		return true
+	end
+	return (retry(function()
+		(store :: DataStore):SetAsync(k, data)
+	end))
+end
+
+-- Global leaderboard: valuation stored as log10 so even huge companies fit.
+local board: OrderedDataStore? = nil
+pcall(function()
+	board = DataStoreService:GetOrderedDataStore(RunService:IsStudio() and "TopCompanies_Studio_v1" or "TopCompanies_v1")
+end)
+local boardNames = nil :: DataStore?
+pcall(function()
+	boardNames = DataStoreService:GetDataStore(RunService:IsStudio() and "TopNames_Studio_v1" or "TopNames_v1")
+end)
+local localBoard: { [string]: { score: number, name: string, company: string } } = {}
+
+function Saves.postScore(userId: number, name: string, company: string, valuation: number)
+	local score = math.floor(math.log10(math.max(valuation, 1) + 1) * 1e6)
+	localBoard[tostring(userId)] = { score = score, name = name, company = company }
+	if not Saves.available or not board then
+		return
+	end
+	pcall(function()
+		(board :: OrderedDataStore):UpdateAsync(tostring(userId), function(old)
+			return math.max(tonumber(old) or 0, score)
+		end)
+	end)
+	pcall(function()
+		(boardNames :: DataStore):SetAsync(tostring(userId), { name = name, company = company })
+	end)
+end
+
+-- returns { { userId, name, company, valuation } } best first
+function Saves.topScores(n: number)
+	local out = {}
+	if Saves.available and board then
+		local ok, pages = pcall(function()
+			return (board :: OrderedDataStore):GetSortedAsync(false, n)
+		end)
+		if ok and pages then
+			for _, e in ipairs(pages:GetCurrentPage()) do
+				local info = nil
+				pcall(function()
+					info = (boardNames :: DataStore):GetAsync(e.key)
+				end)
+				table.insert(out, { userId = tonumber(e.key), name = info and info.name or "Player", company = info and info.company or "?", valuation = 10 ^ (e.value / 1e6) - 1 })
+			end
+			return out
+		end
+	end
+	for id, e in pairs(localBoard) do
+		table.insert(out, { userId = tonumber(id), name = e.name, company = e.company, valuation = 10 ^ (e.score / 1e6) - 1 })
+	end
+	table.sort(out, function(a, b)
+		return a.valuation > b.valuation
+	end)
+	return out
+end
+
 function Saves.delete(userId: number, slot: number)
 	if not Saves.available then
 		memSet(key(userId, slot), nil)

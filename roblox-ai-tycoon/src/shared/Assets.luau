@@ -37,6 +37,9 @@ return {
 		cube = "rbxassetid://82032918412717",
 		robot = "rbxassetid://125405227687943",
 		web = "rbxassetid://126746089428320",
+		gift = "rbxassetid://72983891773209",
+		gear = "rbxassetid://126632620063333",
+		trophy = "rbxassetid://80793800061082",
 	},
 	icons = {
 		lab = "rbxassetid://110952761663378",

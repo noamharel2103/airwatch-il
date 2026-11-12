@@ -20,6 +20,7 @@ local Decor = require(game:GetService("ReplicatedStorage").Shared.Decor)
 local MT = require(Shared.ModelTypes)
 local Shop = require(Shared.Shop)
 local Website = require(Shared.Website)
+local Events = require(Shared.Events)
 local rng = Random.new()
 
 local function year(state)
@@ -92,7 +93,7 @@ function Game.new(companyName: string, locationId: string?)
 	state.gpus.owned.laptop = 1
 	Game.refreshCandidates(state)
 	local loc = locationOf(state)
-	Game.mail(state, "Welcome", "You, last night", "The plan", "$150K of savings, one gaming laptop, " .. loc.name:lower() .. ". Train a tiny model in the Lab, ship it, get users. The Bank will lend you money, and once people use your AI, investors will call. ChatGPT already exists. GPT-4 lands in March.")
+	Game.mail(state, "Welcome", "You, last night", "The plan", "$150K of savings, one gaming laptop, " .. loc.name:lower() .. ". Train a tiny model in the Lab, ship it, get users. The Bank will lend you money, and once people use your AI, investors will call. The big labs already have chatbots with millions of users. A much smarter one lands in March.")
 	Game.chatMsg(state, "general", "Mom", "Did you quit your job?? Call me.")
 	Game.newGoals(state)
 	Game.advanceWorld(state)
@@ -150,11 +151,26 @@ function Game.advanceWorld(state)
 		end
 		w.idx += 1
 	end
+	-- new GPUs: the day one comes out, it is in the news
+	for _, h in ipairs(Hardware.list) do
+		if h.fromDay == state.day and h.id ~= "laptop" then
+			Game.newsItem(state, "NEW GPU: " .. h.name .. " is out. As strong as " .. h.power .. " H1 chips.", "rival")
+			Game.chatMsg(state, "infra", "Infra team", "The " .. h.name .. " just launched. Want to upgrade? Check GPUS.")
+		end
+	end
 	-- Future: after the real calendar, each lab ships on its cadence.
 	if state.day > Labs.LAST_REAL_DAY then
 		for _, lab in ipairs(Labs.list) do
 			local names = Labs.futureNames[lab.id]
-			if names and not (state.acquired and state.acquired[lab.id]) then
+			-- brand new companies appear in the news the month they are founded
+			w.founded = w.founded or {}
+			local alive = Labs.isFounded(lab.id, state.day)
+			if alive and lab.founded and not w.founded[lab.id] then
+				w.founded[lab.id] = true
+				Game.newsItem(state, "NEW COMPANY: " .. Labs.displayName(lab.id) .. ". " .. (lab.story or ""), "rival")
+				Game.chatMsg(state, "general", "Strategy", "A new rival just showed up: " .. Labs.displayName(lab.id) .. ". Keep an eye on them.")
+			end
+			if names and alive and not (state.acquired and state.acquired[lab.id]) then
 				local nextDay = w.future[lab.id]
 				if not nextDay then
 					w.future[lab.id] = state.day + rng:NextInteger(20, math.floor(lab.cadence * 30))
@@ -166,7 +182,7 @@ function Game.advanceWorld(state)
 					if n + 1 > #names then
 						name = names[#names] .. "." .. (n + 1 - #names)
 					end
-					local cap = Labs.frontierProjection(state.day) + (LAB_OFFSET[lab.id] or -6) + rng:NextNumber(-2, 2)
+					local cap = Labs.frontierProjection(state.day) + (LAB_OFFSET[lab.id] or -6) + rng:NextNumber(-2, 2) + (w.openBoost or 0)
 					local r = { day = state.day, lab = lab.id, model = name, cap = cap, open = lab.open >= 7, priceOut = lab.open >= 7 and 2 or 20, note = "Rumoured to be trained on a gigawatt cluster", future = true }
 					addRelease(state, r)
 					Game.newsItem(state, Labs.displayName(lab.id) .. " releases " .. name, "rival")
@@ -176,6 +192,41 @@ function Game.advanceWorld(state)
 		end
 	end
 	w.marketUsers = marketUsersM(year(state), state.day)
+	if w.openBoost then
+		w.openBoost *= 0.995
+	end
+end
+
+-- ===== world events (admin abuse) + luck =====
+-- active events for this server: { [id] = endsAt (os.time) }. Started from the F2 console.
+Game.worldEvents = {} :: { [string]: number }
+function Game.eventFx()
+	return Events.combined(Game.worldEvents, os.time())
+end
+
+-- start/stop from the console or another server's message; clients see it in the next push
+function Game.applyWorldEvent(msg)
+	if type(msg) ~= "table" then
+		return
+	end
+	if msg.op == "start" and Events.byId[msg.id] and tonumber(msg.ends) then
+		Game.worldEvents[msg.id] = tonumber(msg.ends) :: number
+	elseif msg.op == "stop" then
+		if msg.id == "all" then
+			table.clear(Game.worldEvents)
+		else
+			Game.worldEvents[msg.id] = nil
+		end
+	end
+end
+
+-- Luck: every Robux purchase adds a little (up to +60%), VIP adds 15%, events multiply it.
+function Game.luck(state): number
+	local base = 1 + math.min(0.6, ((state.stats and state.stats.robux) or 0) * 0.04)
+	if state.perks and state.perks.vip then
+		base += 0.15
+	end
+	return base * Game.eventFx().luck
 end
 
 -- ===== helpers =====
@@ -526,9 +577,15 @@ function Game.rollCandidates(state, place, minR, role, n)
 				c.name, c.userId, c.from = f.name, f.id, "Your Roblox friend"
 			end
 		end
-		c.rarity = Staff.rollRarity(rng, place.weights, minR)
+		local ev = Game.eventFx()
+		local mr = ev.legends and math.max(minR, 3) or minR
+		c.rarity = Staff.rollRarity(rng, place.weights, mr)
+		-- luck: a second roll keeps the better one
+		if rng:NextNumber() < (Game.luck(state) - 1) * 0.6 then
+			c.rarity = math.max(c.rarity, Staff.rollRarity(rng, place.weights, mr))
+		end
 		c.skill = math.floor((0.85 + c.rarity * 0.08 + rng:NextNumber(0, 0.1)) * 100) / 100
-		c.demand = math.clamp((c.rarity - 2) * 0.09, 0, 0.6)
+		c.demand = Game.eventFx().legends and 0 or math.clamp((c.rarity - 2) * 0.09, 0, 0.6)
 		c.key = state.day .. "_" .. i .. "_" .. rng:NextInteger(1, 1e6)
 		table.insert(results, c)
 	end
@@ -990,7 +1047,7 @@ function Actions.buy(state, id, n)
 	-- over your allocation you can still buy, but the extra GPUs cost 8x (grey market)
 	local room = math.max(0, math.floor((Game.gpuCap(state) - Game.clusterPower(state)) / h.power))
 	local over = math.max(0, n - room)
-	local price = Hardware.buyPrice(h, year(state)) * (n - over + over * 8)
+	local price = Hardware.buyPrice(h, year(state)) * (n - over + over * 8) * Game.eventFx().gpuPrice
 	if state.cash < price then
 		return false, "Not enough cash"
 	end
@@ -1291,6 +1348,7 @@ function Game.boostDays(state, m)
 	if state.turboUntil and state.day < state.turboUntil then
 		d /= 3
 	end
+	d /= Game.eventFx().train
 	return math.clamp(math.ceil(d), 1, 30)
 end
 
@@ -1332,8 +1390,52 @@ function Actions.boost(state, modelId, a, b)
 	return true
 end
 
+-- Learn from an open-weights model (distillation): your stats move toward its level.
+function Game.openModelSize(cap: number): number
+	return math.floor(math.clamp(2 ^ ((cap - 20) / 6), 1, 8000))
+end
+
+function Actions.learnFrom(state, modelId, releaseIdx)
+	local m = state.models[modelId]
+	local r = state.world.released[tonumber(releaseIdx) or 0]
+	if not m or not m.stats then
+		return false, "Pick one of your models first"
+	end
+	if not r or not r.open then
+		return false, "That model is not open source"
+	end
+	if m.boosting then
+		return false, "This model is already training"
+	end
+	local cost = (Game.boostCost(state, m) + Game.boostPower(state, m)) * 1.4
+	if state.cash < cost then
+		return false, "Learning from it costs " .. Format.money(cost)
+	end
+	spend(state, cost, "compute")
+	m.boosting = { a = "learn", from = r.model, target = r.cap, doneDay = state.day + math.ceil(Game.boostDays(state, m) * 1.5), startDay = state.day }
+	state.taps = 0
+	Game.chatMsg(state, "research", "Training bot", m.name .. " is studying " .. r.model .. ". Open weights are a gift.")
+	return true
+end
+
 local function finishBoost(state, m)
 	local bst = m.boosting
+	if bst.a == "learn" then
+		m.boosting = nil
+		local gains = 0
+		for k, v in pairs(m.stats) do
+			if k ~= "safety" then
+				local g = bst.target > v and math.max(1, math.floor((bst.target - v) * 0.35 * Game.luck(state) ^ 0.5)) or 1
+				m.stats[k] = v + g
+				gains += g
+			end
+		end
+		Game.applyStats(m)
+		m.lastGain = "+" .. gains .. " TOTAL FROM " .. tostring(bst.from):upper()
+		Game.chatMsg(state, "research", "Training bot", m.name .. " finished learning from " .. tostring(bst.from) .. ". " .. m.lastGain)
+		state.stats.updates += 1
+		return
+	end
 	m.boosting = nil
 	local fx = Game.staffEffects(state)
 	local gains = {}
@@ -1341,7 +1443,7 @@ local function finishBoost(state, m)
 	local power = math.max(Game.clusterPower(state), 0.01)
 	for _, k in ipairs({ bst.a, bst.b }) do
 		-- more GPUs, a better team and a bigger model all give bigger jumps
-		local base = 3 + rng:NextNumber(0, 4) + math.log(1 + power, 2) * 0.8 + math.log(1 + fx.research) * 1.6 + math.log10(1 + m.size) * 1.2
+		local base = (3 + rng:NextNumber(0, 4) + math.log(1 + power, 2) * 0.8 + math.log(1 + fx.research) * 1.6 + math.log10(1 + m.size) * 1.2) * Game.luck(state) ^ 0.6
 		-- no hard cap, but going past what is possible this year gets very slow
 		-- past this year's best it slows down, but it never stops: everything is reachable with time
 		local over = m.stats[k] - ceil
@@ -1547,6 +1649,22 @@ function Actions.release(state, modelId, opts)
 	goalProgress(state, "release", 1)
 	-- effects
 	local eff = result.effects
+	eff.signups *= Game.luck(state) ^ 0.5 * Game.eventFx().users
+	if o.open then
+		-- everyone can now train on your weights: rivals below you catch up a lot
+		local helped = 0
+		for _, lb in pairs(state.world.labBest) do
+			if lb.cap < m.cap then
+				lb.cap += (m.cap - lb.cap) * 0.3
+				helped += 1
+			end
+		end
+		state.world.openBoost = math.max(state.world.openBoost or 0, math.max(0, m.cap - state.world.frontier) * 0.5 + 2)
+		state.openRep = (state.openRep or 0) + 5
+		if helped > 0 then
+			Game.newsItem(state, helped .. " rival labs are already training on " .. m.name .. "'s open weights", "rival")
+		end
+	end
 	if state.trendyNext then
 		state.trendyNext = nil
 		eff.signups *= 3
@@ -2257,6 +2375,13 @@ function Actions.trainTap(state)
 	return true, state.taps
 end
 
+-- ===== gifts =====
+-- Gift size grows with the company (recent revenue + a bit of valuation), never tiny.
+function Game.giftBase(state): number
+	local rev = state.lastMonth and state.lastMonth.revenue or 0
+	return math.max(3000, rev * 0.08 + math.max(state.valuation, 0) * 0.0004 + math.max(state.cash, 0) * 0.002)
+end
+
 -- ===== website =====
 function Game.websiteBonus(state)
 	return Website.bonus(state.website)
@@ -2493,7 +2618,7 @@ local DMS = {
 	{ from = "Landlord", when = function(s) return s.office <= 2 end, text = { "Why is my electricity bill 4x? What are you running in there?", "The neighbors say your room is humming." } },
 	{ from = "A user", when = function(s) return s.users > 500 end, text = { "Your AI helped me pass my exam. Thank you!!", "Your AI wrote my wedding speech. Everyone cried.", "Why did your AI call my code brave?" } },
 	{ from = "Angry user", when = function(s) return s.users > 2000 end, text = { "Your model refused to help me name my cat. Unsubscribing.", "It made up a law and I almost went to court with it.", "Down AGAIN? I pay 20 dollars for this." } },
-	{ from = "YouTuber (2.1M subs)", when = function(s) return s.users > 20000 end, text = { "Can I get early access for an Is this better than ChatGPT video?", "We tested your model vs 5 others. You placed 3rd. Want to comment?" } },
+	{ from = "YouTuber (2.1M subs)", when = function(s) return s.users > 20000 end, text = { "Can I get early access for an Is this better than the big chatbots video?", "We tested your model vs 5 others. You placed 3rd. Want to comment?" } },
 	{ from = "Tech reporter", when = function(s) return s.launches > 0 end, text = { "Any comment on the jailbreak rumors?", "Can I get 15 minutes with the founder for a profile piece?", "Is it true you trained on Reddit?" } },
 	{ from = "Recruiter", when = function(s) return s.users > 10000 end, text = { "Three engineers from a big lab want to talk to you.", "A star researcher is open to offers. Expensive though." } },
 	{ from = "Angel investor", when = function(s) return s.valuation > 2e6 end, text = { "Love what you are building. Coffee next week?", "If you ever raise, I want in. Even a small check." } },
@@ -2537,13 +2662,13 @@ Game.ACHIEVEMENTS = {
 	{ id = "users_100k", name = "Going Viral", desc = "100,000 users", reward = 150e3, test = function(s) return s.users >= 1e5 end },
 	{ id = "users_10m", name = "Household Name", desc = "10 million users", reward = 5e6, test = function(s) return s.users >= 1e7 end },
 	{ id = "users_500m", name = "Half the Internet", desc = "500 million users", reward = 2e8, test = function(s) return s.users >= 5e8 end },
-	{ id = "beat_35", name = "Better Than GPT-3", desc = "A model with capability 35+", reward = 50e3, test = function(s) return anyModel(s, function(m) return m.cap >= 35 end) end },
-	{ id = "beat_50", name = "GPT-4 Killer", desc = "A model with capability 50+", reward = 2e6, test = function(s) return anyModel(s, function(m) return m.cap >= 50 end) end },
+	{ id = "beat_35", name = "Smarter Than A Toaster", desc = "A model with capability 35+", reward = 50e3, test = function(s) return anyModel(s, function(m) return m.cap >= 35 end) end },
+	{ id = "beat_50", name = "Frontier Killer", desc = "A model with capability 50+", reward = 2e6, test = function(s) return anyModel(s, function(m) return m.cap >= 50 end) end },
 	{ id = "frontier", name = "Frontier Lab", desc = "Launch a model better than everyone", reward = 5e7, test = function(s) return anyModel(s, function(m) return m.status == "released" and m.cap > s.world.frontier end) end },
 	{ id = "team_10", name = "Real Company", desc = "10 people on the team", reward = 100e3, test = function(s) return Game.headcount(s) >= 10 end },
 	{ id = "team_100", name = "Scale Up", desc = "100 people", reward = 5e6, test = function(s) return Game.headcount(s) >= 100 end },
-	{ id = "gpus_100", name = "GPU Rich", desc = "100 H100s worth of compute", reward = 500e3, test = function(s) return Game.clusterPower(s) >= 100 end },
-	{ id = "gpus_10k", name = "Datacenter", desc = "10,000 H100s worth", reward = 5e7, test = function(s) return Game.clusterPower(s) >= 1e4 end },
+	{ id = "gpus_100", name = "GPU Rich", desc = "100 H1 chips worth of compute", reward = 500e3, test = function(s) return Game.clusterPower(s) >= 100 end },
+	{ id = "gpus_10k", name = "Datacenter", desc = "10,000 H1 chips worth", reward = 5e7, test = function(s) return Game.clusterPower(s) >= 1e4 end },
 	{ id = "unicorn", name = "Unicorn", desc = "Worth $1 billion", reward = 1e7, test = function(s) return s.valuation >= 1e9 end },
 	{ id = "decacorn", name = "Decacorn", desc = "Worth $10 billion", reward = 5e7, test = function(s) return s.valuation >= 1e10 end },
 	{ id = "trillion", name = "Trillion Club", desc = "Worth $1 trillion", reward = 5e9, test = function(s) return s.valuation >= 1e12 end },
@@ -2738,6 +2863,10 @@ local function tickProblems(state, fx)
 	local risk = Config.RISK_BY_SPEED[state.speed] or 1
 	if perk(state, "shield") then
 		risk *= 0.25
+	end
+	risk /= Game.luck(state)
+	if Game.eventFx().noCrisis then
+		risk = 0
 	end
 	if (state.calmUntil and state.day < state.calmUntil) or #state.problems > 0 or (state.lastCrisisDay and state.day - state.lastCrisisDay < 40) then
 		risk = 0
@@ -3061,6 +3190,7 @@ function Game.tickDay(state)
 		if state.turboUntil and state.day < state.turboUntil then
 			step *= 3
 		end
+		step *= Game.eventFx().train
 		if Game.hasProblem(state, "overheat") then
 			step *= 0.4
 		end
@@ -3073,7 +3203,7 @@ function Game.tickDay(state)
 		end
 		-- run failures: more likely at high speed
 		local risk = Config.RISK_BY_SPEED[state.speed] or 1
-		local failChance = t.eval.risk / math.max(t.days, 5) * risk / (1 + fx.infra * 0.3)
+		local failChance = t.eval.risk / math.max(t.days, 5) * risk / (1 + fx.infra * 0.3) / Game.luck(state)
 		if rng:NextNumber() < failChance then
 			local lost = math.max(1, math.floor(t.days * rng:NextNumber(0.03, 0.12)))
 			t.progress = math.max(0, t.progress - lost / t.days)
@@ -3135,7 +3265,7 @@ function Game.tickDay(state)
 		local web = Website.bonus(state.website)
 		local target = math.min(state.world.marketUsers * 1e6, state.world.marketUsers * 1e6 * share * (perk(state, "vip") and 1.5 or 1) * (1 + web.users))
 		state.brand += web.brand / 30
-		local rate = target > state.users and 0.03 or 0.012
+		local rate = target > state.users and math.min(0.3, 0.03 * Game.eventFx().users) or 0.012
 		state.users = math.max(0, state.users + (target - state.users) * rate)
 		state.brand += fx.hype * 0.00002 + 0.00001
 		-- revenue
@@ -3198,6 +3328,9 @@ function Game.tickDay(state)
 	if perk(state, "cash2x") then
 		revenue *= 2
 	end
+	-- friends playing in the same server: +10% each (max +50%)
+	revenue *= 1 + (state.friendBonus or 0)
+	revenue *= Game.eventFx().cash
 	state.cash += revenue
 	state.month.revenue += revenue
 	spend(state, salaries, "salaries")
@@ -3417,8 +3550,32 @@ function Game.snapshot(state)
 			end
 			return nil
 		end)(),
+		openModels = (function()
+			local out = {}
+			local rel = state.world.released
+			for i = #rel, 1, -1 do
+				local r = rel[i]
+				if r.open then
+					table.insert(out, { idx = i, model = r.model, lab = Labs.displayName(r.lab), cap = r.cap, day = r.day, size = Game.openModelSize(r.cap) })
+					if #out >= 30 then
+						break
+					end
+				end
+			end
+			return out
+		end)(),
 		taps = state.taps or 0, tapKey = state.tapKey, trendyNext = state.trendyNext,
 		searchPlace = state.searchPlace, earlyKinds = state.earlyKinds or {}, turboUntil = state.turboUntil or 0, website = state.website or { parts = {} }, websiteBonus = Game.websiteBonus(state),
+		friendBonus = state.friendBonus or 0, luck = Game.luck(state), events = (function()
+			local out = {}
+			local now = os.time()
+			for id, ends in pairs(Game.worldEvents) do
+				if ends > now then
+					table.insert(out, { id = id, left = ends - now })
+				end
+			end
+			return out
+		end)(),
 		perks = state.perks or {}, sideIncome = Game.sideIncome(state), calmUntil = state.calmUntil,
 		eraCeiling = Game.eraCeiling(state), achievements = state.achievements or {}, lastAchievement = state.lastAchievement, boxes = #(state.boxes or {}), problems = state.problems or {}, acquired = state.acquired or {}, location = state.location, loans = state.loans, loanLimit = Game.loanLimit(state), gpuCap = Game.gpuCap(state),
 	}

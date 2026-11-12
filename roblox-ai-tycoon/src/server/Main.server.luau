@@ -49,6 +49,7 @@ local function saveSession(player: Player)
 	local s = sessions[player]
 	if s then
 		Saves.save(player.UserId, s.slot, s.state, summary(s.state))
+		Saves.postScore(player.UserId, player.DisplayName, s.state.company or "?", s.state.valuation or 0)
 	end
 end
 
@@ -95,6 +96,12 @@ local function refreshPasses(player: Player)
 		-- Studio test purchases are remembered on the save so testing survives a restart
 		for k, v in pairs(s.state.testPerks or {}) do
 			if IS_STUDIO and v then
+				perks[k] = true
+			end
+		end
+		-- passes gifted from the F2 admin console
+		for k, v in pairs(s.state.giftPerks or {}) do
+			if v then
 				perks[k] = true
 			end
 		end
@@ -251,6 +258,179 @@ ShopRF.OnServerInvoke = function(player: Player, kind: string, key: string, targ
 	return { ok = false, err = "Bad request" }
 end
 
+-- F2 admin console reaches the live sessions through this bridge.
+local AdminBridge = require(Modules.AdminBridge)
+AdminBridge.sessions = sessions
+AdminBridge.push = push
+AdminBridge.refreshPasses = refreshPasses
+
+
+-- ===== account stuff: settings, daily gift streak, playtime gifts, friend bonus, world top =====
+local metas: { [Player]: any } = {}
+local joinedAt: { [Player]: number } = {}
+local MetaRF = remote("RemoteFunction", "Meta") :: RemoteFunction
+local STREAK = { 0.15, 0.3, 0.5, 0.75, 1, 1.4, 2 }
+local PLAYTIME_EVERY_NORMAL = 8 * 60
+local PLAYTIME_MAX = 8
+
+local function today(): number
+	return math.floor(os.time() / 86400)
+end
+
+local function metaOf(player: Player)
+	if not metas[player] then
+		metas[player] = Saves.loadMeta(player.UserId)
+	end
+	local m = metas[player]
+	m.daily = m.daily or { last = -1, streak = 0 }
+	m.settings = m.settings or {}
+	m.playtime = m.playtime or {}
+	return m
+end
+
+local function streakMult(streak: number): number
+	if streak <= #STREAK then
+		return STREAK[math.max(streak, 1)]
+	end
+	return math.min(4, STREAK[#STREAK] + (streak - #STREAK) * 0.25)
+end
+
+local function dailyInfo(player: Player, st)
+	local m = metaOf(player)
+	local d = m.daily
+	local claimed = d.last == today()
+	local nextStreak = claimed and d.streak or ((d.last == today() - 1) and d.streak + 1 or 1)
+	return {
+		claimed = claimed,
+		streak = claimed and d.streak or (nextStreak - 1),
+		nextStreak = nextStreak,
+		amount = st and math.floor(Game.giftBase(st) * streakMult(nextStreak)) or 0,
+	}
+end
+
+local function playtimeInfo(player: Player, st)
+	local m = metaOf(player)
+	local got = m.playtime.session == joinedAt[player] and (m.playtime.count or 0) or 0
+	local since = os.clock() - (joinedAt[player] or os.clock())
+	local PLAYTIME_EVERY = Game.eventFx().gifts and 60 or PLAYTIME_EVERY_NORMAL
+	local earned = math.min(PLAYTIME_MAX, math.floor(since / PLAYTIME_EVERY))
+	return {
+		ready = earned > got,
+		count = got,
+		max = PLAYTIME_MAX,
+		nextIn = math.max(0, (got + 1) * PLAYTIME_EVERY - since),
+		amount = st and math.floor(Game.giftBase(st) * 0.12 * (1 + got * 0.2)) or 0,
+	}
+end
+
+-- friends playing here at the same time: +10% money each, max +50%
+local friendCacheOk: { [string]: boolean } = {}
+local function isFriend(a: Player, b: Player): boolean
+	local k = math.min(a.UserId, b.UserId) .. "_" .. math.max(a.UserId, b.UserId)
+	if friendCacheOk[k] == nil then
+		local ok, res = pcall(a.IsFriendsWith, a, b.UserId)
+		friendCacheOk[k] = ok and res == true
+	end
+	return friendCacheOk[k]
+end
+local function refreshFriendBonus()
+	for _, p in ipairs(Players:GetPlayers()) do
+		local n = 0
+		for _, q in ipairs(Players:GetPlayers()) do
+			if q ~= p and isFriend(p, q) then
+				n += 1
+			end
+		end
+		local s = sessions[p]
+		if s then
+			s.state.friendBonus = math.min(0.5, n * 0.1)
+			s.dirty = true
+		end
+	end
+end
+Players.PlayerAdded:Connect(function(p)
+	joinedAt[p] = os.clock()
+	task.spawn(refreshFriendBonus)
+end)
+for _, p in ipairs(Players:GetPlayers()) do
+	joinedAt[p] = joinedAt[p] or os.clock()
+end
+Players.PlayerRemoving:Connect(function(p)
+	if metas[p] then
+		Saves.saveMeta(p.UserId, metas[p])
+	end
+	metas[p] = nil
+	joinedAt[p] = nil
+	task.defer(refreshFriendBonus)
+end)
+
+-- world events from other servers (admin abuse is global)
+task.spawn(function()
+	pcall(function()
+		game:GetService("MessagingService"):SubscribeAsync("FrontierWorldEvents", function(message)
+			Game.applyWorldEvent(message.Data)
+			for _, s in pairs(sessions) do
+				s.dirty = true
+			end
+		end)
+	end)
+end)
+
+local topCache, topAt = {}, -1e9
+MetaRF.OnServerInvoke = function(player: Player, action: string, arg: any)
+	local s = sessions[player]
+	local st = s and s.state
+	if action == "info" then
+		return { daily = dailyInfo(player, st), playtime = playtimeInfo(player, st), settings = metaOf(player).settings, friendBonus = st and st.friendBonus or 0 }
+	elseif action == "claimDaily" then
+		if not st then
+			return { ok = false, err = "Load a company first" }
+		end
+		local info = dailyInfo(player, st)
+		if info.claimed then
+			return { ok = false, err = "Come back tomorrow" }
+		end
+		local m = metaOf(player)
+		m.daily = { last = today(), streak = info.nextStreak }
+		st.cash += info.amount
+		Game.chatMsg(st, "general", "Daily gift", "Day " .. info.nextStreak .. " gift: " .. Format.money(info.amount) .. ".")
+		s.dirty = true
+		task.spawn(Saves.saveMeta, player.UserId, m)
+		return { ok = true, amount = info.amount, streak = info.nextStreak }
+	elseif action == "claimPlaytime" then
+		if not st then
+			return { ok = false, err = "Load a company first" }
+		end
+		local info = playtimeInfo(player, st)
+		if not info.ready then
+			return { ok = false, err = "Not yet" }
+		end
+		local m = metaOf(player)
+		m.playtime = { session = joinedAt[player], count = info.count + 1 }
+		st.cash += info.amount
+		s.dirty = true
+		return { ok = true, amount = info.amount }
+	elseif action == "setSettings" then
+		if type(arg) == "table" then
+			local m = metaOf(player)
+			for k, v in pairs(arg) do
+				if type(k) == "string" and #k < 20 and (type(v) == "number" or type(v) == "boolean") then
+					m.settings[k] = v
+				end
+			end
+			task.spawn(Saves.saveMeta, player.UserId, m)
+		end
+		return { ok = true }
+	elseif action == "top" then
+		if os.clock() - topAt > 60 then
+			topAt = os.clock()
+			topCache = Saves.topScores(25)
+		end
+		return { ok = true, list = topCache }
+	end
+	return { ok = false }
+end
+
 -- Upgrade old saves with any fields added later.
 local function reconcile(state)
 	local fresh = Game.new(state.company or "Company")
@@ -303,6 +483,7 @@ SlotsRF.OnServerInvoke = function(player: Player, action: string, slot: number?,
 		task.spawn(function()
 			state.friendPool = loadFriends(player)
 		end)
+		task.spawn(refreshFriendBonus)
 		push(player, sessions[player])
 		return { ok = true, persistent = Saves.available or RunService:IsStudio() }
 	elseif action == "delete" then

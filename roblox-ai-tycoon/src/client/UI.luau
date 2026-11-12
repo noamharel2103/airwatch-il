@@ -158,6 +158,8 @@ end
 
 UI.GHOST = Color3.fromRGB(150, 170, 205)
 UI.guardUntil = 0
+-- set by Main: plays a sound by name (clicks, hovers)
+UI.sound = nil :: ((string, number?) -> ())?
 -- kind: "primary" | "ghost" | "danger" | "success" | color
 -- Roblox simulator style: rounded, tall, gradient, thick outline, white outlined text.
 function UI.button(parent: Instance, text: string, onClick: (() -> ())?, kind: any?, props: { [string]: any }?)
@@ -211,6 +213,9 @@ function UI.button(parent: Instance, text: string, onClick: (() -> ())?, kind: a
 		if color ~= UI.GHOST then
 			setColor(color:Lerp(Color3.new(1, 1, 1), 0.12))
 		end
+		if UI.sound then
+			UI.sound("Hover", 1.1)
+		end
 		local hs = b:FindFirstChild("HoverScale") or new("UIScale", { Name = "HoverScale", Parent = b })
 		if not b:FindFirstChildOfClass("UIScale") or b:FindFirstChildOfClass("UIScale") == hs then
 			TweenService:Create(hs, TweenInfo.new(0.15, Enum.EasingStyle.Back), { Scale = 1.04 }):Play()
@@ -228,6 +233,9 @@ function UI.button(parent: Instance, text: string, onClick: (() -> ())?, kind: a
 		-- ignore the mouse-up of the click that just opened this screen (or rebuilt it)
 		if os.clock() - born < 0.25 or os.clock() < UI.guardUntil then
 			return
+		end
+		if UI.sound then
+			UI.sound("Click", 0.95 + math.random() * 0.1)
 		end
 		local sc = b:FindFirstChildOfClass("UIScale") or new("UIScale", { Parent = b })
 		sc.Scale = 0.92
