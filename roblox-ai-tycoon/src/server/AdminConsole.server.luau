@@ -1,8 +1,13 @@
 -- F2 admin console (Cmdr). Only the game creator can run commands; everyone else is blocked on the server.
--- Add commands in shared/AdminCommands.luau (name, args) + server/AdminCommandsServer.luau (what they do).
+-- Commands: shared/AdminCommands.luau (name, args) + server/AdminCommandsServer.luau (what they do).
+-- Screen effects (announce, pranks) are drawn by client/AdminFx.client.luau.
 local RunService = game:GetService("RunService")
 local RS = game:GetService("ReplicatedStorage")
 local SSS = game:GetService("ServerScriptService")
+
+local fxRemote = RS:FindFirstChild("AdminFx") or Instance.new("RemoteEvent")
+fxRemote.Name = "AdminFx"
+fxRemote.Parent = RS
 
 local cmdrModule = SSS:FindFirstChild("Cmdr")
 if not cmdrModule then
@@ -34,9 +39,12 @@ Cmdr.Registry:RegisterHook("BeforeRun", function(context)
 	return nil
 end)
 
-local defs = require(RS:WaitForChild("Shared"):WaitForChild("AdminCommands"))
+local admin = require(RS:WaitForChild("Shared"):WaitForChild("AdminCommands"))
+for typeName, values in pairs(admin.Enums) do
+	Cmdr.Registry:RegisterType(typeName, Cmdr.Util.MakeEnumType(typeName, values))
+end
 local runs = require(script.Parent:WaitForChild("Modules"):WaitForChild("AdminCommandsServer"))
-for _, def in ipairs(defs) do
+for _, def in ipairs(admin.Commands) do
 	local run = runs[def.Name]
 	if run then
 		local obj = table.clone(def)

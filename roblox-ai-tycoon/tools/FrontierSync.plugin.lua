@@ -4,8 +4,62 @@ local RunService = game:GetService("RunService")
 if not RunService:IsEdit() then
 	return
 end
+-- Only the FRONTIER place: without this it synced the game code into every open Studio.
+local FRONTIER_PLACE_ID = 77800822441354
+if game.PlaceId == 0 then
+	game:GetPropertyChangedSignal("PlaceId"):Wait()
+end
+if game.PlaceId ~= FRONTIER_PLACE_ID then
+	return
+end
 local Http = game:GetService("HttpService")
 local BASE = "http://127.0.0.1:34873/"
+
+-- Vendored Cmdr (F2 admin console) -> ServerScriptService.Cmdr, installed once if missing.
+local function installCmdr()
+	if game.ServerScriptService:FindFirstChild("Cmdr") then
+		return "Cmdr already installed"
+	end
+	local files = Http:JSONDecode(Http:GetAsync(BASE .. "_vendor/cmdr_files.json?" .. os.clock()))
+	local initDirs = {}
+	for _, f in ipairs(files) do
+		local dir = f:match("^(.*)/init%.lua$")
+		if dir then
+			initDirs[dir] = true
+		end
+	end
+	local root = Instance.new("Folder")
+	local made = {}
+	local function node(path)
+		if path == "_vendor" then
+			return root
+		end
+		if made[path] then
+			return made[path]
+		end
+		local parentPath, name = path:match("^(.*)/([^/]+)$")
+		local inst = Instance.new(initDirs[path] and "ModuleScript" or "Folder")
+		inst.Name = name
+		inst.Parent = node(parentPath)
+		made[path] = inst
+		return inst
+	end
+	for _, f in ipairs(files) do
+		local src = Http:GetAsync(BASE .. f .. "?" .. os.clock()):gsub("^\239\187\191", "")
+		local dir, file = f:match("^(.*)/([^/]+)%.lua$")
+		if file == "init" then
+			node(dir).Source = src
+		else
+			local m = Instance.new("ModuleScript")
+			m.Name = file
+			m.Source = src
+			m.Parent = node(dir)
+		end
+	end
+	root.Cmdr.Parent = game.ServerScriptService
+	root:Destroy()
+	return "Cmdr installed (" .. #files .. " files)"
+end
 
 local function doSync()
 
@@ -90,6 +144,7 @@ task.spawn(function()
 			if lastStamp ~= nil or true then
 				local ok2, res = pcall(doSync)
 				print("[FrontierSync]", ok2, res)
+				print("[FrontierSync]", pcall(installCmdr))
 			end
 			lastStamp = stamp
 		end
