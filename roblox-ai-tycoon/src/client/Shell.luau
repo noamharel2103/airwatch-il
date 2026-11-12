@@ -108,24 +108,48 @@ local PROBLEM_LABEL = { massive = "MASSIVE JAILBREAK", outage = "SERVERS DOWN", 
 -- training mini status (bottom left)
 -- training card (bottom left): tap the big button to speed it up; after enough taps it
 -- becomes the Robux instant finish
-local trainMini = new("Frame", { Position = UDim2.new(0, 16, 1, -126), Size = UDim2.fromOffset(470, 110), BackgroundColor3 = Color3.fromRGB(70, 40, 150), Visible = false, Parent = hud })
-UI.corner(trainMini, 2)
-UI.stroke(trainMini, T.line, 4)
-new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(150, 90, 255), Color3.fromRGB(60, 30, 140)), Parent = trainMini })
-local trainL = new("TextLabel", { Text = "", FontFace = UI.BOLD, TextSize = 14, TextTruncate = Enum.TextTruncate.AtEnd, TextWrapped = false, Position = UDim2.fromOffset(16, 12), Size = UDim2.new(1, -170, 0, 20), Parent = trainMini })
-local trainBarHolder = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(16, 42), Size = UDim2.new(1, -170, 0, 18), Parent = trainMini })
-local _, trainFill = UI.bar(trainBarHolder, 0, T.green, 18)
-local trainSub = new("TextLabel", { Text = "", TextSize = 13, TextColor3 = Color3.fromRGB(225, 215, 255), Position = UDim2.fromOffset(16, 70), Size = UDim2.new(1, -170, 0, 18), Parent = trainMini })
-local tapsL = new("TextLabel", { Text = "", FontFace = UI.BOLD, TextSize = 10, TextColor3 = T.yellow, Position = UDim2.fromOffset(16, 90), Size = UDim2.new(1, -170, 0, 14), Parent = trainMini })
-local tapBtn = new("TextButton", { Text = "TAP!", FontFace = UI.HEAVY, TextSize = 22, TextXAlignment = Enum.TextXAlignment.Center, TextWrapped = true, TextColor3 = Color3.new(1, 1, 1), AutoButtonColor = false, BackgroundColor3 = T.green, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0), Size = UDim2.fromOffset(136, 82), Parent = trainMini })
-UI.corner(tapBtn, 2)
-UI.stroke(tapBtn, T.line, 4)
+local trainMini = new("Frame", { Position = UDim2.fromOffset(16, 232), Size = UDim2.fromOffset(196, 268), BackgroundColor3 = T.bg, Visible = false, Parent = hud })
+new("UICorner", { CornerRadius = UDim.new(0, 10), Parent = trainMini })
+new("UIStroke", { Color = T.line, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = trainMini })
+local tmHead = new("Frame", { BackgroundColor3 = T.purple, Size = UDim2.new(1, 0, 0, 30), Parent = trainMini })
+new("UICorner", { CornerRadius = UDim.new(0, 10), Parent = tmHead })
+new("UIGradient", { Color = ColorSequence.new(Color3.fromRGB(170, 100, 255), Color3.fromRGB(90, 50, 220)), Parent = tmHead })
+new("TextLabel", { Text = "TRAINING", FontFace = UI.HEAVY, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromScale(1, 1), Parent = tmHead })
+local trainL = new("TextLabel", { Text = "", FontFace = UI.BOLD, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Center, TextTruncate = Enum.TextTruncate.AtEnd, TextWrapped = false, Position = UDim2.fromOffset(10, 38), Size = UDim2.new(1, -20, 0, 18), Parent = trainMini })
+local trainBarHolder = new("Frame", { BackgroundColor3 = Color3.fromRGB(14, 16, 32), Position = UDim2.fromOffset(12, 62), Size = UDim2.new(1, -24, 0, 22), Parent = trainMini })
+new("UICorner", { CornerRadius = UDim.new(0, 11), Parent = trainBarHolder })
+local trainFill = new("Frame", { BackgroundColor3 = T.green, Size = UDim2.fromScale(0, 1), Parent = trainBarHolder })
+new("UICorner", { CornerRadius = UDim.new(0, 11), Parent = trainFill })
+new("UIGradient", { Color = ColorSequence.new(Color3.fromRGB(0, 230, 120), Color3.fromRGB(0, 200, 255)), Parent = trainFill })
+local trainPct = new("TextLabel", { Text = "", FontFace = UI.BOLD, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromScale(1, 1), ZIndex = 3, Parent = trainBarHolder })
+new("UIStroke", { Color = T.line, Thickness = 1.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual, Parent = trainPct })
+local trainSub = new("TextLabel", { Text = "", TextSize = 14, TextColor3 = T.sub, TextXAlignment = Enum.TextXAlignment.Center, Position = UDim2.fromOffset(10, 90), Size = UDim2.new(1, -20, 0, 18), Parent = trainMini })
+-- the big button with a soft pulsing ring behind it
+local ring = new("Frame", { BackgroundColor3 = T.green, BackgroundTransparency = 0.7, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0, 166), Size = UDim2.fromOffset(170, 96), Parent = trainMini })
+new("UICorner", { CornerRadius = UDim.new(0, 14), Parent = ring })
+local tapBtn = new("TextButton", { Text = "TAP!", FontFace = UI.HEAVY, TextSize = 26, TextXAlignment = Enum.TextXAlignment.Center, TextWrapped = true, TextColor3 = Color3.new(1, 1, 1), AutoButtonColor = false, BackgroundColor3 = T.green, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0, 166), Size = UDim2.fromOffset(160, 86), Parent = trainMini })
+new("UICorner", { CornerRadius = UDim.new(0, 12), Parent = tapBtn })
+new("UIStroke", { Color = T.line, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = tapBtn })
 local tapGrad = new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(120, 255, 160), Color3.fromRGB(0, 160, 80)), Parent = tapBtn })
-new("UIStroke", { Color = T.line, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual, Parent = tapBtn })
+new("UIStroke", { Color = T.line, Thickness = 2.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual, Parent = tapBtn })
 local tapScale = new("UIScale", { Parent = tapBtn })
+local tapsL = new("TextLabel", { Text = "", FontFace = UI.BOLD, TextSize = 10, TextColor3 = T.yellow, TextXAlignment = Enum.TextXAlignment.Center, Position = UDim2.fromOffset(8, 220), Size = UDim2.new(1, -16, 0, 14), Parent = trainMini })
+local tapBarBg = new("Frame", { BackgroundColor3 = Color3.fromRGB(14, 16, 32), Position = UDim2.fromOffset(20, 240), Size = UDim2.new(1, -40, 0, 8), Parent = trainMini })
+new("UICorner", { CornerRadius = UDim.new(0, 4), Parent = tapBarBg })
+local tapBar = new("Frame", { BackgroundColor3 = T.yellow, Size = UDim2.fromScale(0, 1), Parent = tapBarBg })
+new("UICorner", { CornerRadius = UDim.new(0, 4), Parent = tapBar })
+task.spawn(function()
+	local t0 = os.clock()
+	while true do
+		local t = (os.clock() - t0) % 1.4 / 1.4
+		ring.Size = UDim2.fromOffset(160 + t * 30, 86 + t * 26)
+		ring.BackgroundTransparency = 0.6 + t * 0.4
+		task.wait(1 / 30)
+	end
+end)
 local tapState = { taps = 0, finish = false, progress = 0 }
 local function floaty(text: string)
-	local f = new("TextLabel", { Text = text, FontFace = UI.HEAVY, TextSize = 16, TextColor3 = T.yellow, TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, -82 + math.random(-30, 30), 0, 10), Size = UDim2.fromOffset(120, 24), Parent = trainMini })
+	local f = new("TextLabel", { Text = text, FontFace = UI.HEAVY, TextSize = 16, TextColor3 = T.yellow, TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, math.random(-40, 40), 0, 126), Size = UDim2.fromOffset(120, 24), Parent = trainMini })
 	new("UIStroke", { Color = T.line, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual, Parent = f })
 	UI.tween(f, 0.7, { Position = f.Position - UDim2.fromOffset(0, 50), TextTransparency = 1 })
 	task.delay(0.7, function()
@@ -143,7 +167,8 @@ tapBtn.MouseButton1Down:Connect(function()
 	end
 	-- feel it right away, the server confirms
 	tapState.progress = math.min(0.999, tapState.progress + 0.004)
-	trainFill.Size = UDim2.fromScale(tapState.progress, 1)
+	trainFill.Size = UDim2.fromScale(math.max(tapState.progress, 0.06), 1)
+	trainPct.Text = math.floor(tapState.progress * 100) .. "%"
 	floaty("+0.4%")
 	task.spawn(function()
 		local ok, n = Net.quiet("trainTap")
@@ -211,9 +236,34 @@ Net.setToast(Shell.toast)
 -- ===== Computer =====
 local comp = new("Frame", { Name = "Computer", BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 10, Parent = gui })
 Shell.computer = comp
-local screen = new("Frame", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -24), Size = UDim2.new(0.84, 0, 1, -150), BackgroundColor3 = Color3.fromRGB(20, 28, 52), ZIndex = 10, Parent = comp })
-UI.corner(screen, 22)
+-- the OS lives inside a laptop: dark bezel with a camera, a metal keyboard base below
+local laptop = new("Frame", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -58), Size = UDim2.new(0.74, 0, 1, -196), BackgroundColor3 = Color3.fromRGB(22, 24, 32), ZIndex = 9, Parent = comp })
+new("UICorner", { CornerRadius = UDim.new(0, 18), Parent = laptop })
+new("UIStroke", { Color = Color3.fromRGB(8, 9, 14), Thickness = 4, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = laptop })
+new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(46, 50, 64), Color3.fromRGB(18, 20, 28)), Parent = laptop })
+local camDot = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0, 13), Size = UDim2.fromOffset(9, 9), BackgroundColor3 = Color3.fromRGB(10, 12, 18), ZIndex = 10, Parent = laptop })
+UI.corner(camDot, 99)
+new("UIStroke", { Color = Color3.fromRGB(70, 80, 110), Thickness = 1.5, Parent = camDot })
+local camLed = new("Frame", { AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0.5, 12, 0, 13), Size = UDim2.fromOffset(5, 5), BackgroundColor3 = Color3.fromRGB(0, 230, 120), ZIndex = 10, Parent = laptop })
+UI.corner(camLed, 99)
+-- keyboard deck (wider than the lid), with the little thumb notch
+local deck = new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 1, -2), Size = UDim2.new(1.08, 0, 0, 34), BackgroundColor3 = Color3.fromRGB(170, 176, 192), ZIndex = 8, Parent = laptop })
+new("UICorner", { CornerRadius = UDim.new(0, 12), Parent = deck })
+new("UIStroke", { Color = Color3.fromRGB(8, 9, 14), Thickness = 4, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = deck })
+new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(225, 230, 240), Color3.fromRGB(120, 126, 144)), Parent = deck })
+local notch = new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 0), Size = UDim2.fromOffset(170, 10), BackgroundColor3 = Color3.fromRGB(110, 116, 134), ZIndex = 9, Parent = deck })
+UI.corner(notch, 6)
+local brand = new("TextLabel", { Text = "", FontFace = UI.BOLD, TextSize = 10, TextColor3 = Color3.fromRGB(150, 160, 190), TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -4), Size = UDim2.fromOffset(300, 14), ZIndex = 10, Parent = laptop })
+Shell.laptopBrand = brand
+local screen = new("Frame", { Position = UDim2.fromOffset(20, 26), Size = UDim2.new(1, -40, 1, -48), BackgroundColor3 = Color3.fromRGB(20, 28, 52), ClipsDescendants = true, ZIndex = 10, Parent = laptop })
+new("UICorner", { CornerRadius = UDim.new(0, 6), Parent = screen })
 UI.grad(screen, Color3.fromRGB(70, 120, 255), Color3.fromRGB(150, 60, 220), 135)
+-- wallpaper: soft glow blobs and the company logo mark
+for i, col in ipairs({ Color3.fromRGB(0, 220, 255), Color3.fromRGB(255, 90, 200), Color3.fromRGB(255, 200, 40) }) do
+	local blob = new("Frame", { BackgroundColor3 = col, BackgroundTransparency = 0.82, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(({ 0.75, 0.9, 0.55 })[i], ({ 0.3, 0.75, 0.85 })[i]), Size = UDim2.fromOffset(({ 520, 380, 300 })[i], ({ 520, 380, 300 })[i]), ZIndex = 10, Parent = screen })
+	UI.corner(blob, 999)
+	new("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) }), Parent = blob })
+end
 -- blocky city skyline wallpaper
 
 local desk = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(40, 40), Size = UDim2.new(0, 400, 1, -120), ZIndex = 11, Parent = screen })
@@ -330,7 +380,7 @@ local function bootThen(after: () -> ())
 	booted = true
 	local dur = long and 2.2 or 0.8
 	local boot = new("Frame", { BackgroundColor3 = Color3.fromRGB(6, 8, 20), Size = UDim2.fromScale(1, 1), ZIndex = 80, Parent = screen })
-	UI.corner(boot, 22)
+	new("UICorner", { CornerRadius = UDim.new(0, 6), Parent = boot })
 	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(14, 18, 48), Color3.fromRGB(4, 4, 12)), Parent = boot })
 	-- logo: four coloured blocks turning into a diamond
 	local logo = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.4), Size = UDim2.fromOffset(120, 120), Rotation = 0, ZIndex = 81, Parent = boot })
@@ -377,8 +427,12 @@ end
 function Shell.openComputer(appId: string?)
 	comp.Visible = true
 	hud.Visible = true
-	screen.Size = UDim2.new(0.8, 0, 1, -190)
-	UI.tween(screen, 0.2, { Size = UDim2.new(0.84, 0, 1, -150) })
+	if Shell.laptopBrand then
+		Shell.laptopBrand.Text = ((Net.state and Net.state.company) or ""):upper()
+	end
+	local ls = laptop:FindFirstChildOfClass("UIScale") or new("UIScale", { Parent = laptop })
+	ls.Scale = 0.92
+	UI.tween(ls, 0.25, { Scale = 1 }, Enum.EasingStyle.Back)
 	hint.Visible = false
 	bootThen(function()
 		if appId then
@@ -519,19 +573,20 @@ afterProblems = function(s)
 		trainMini.Visible = true
 		local prog, left
 		if s.training then
-			trainL.Text = "TRAINING " .. s.training.name:upper()
+			trainL.Text = s.training.name:upper()
 			prog = s.training.progress
 			left = math.ceil(s.training.daysLeft or s.training.days)
 		else
 			local b = boosting.boosting
-			trainL.Text = "TRAINING STATS  " .. boosting.name:upper()
+			trainL.Text = "STATS: " .. boosting.name:upper()
 			local total = math.max(1, b.doneDay - b.startDay)
 			prog = math.clamp((s.day - b.startDay) / total, 0, 1)
 			left = math.max(0, b.doneDay - s.day)
 		end
 		tapState.progress = prog
-		trainFill.Size = UDim2.fromScale(prog, 1)
-		trainSub.Text = string.format("%d%%   about %d days left", math.floor(prog * 100), left)
+		trainFill.Size = UDim2.fromScale(math.max(prog, 0.06), 1)
+		trainPct.Text = math.floor(prog * 100) .. "%"
+		trainSub.Text = left .. " DAYS LEFT"
 		tapState.taps = s.taps or tapState.taps
 		local need = 40
 		local finish = tapState.taps >= need
@@ -539,17 +594,20 @@ afterProblems = function(s)
 			tapState.finish = finish
 			if finish then
 				tapBtn.Text = "FINISH NOW  R$ 39"
-				tapBtn.TextSize = 13
+				tapBtn.TextSize = 15
+				ring.BackgroundColor3 = T.yellow
 				tapBtn.TextColor3 = Color3.fromRGB(40, 22, 0)
 				tapGrad.Color = ColorSequence.new(Color3.fromRGB(255, 240, 130), Color3.fromRGB(220, 130, 0))
 			else
 				tapBtn.Text = "TAP!"
-				tapBtn.TextSize = 22
+				tapBtn.TextSize = 26
+				ring.BackgroundColor3 = T.green
 				tapBtn.TextColor3 = Color3.new(1, 1, 1)
 				tapGrad.Color = ColorSequence.new(Color3.fromRGB(120, 255, 160), Color3.fromRGB(0, 160, 80))
 			end
 		end
-		tapsL.Text = finish and "TIRED OF TAPPING? FINISH IT INSTANTLY" or string.format("TAP TO SPEED UP   %d / %d", tapState.taps, need)
+		tapsL.Text = finish and "OR FINISH IT INSTANTLY" or string.format("TAPS  %d / %d", tapState.taps, need)
+		tapBar.Size = UDim2.fromScale(math.clamp(tapState.taps / need, 0, 1), 1)
 	else
 		trainMini.Visible = false
 		tapState.taps = 0

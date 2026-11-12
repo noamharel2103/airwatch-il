@@ -79,7 +79,8 @@ local function mountComputer(ctx, s)
 	end
 end
 
--- ONE simple page: three meters, the best GPU right now, more space, and one fix-it button.
+-- Simple store page: one status line, amount in the title bar, a clean list of GPUs (best first),
+-- one "more space" row, and the Robux GPU packs at the bottom.
 local showAll = false
 function App.mount(ctx, s)
 	if not s then
@@ -87,109 +88,71 @@ function App.mount(ctx, s)
 	end
 	UI.clear(ctx.tabs)
 	UI.clear(ctx.body)
-	local sc = UI.scroll(ctx.body)
-	UI.list(sc, 12)
-	UI.pad(sc, 0, 0, 10, 8)
-	-- meters
-	local meters = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 110), Parent = sc })
-	new("UIGridLayout", { CellSize = UDim2.new(1 / 3, -8, 1, 0), CellPadding = UDim2.fromOffset(12, 0), Parent = meters })
-	local function meter(title, value, frac, color)
-		local c = new("Frame", { BackgroundColor3 = color, Parent = meters })
-		UI.corner(c, 2)
-		UI.stroke(c, T.line, 3)
-		new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(150, 150, 150)), Parent = c })
-		new("TextLabel", { Text = title, FontFace = UI.HEAVY, TextSize = 12, Position = UDim2.fromOffset(14, 10), Size = UDim2.new(1, -28, 0, 18), Parent = c })
-		new("TextLabel", { Text = value, FontFace = UI.HEAVY, TextSize = 22, Position = UDim2.fromOffset(14, 34), Size = UDim2.new(1, -28, 0, 30), Parent = c })
-		local h = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(14, 76), Size = UDim2.new(1, -28, 0, 14), Parent = c })
-		UI.bar(h, math.clamp(frac, 0, 1), Color3.new(1, 1, 1), 14)
-	end
-	meter("COMPUTE POWER", string.format("%s H100", Format.count(math.floor(s.clusterPower))), s.clusterPower / math.max(s.gpuCap, 1), T.orange)
-	meter("SPACE FOR GPUS", Format.count(s.gpuUsed or 0) .. " / " .. Format.count(s.gpuSlots or 4), (s.gpuUsed or 0) / math.max(s.gpuSlots or 4, 1), T.accent)
-	local sup = s.pcSupply or { gb = 16, gbNeed = 16, cool = 0.3, coolNeed = 0.3 }
-	local okSupply = sup.gb >= sup.gbNeed and sup.cool >= sup.coolNeed
-	meter("RAM + COOLING", okSupply and "ALL GOOD" or "NOT ENOUGH", okSupply and 1 or math.min(sup.gb / math.max(sup.gbNeed, 1), sup.cool / math.max(sup.coolNeed, 0.1)), okSupply and T.green or T.red)
-	if not okSupply then
-		UI.button(sc, "FIX RAM AND COOLING AUTOMATICALLY", function()
-			Net.act("autoSupply")
-		end, T.red, { Size = UDim2.new(1, -8, 0, 56), TextSize = 15 })
-	end
-
-	-- the best GPU you can get right now
-	local best
-	for _, hw in ipairs(Hardware.list) do
-		if hw.id ~= "laptop" and Hardware.available(hw, s.day) and (not best or hw.power > best.power) then
-			best = hw
-		end
-	end
-	local function gpuCard(hw, big: boolean)
-		local c = new("Frame", { BackgroundColor3 = big and Color3.fromRGB(40, 70, 140) or T.panel2, Size = UDim2.new(1, -8, 0, big and 190 or 120), Parent = sc })
-		UI.skin(c, big and Color3.fromRGB(40, 70, 140) or T.panel2)
-		local ic = UI.icon(c, "gpu", T.orange, big and 130 or 80)
-		ic.Position = UDim2.fromOffset(18, big and 30 or 20)
-		local x = big and 170 or 116
-		if big then
-			new("TextLabel", { Text = "BEST GPU THIS YEAR", FontFace = UI.BOLD, TextSize = 11, TextColor3 = T.yellow, Position = UDim2.fromOffset(x, 18), Size = UDim2.new(1, -x - 330, 0, 16), Parent = c })
-		end
-		new("TextLabel", { Text = hw.name, FontFace = UI.HEAVY, TextSize = big and 24 or 17, Position = UDim2.fromOffset(x, big and 40 or 16), Size = UDim2.new(1, -x - 330, 0, 30), Parent = c })
-		new("TextLabel", { Text = string.format("As strong as %g H100s.  %s", hw.power, hw.blurb), TextSize = 15, TextColor3 = T.sub, Position = UDim2.fromOffset(x, big and 76 or 48), Size = UDim2.new(1, -x - 330, 0, 44), TextYAlignment = Enum.TextYAlignment.Top, Parent = c })
-		local own = (s.gpus.owned[hw.id] or 0) + (s.gpus.rented[hw.id] or 0)
-		new("TextLabel", { Text = "YOU HAVE " .. Format.count(own), FontFace = UI.BOLD, TextSize = 12, TextColor3 = T.green, Position = UDim2.fromOffset(x, big and 140 or 92), Size = UDim2.new(0, 300, 0, 18), Parent = c })
-		local price = Hardware.buyPrice(hw, s.year) * qty
-		local col = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -16, 0.5, 0), Size = UDim2.fromOffset(300, big and 150 or 96), Parent = c })
-		UI.list(col, 8)
-		local id = hw.id
-		UI.button(col, "BUY " .. qty .. "  " .. Format.money(price), function()
-			Net.act("buy", id, qty)
-		end, s.cash >= price and T.green or "ghost", { Size = UDim2.new(1, 0, 0, big and 70 or 46), TextSize = big and 16 or 13 })
-		if big then
-			UI.button(col, "RENT " .. qty .. "  (" .. Format.money(Hardware.rentPrice(hw, s.year) * 24 * 30 * qty) .. "/MO)", function()
-				Net.act("rent", id, qty)
-			end, T.accent, { Size = UDim2.new(1, 0, 0, 46), TextSize = 11 })
-		end
-	end
-	-- how many at once
-	local qrow = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 46), Parent = sc })
-	UI.list(qrow, 8, true)
-	UI.label(qrow, "HOW MANY:", 14, T.text, { FontFace = UI.HEAVY, Size = UDim2.fromOffset(150, 46) })
-	for _, q in ipairs({ 1, 10, 100, 1000, 10000 }) do
-		UI.button(qrow, "x" .. Format.count(q), function()
+	for _, q in ipairs({ 1, 10, 100, 1000 }) do
+		UI.button(ctx.tabs, "x" .. Format.count(q), function()
 			qty = q
 			App.mount(ctx, Net.state)
-		end, qty == q and T.yellow or "ghost", { Size = UDim2.fromOffset(110, 44), TextSize = 13 })
+		end, qty == q and T.yellow or "ghost", { Size = UDim2.fromOffset(96, 36), TextSize = 13 })
 	end
-	if best then
-		gpuCard(best, true)
+	local sc = UI.scroll(ctx.body)
+	UI.list(sc, 10)
+	UI.pad(sc, 0, 0, 10, 8)
+
+	-- one status line
+	local sup = s.pcSupply or { gb = 16, gbNeed = 16, cool = 0.6, coolNeed = 0.5 }
+	local okSupply = sup.gb >= sup.gbNeed and sup.cool >= sup.coolNeed
+	local bar = new("Frame", { BackgroundColor3 = T.panel2, Size = UDim2.new(1, -8, 0, 56), Parent = sc })
+	UI.corner(bar, 2)
+	UI.stroke(bar, T.line, 3)
+	new("TextLabel", { Text = string.format("POWER  %s H100      SPACE  %s / %s", Format.count(math.floor(s.clusterPower)), Format.count(s.gpuUsed or 0), Format.count(s.gpuSlots or 4)), FontFace = UI.BOLD, TextSize = 14, Position = UDim2.fromOffset(16, 0), Size = UDim2.new(1, -300, 1, 0), Parent = bar })
+	if okSupply then
+		new("TextLabel", { Text = "RAM + COOLING OK", FontFace = UI.BOLD, TextSize = 12, TextColor3 = T.green, TextXAlignment = Enum.TextXAlignment.Right, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, 0), Size = UDim2.fromOffset(260, 56), Parent = bar })
+	else
+		UI.button(bar, "FIX RAM + COOLING", function()
+			Net.act("autoSupply")
+		end, T.red, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(260, 42), TextSize = 12 })
 	end
 
-	-- Robux GPU packs: cheap rack, mid cluster, mega datacenter (space and power included)
-	local ShopData = require(Shared.Shop)
-	UI.label(sc, "GPU PACKS  (SPACE AND POWER INCLUDED)", 16, T.yellow, { FontFace = UI.HEAVY })
-	local packs = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 250), Parent = sc })
-	new("UIGridLayout", { CellSize = UDim2.new(1 / 3, -8, 1, 0), CellPadding = UDim2.fromOffset(12, 0), Parent = packs })
-	for _, key in ipairs({ "gpuS", "gpuM", "gpuL" }) do
-		local item = ShopData.productByKey[key]
-		local c = new("Frame", { BackgroundColor3 = item.color, Parent = packs })
-		UI.corner(c, 2)
-		UI.stroke(c, item.gpuTier == 3 and Color3.fromRGB(255, 230, 120) or T.line, item.gpuTier == 3 and 5 or 3)
-		new("UIGradient", { Rotation = 90, Color = ColorSequence.new(item.color:Lerp(Color3.new(1, 1, 1), 0.15), item.color:Lerp(Color3.new(0, 0, 0), 0.55)), Parent = c })
-		local ic = UI.icon(c, "gpu", item.color, 84)
-		ic.AnchorPoint = Vector2.new(0.5, 0)
-		ic.Position = UDim2.new(0.5, 0, 0, 12)
-		for i = 2, item.gpuTier do -- stacked look for bigger packs
-			local extra = UI.icon(c, "gpu", item.color, 60)
-			extra.Position = UDim2.new(0.5, 10 + (i - 1) * 26, 0, 40)
-			extra.ZIndex = 0
+	-- GPUs, best first
+	local list = {}
+	for _, hw in ipairs(Hardware.list) do
+		if hw.id ~= "laptop" and Hardware.available(hw, s.day) then
+			table.insert(list, hw)
 		end
-		new("TextLabel", { Text = item.name, FontFace = UI.HEAVY, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Center, Position = UDim2.fromOffset(8, 104), Size = UDim2.new(1, -16, 0, 22), Parent = c })
-		new("TextLabel", { Text = item.desc, TextSize = 15, TextXAlignment = Enum.TextXAlignment.Center, Position = UDim2.fromOffset(12, 130), Size = UDim2.new(1, -24, 0, 44), Parent = c })
-		UI.button(c, "R$ " .. item.robux, function()
-			if App.buyProduct then
-				App.buyProduct(key)
-			end
-		end, Color3.fromRGB(0, 200, 90), { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -12), Size = UDim2.new(1, -24, 0, 52), TextSize = 17 })
+	end
+	table.sort(list, function(a, b)
+		return a.power > b.power
+	end)
+	for i, hw in ipairs(list) do
+		if i > 3 and not showAll then
+			break
+		end
+		local best = i == 1
+		local c = new("Frame", { BackgroundColor3 = best and Color3.fromRGB(36, 64, 130) or T.panel2, Size = UDim2.new(1, -8, 0, 96), Parent = sc })
+		UI.corner(c, 2)
+		UI.stroke(c, best and T.yellow or T.line, 3)
+		local ic = UI.icon(c, "gpu", T.orange, 72)
+		ic.Position = UDim2.fromOffset(12, 12)
+		new("TextLabel", { Text = hw.name .. (best and "   BEST" or ""), FontFace = UI.HEAVY, TextSize = 16, Position = UDim2.fromOffset(98, 16), Size = UDim2.new(1, -520, 0, 24), Parent = c })
+		local own = (s.gpus.owned[hw.id] or 0) + (s.gpus.rented[hw.id] or 0)
+		new("TextLabel", { Text = string.format("= %g H100      you have %s", hw.power, Format.count(own)), TextSize = 15, TextColor3 = T.sub, Position = UDim2.fromOffset(98, 50), Size = UDim2.new(1, -520, 0, 22), Parent = c })
+		local price = Hardware.buyPrice(hw, s.year) * qty
+		local id = hw.id
+		UI.button(c, "BUY " .. Format.count(qty) .. "  " .. Format.money(price), function()
+			Net.act("buy", id, qty)
+		end, s.cash >= price and T.green or "ghost", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -168, 0.5, 0), Size = UDim2.fromOffset(240, 60), TextSize = 13 })
+		UI.button(c, "RENT", function()
+			Net.act("rent", id, qty)
+		end, T.accent, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), Size = UDim2.fromOffset(144, 60), TextSize = 13 })
+	end
+	if #list > 3 then
+		UI.button(sc, showAll and "SHOW LESS" or ("SHOW ALL " .. #list .. " GPUS"), function()
+			showAll = not showAll
+			App.mount(ctx, Net.state)
+		end, "ghost", { Size = UDim2.new(1, -8, 0, 40), TextSize = 12 })
 	end
 
-	-- more space: just the next place you can buy
+	-- more space (only the next place that makes sense)
 	local nextPlace
 	for _, st in ipairs(Catalog.storage) do
 		if not nextPlace or (s.cash >= st.cost and st.slots > nextPlace.slots) then
@@ -197,29 +160,39 @@ function App.mount(ctx, s)
 		end
 	end
 	if nextPlace then
-		local c = new("Frame", { BackgroundColor3 = Color3.fromRGB(30, 90, 70), Size = UDim2.new(1, -8, 0, 110), Parent = sc })
-		UI.skin(c, Color3.fromRGB(30, 90, 70))
-		local ic = UI.icon(c, "company", T.teal, 76)
-		ic.Position = UDim2.fromOffset(18, 17)
-		new("TextLabel", { Text = "NEED MORE SPACE?  " .. nextPlace.name:upper(), FontFace = UI.HEAVY, TextSize = 16, Position = UDim2.fromOffset(112, 18), Size = UDim2.new(1, -440, 0, 24), Parent = c })
-		new("TextLabel", { Text = string.format("Room for %s more GPUs. Rent %s a month.", Format.count(nextPlace.slots), Format.money(nextPlace.rent)), TextSize = 15, TextColor3 = T.sub, Position = UDim2.fromOffset(112, 50), Size = UDim2.new(1, -440, 0, 40), Parent = c })
+		local c = new("Frame", { BackgroundColor3 = Color3.fromRGB(26, 84, 66), Size = UDim2.new(1, -8, 0, 84), Parent = sc })
+		UI.corner(c, 2)
+		UI.stroke(c, T.line, 3)
+		local ic = UI.icon(c, "company", T.teal, 60)
+		ic.Position = UDim2.fromOffset(12, 12)
+		new("TextLabel", { Text = "MORE SPACE:  " .. nextPlace.name:upper(), FontFace = UI.HEAVY, TextSize = 14, Position = UDim2.fromOffset(86, 14), Size = UDim2.new(1, -380, 0, 22), Parent = c })
+		new("TextLabel", { Text = string.format("+%s GPUs   |   %s a month", Format.count(nextPlace.slots), Format.money(nextPlace.rent)), TextSize = 15, TextColor3 = T.sub, Position = UDim2.fromOffset(86, 44), Size = UDim2.new(1, -380, 0, 22), Parent = c })
 		local sid = nextPlace.id
 		UI.button(c, "BUY  " .. Format.money(nextPlace.cost), function()
 			Net.act("buyStorage", sid)
-		end, s.cash >= nextPlace.cost and T.green or "ghost", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -16, 0.5, 0), Size = UDim2.fromOffset(300, 62), TextSize = 15 })
+		end, s.cash >= nextPlace.cost and T.green or "ghost", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), Size = UDim2.fromOffset(280, 56), TextSize = 13 })
 	end
 
-	-- older GPUs, hidden unless you want them
-	UI.button(sc, showAll and "HIDE OLDER GPUS" or "SHOW OLDER GPUS", function()
-		showAll = not showAll
-		App.mount(ctx, Net.state)
-	end, "ghost", { Size = UDim2.new(1, -8, 0, 44), TextSize = 12 })
-	if showAll then
-		for _, hw in ipairs(Hardware.list) do
-			if hw ~= best and hw.id ~= "laptop" and Hardware.available(hw, s.day) then
-				gpuCard(hw, false)
+	-- Robux GPU packs
+	local ShopData = require(Shared.Shop)
+	UI.label(sc, "GPU PACKS", 16, T.yellow, { FontFace = UI.HEAVY })
+	local packs = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 96), Parent = sc })
+	new("UIGridLayout", { CellSize = UDim2.new(1 / 3, -8, 1, 0), CellPadding = UDim2.fromOffset(12, 0), Parent = packs })
+	for _, key in ipairs({ "gpuS", "gpuM", "gpuL" }) do
+		local item = ShopData.productByKey[key]
+		local c = new("TextButton", { Text = "", AutoButtonColor = false, BackgroundColor3 = item.color, Parent = packs })
+		UI.corner(c, 2)
+		UI.stroke(c, T.line, 3)
+		new("UIGradient", { Rotation = 90, Color = ColorSequence.new(item.color:Lerp(Color3.new(1, 1, 1), 0.15), item.color:Lerp(Color3.new(0, 0, 0), 0.45)), Parent = c })
+		local ic = UI.icon(c, "gpu", item.color, 64)
+		ic.Position = UDim2.fromOffset(12, 16)
+		new("TextLabel", { Text = item.name, FontFace = UI.HEAVY, TextSize = 13, Position = UDim2.fromOffset(86, 18), Size = UDim2.new(1, -96, 0, 20), Parent = c })
+		new("TextLabel", { Text = "R$ " .. item.robux, FontFace = UI.HEAVY, TextSize = 18, TextColor3 = Color3.fromRGB(180, 255, 200), Position = UDim2.fromOffset(86, 50), Size = UDim2.new(1, -96, 0, 26), Parent = c })
+		c.MouseButton1Click:Connect(function()
+			if App.buyProduct then
+				App.buyProduct(key)
 			end
-		end
+		end)
 	end
 end
 
