@@ -13,6 +13,8 @@ local new = UI.new
 local App = { id = "team", name = "Team", icon = "team", color = Color3.fromRGB(150, 90, 240) }
 local page = "chat"
 local channel = "general"
+local searchRole = "any"
+local minRarity = 1
 
 function App.mount(ctx, s)
 	if not s then
@@ -27,7 +29,7 @@ function App.mount(ctx, s)
 		end, page == p[1] and "primary" or "ghost", { Size = UDim2.fromOffset(100, 34) })
 	end
 	if page == "chat" then
-		local side = new("Frame", { BackgroundColor3 = Color3.fromRGB(236, 226, 255), Size = UDim2.new(0, 220, 1, 0), Parent = ctx.body })
+		local side = new("Frame", { BackgroundColor3 = T.panel2, Size = UDim2.new(0, 220, 1, 0), Parent = ctx.body })
 		UI.corner(side, 12)
 		UI.pad(side, 12)
 		UI.list(side, 4)
@@ -115,11 +117,14 @@ function App.mount(ctx, s)
 		-- everyone
 		UI.label(sc, "Your people", 18, T.text, { FontFace = UI.HEAVY })
 		if n == 0 then
-			UI.label(sc, "Nobody yet. Hire in the Hire tab or find stars on LinkedIn.", 14, T.dim)
+			UI.label(sc, "Nobody yet. Find people in the Hire tab.", 14, T.dim)
 		end
 		for _, p in ipairs(s.people or {}) do
 			local c = new("Frame", { BackgroundColor3 = T.panel2, Size = UDim2.new(1, -8, 0, 78), Parent = sc })
 			UI.stroke(c, T.line, 3)
+			local rr = Staff.RARITIES[p.rarity or 1]
+			new("Frame", { BackgroundColor3 = rr.color, Size = UDim2.new(0, 8, 1, 0), Parent = c })
+			new("TextLabel", { Text = rr.name, FontFace = UI.HEAVY, TextSize = 10, TextColor3 = rr.color, TextXAlignment = Enum.TextXAlignment.Right, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -410, 0, 8), Size = UDim2.fromOffset(140, 16), Parent = c })
 			local role = Staff.byId[p.role]
 			local away = p.offUntil and p.offUntil > s.day
 			new("TextLabel", { Text = p.name .. (away and "   (DAY OFF)" or ""), FontFace = UI.HEAVY, TextSize = 14, TextColor3 = T.text, BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 8), Size = UDim2.new(0.5, 0, 0, 18), TextXAlignment = Enum.TextXAlignment.Left, Parent = c })
@@ -143,51 +148,121 @@ function App.mount(ctx, s)
 		end
 		return
 	end
-	-- hire
+	-- hire: pay a place to search, filter by role and rarity, then pick people
 	local sc = UI.scroll(ctx.body)
-	UI.list(sc, 10)
+	UI.list(sc, 12)
+	UI.pad(sc, 0, 0, 10, 8)
 	local stage = Catalog.officeStages[s.office]
-	UI.label(sc, string.format("%d / %d desks used. Salaries are real %d numbers. Most of the pay is equity.", s.headcount, stage.maxStaff, s.year), 14, T.sub)
-	local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = sc })
-	new("UIGridLayout", { CellSize = UDim2.new(0.5, -6, 0, 140), CellPadding = UDim2.fromOffset(10, 10), Parent = grid })
-	for _, r in ipairs(Staff.roles) do
-		local cand
-		for _, c in ipairs(s.candidates) do
-			if c.role == r.id then
-				cand = c
-				break
+	local head = new("Frame", { BackgroundColor3 = T.panel2, Size = UDim2.new(1, -8, 0, 70), Parent = sc })
+	UI.skin(head, T.panel2)
+	new("TextLabel", { Text = string.format("%d / %d DESKS USED", s.headcount, stage.maxStaff), FontFace = UI.HEAVY, TextSize = 18, TextColor3 = s.headcount >= stage.maxStaff and T.red or T.green, Position = UDim2.fromOffset(16, 10), Size = UDim2.new(0.5, 0, 0, 24), Parent = head })
+	new("TextLabel", { Text = "Bigger office = more desks. Rare people do the work of many.", TextSize = 14, TextColor3 = T.sub, Position = UDim2.fromOffset(16, 38), Size = UDim2.new(0.6, 0, 0, 20), Parent = head })
+	-- advanced search filters
+	local roleName = searchRole == "any" and "ANY JOB" or Staff.byId[searchRole].name:upper()
+	UI.button(head, "JOB: " .. roleName .. "  >", function()
+		local ids = { "any" }
+		for _, r in ipairs(Staff.roles) do
+			table.insert(ids, r.id)
+		end
+		local idx = table.find(ids, searchRole) or 1
+		searchRole = ids[idx % #ids + 1]
+		App.mount(ctx, Net.state)
+	end, T.accent, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -270, 0.5, 0), Size = UDim2.fromOffset(300, 48), TextSize = 12 })
+	local rar = Staff.RARITIES[minRarity]
+	UI.button(head, "MIN: " .. rar.name .. "  >", function()
+		minRarity = minRarity % #Staff.RARITIES + 1
+		App.mount(ctx, Net.state)
+	end, rar.color, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), Size = UDim2.fromOffset(250, 48), TextSize = 12 })
+
+	-- the places
+	local places = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 210), Parent = sc })
+	new("UIGridLayout", { CellSize = UDim2.new(0.25, -9, 1, 0), CellPadding = UDim2.fromOffset(12, 0), Parent = places })
+	for _, pl in ipairs(Staff.PLACES) do
+		local locked = s.office < pl.office
+		local c = new("Frame", { BackgroundColor3 = locked and Color3.fromRGB(50, 56, 80) or pl.color, Parent = places })
+		UI.corner(c, 2)
+		UI.stroke(c, T.line, 3)
+		new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(150, 150, 150)), Parent = c })
+		new("TextLabel", { Text = pl.name, FontFace = UI.HEAVY, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Center, Position = UDim2.fromOffset(8, 12), Size = UDim2.new(1, -16, 0, 20), Parent = c })
+		new("TextLabel", { Text = pl.desc, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Center, Position = UDim2.fromOffset(10, 38), Size = UDim2.new(1, -20, 0, 40), Parent = c })
+		-- odds strip
+		local odds = new("Frame", { BackgroundColor3 = T.line, Position = UDim2.fromOffset(12, 88), Size = UDim2.new(1, -24, 0, 14), Parent = c })
+		local total = 0
+		for i, w in ipairs(pl.weights) do
+			if i >= minRarity then
+				total += w
 			end
 		end
-		local c = new("Frame", { BackgroundColor3 = T.panel2, Parent = grid })
-		UI.corner(c, 14)
-		UI.pad(c, 12, 14)
-		new("TextLabel", { Text = r.name .. "   (" .. (s.staff[r.id] or 0) .. ")", FontFace = UI.HEAVY, TextSize = 17, Size = UDim2.new(1, 0, 0, 22), Parent = c })
-		new("TextLabel", { Text = r.blurb, TextSize = 12, TextColor3 = T.sub, Position = UDim2.fromOffset(0, 24), Size = UDim2.new(1, 0, 0, 30), TextYAlignment = Enum.TextYAlignment.Top, Parent = c })
-		new("TextLabel", { Text = cand and ("Candidate: " .. cand.name .. ", " .. cand.from) or "", TextSize = 12, TextColor3 = T.text, Position = UDim2.fromOffset(0, 56), Size = UDim2.new(1, 0, 0, 16), Parent = c })
-		new("TextLabel", { Text = string.format("Total comp %s/yr, cash about %s/mo", Format.money(Staff.tc(r.id, s.year)), Format.money(Staff.monthlyCash(r.id, s.year))), TextSize = 12, TextColor3 = T.yellow, Position = UDim2.fromOffset(0, 74), Size = UDim2.new(1, 0, 0, 16), Parent = c })
-		local row = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 96), Size = UDim2.new(1, 0, 0, 32), Parent = c })
-		UI.list(row, 6, true)
-		UI.button(row, "Hire", function()
-			Net.act("hire", r.id, 1)
-		end, "success", { Size = UDim2.fromOffset(80, 30) })
-		UI.button(row, "Hire 5", function()
-			Net.act("hire", r.id, 5)
-		end, "primary", { Size = UDim2.fromOffset(90, 30) })
-		UI.button(row, "Let go", function()
-			Net.act("fire", r.id)
-		end, "ghost", { Size = UDim2.fromOffset(84, 30) })
+		local x = 0
+		for i, w in ipairs(pl.weights) do
+			if i >= minRarity and w > 0 and total > 0 then
+				new("Frame", { BackgroundColor3 = Staff.RARITIES[i].color, Position = UDim2.fromScale(x, 0), Size = UDim2.fromScale(w / total, 1), Parent = odds })
+				x += w / total
+			end
+		end
+		local cost = Staff.searchCost(pl, s.year, minRarity, searchRole ~= "any")
+		local pid = pl.id
+		UI.button(c, locked and ("NEEDS " .. Catalog.officeStages[pl.office].name:upper()) or ("SEARCH  " .. Format.money(cost)), function()
+			if not locked then
+				Net.act("recruitSearch", pid, { role = searchRole, minRarity = minRarity })
+			end
+		end, locked and "ghost" or T.green, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -12), Size = UDim2.new(1, -24, 0, 52), TextSize = 12 })
 	end
+
+	-- results
+	local results = s.search or {}
+	if #results > 0 then
+		local placeName = s.searchPlace and Staff.placeById[s.searchPlace] and Staff.placeById[s.searchPlace].name or "SEARCH"
+		UI.label(sc, placeName .. " FOUND THESE PEOPLE", 16, T.yellow, { FontFace = UI.HEAVY })
+		local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = sc })
+		new("UIGridLayout", { CellSize = UDim2.new(1 / 3, -8, 0, 250), CellPadding = UDim2.fromOffset(12, 12), Parent = grid })
+		for _, c in ipairs(results) do
+			local r = Staff.RARITIES[c.rarity or 1]
+			local role = Staff.byId[c.role]
+			local f = new("Frame", { BackgroundColor3 = r.color, Parent = grid })
+			UI.corner(f, 2)
+			new("UIStroke", { Color = c.rarity >= 5 and Color3.fromRGB(255, 240, 150) or T.line, Thickness = c.rarity >= 5 and 5 or 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = f })
+			new("UIGradient", { Rotation = 90, Color = ColorSequence.new(r.color:Lerp(Color3.new(1, 1, 1), 0.1), r.color:Lerp(Color3.new(0, 0, 0), 0.6)), Parent = f })
+			local tag = new("TextLabel", { Text = r.name, FontFace = UI.HEAVY, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Center, BackgroundTransparency = 0, BackgroundColor3 = T.line, Position = UDim2.fromOffset(10, 10), Size = UDim2.fromOffset(150, 26), Parent = f })
+			tag.TextColor3 = r.color:Lerp(Color3.new(1, 1, 1), 0.3)
+			-- face: real avatar for friends, a coloured block for everyone else
+			local face = new("ImageLabel", { BackgroundColor3 = Color3.fromRGB(30, 34, 60), Image = c.userId and ("rbxthumb://type=AvatarHeadShot&id=" .. c.userId .. "&w=150&h=150") or "", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -10, 0, 10), Size = UDim2.fromOffset(72, 72), Parent = f })
+			UI.stroke(face, T.line, 3)
+			if not c.userId then
+				new("TextLabel", { Text = c.name:sub(1, 1), FontFace = UI.HEAVY, TextSize = 30, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromScale(1, 1), Parent = face })
+			end
+			if c.userId then
+				local fr = new("TextLabel", { Text = "FRIEND", FontFace = UI.HEAVY, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Center, BackgroundTransparency = 0, BackgroundColor3 = Color3.fromRGB(0, 200, 255), Position = UDim2.fromOffset(10, 42), Size = UDim2.fromOffset(90, 22), Parent = f })
+				local _ = fr
+			end
+			new("TextLabel", { Text = c.name, FontFace = UI.HEAVY, TextSize = 16, Position = UDim2.fromOffset(12, 90), Size = UDim2.new(1, -24, 0, 24), TextTruncate = Enum.TextTruncate.AtEnd, TextWrapped = false, Parent = f })
+			new("TextLabel", { Text = (role and role.name or c.role) .. "  |  " .. (c.from or ""), TextSize = 14, Position = UDim2.fromOffset(12, 118), Size = UDim2.new(1, -24, 0, 36), TextYAlignment = Enum.TextYAlignment.Top, Parent = f })
+			new("TextLabel", { Text = string.format("WORKS LIKE %s PEOPLE", r.mult == math.floor(r.mult) and tostring(r.mult) or string.format("%.1f", r.mult)), FontFace = UI.BOLD, TextSize = 12, TextColor3 = Color3.fromRGB(255, 240, 160), Position = UDim2.fromOffset(12, 156), Size = UDim2.new(1, -24, 0, 18), Parent = f })
+			local signing = Staff.monthlyCash(c.role, s.year) * 1.5 * r.mult
+			local key = c.key
+			UI.button(f, "HIRE  " .. Format.money(signing), function()
+				Net.act("recruit", key)
+			end, T.green, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -12), Size = UDim2.new(1, -24, 0, 50), TextSize = 13 })
+		end
+	else
+		UI.label(sc, "Pick a place and press SEARCH. Rarer people cost more but do the work of a whole team. Your Roblox friends show up too!", 15, T.sub)
+	end
+	UI.button(sc, "LEGEND RECRUIT  (GOLD SHOP)", function()
+		if App.openShop then
+			App.openShop("legendhire")
+		end
+	end, Color3.fromRGB(255, 185, 0), { Size = UDim2.new(1, -8, 0, 54), TextSize = 14 })
 end
 
 function App.key(s)
-	local k = page .. channel .. #s.chat .. s.headcount .. s.year .. #(s.requests or {}) .. tostring((s.partyReady or 0) <= s.day)
+	local k = page .. channel .. #s.chat .. s.headcount .. s.year .. #(s.requests or {}) .. tostring((s.partyReady or 0) <= s.day) .. searchRole .. minRarity .. s.office
 	if page == "people" then
 		for _, p in ipairs(s.people or {}) do
 			k ..= tostring(p.id) .. math.floor((p.morale or 0) / 5) .. (p.rank or 1) .. (p.pc or 0) .. tostring(p.offUntil and p.offUntil > s.day)
 		end
 	end
-	for _, c in ipairs(s.candidates) do
-		k ..= c.name
+	for _, c in ipairs(s.search or {}) do
+		k ..= c.key or ""
 	end
 	return k
 end

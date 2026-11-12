@@ -155,7 +155,7 @@ local function buildModels(body, s)
 	end)
 	-- what kind of AI to build (cycles through every type; newer ones unlock over the years)
 	local kind = MT.get(newKind)
-	local open = MT.unlocked(kind, s.day)
+	local open = MT.unlocked(kind, s.day) or (s.earlyKinds and s.earlyKinds[kind.id]) == true
 	UI.button(left, open and ("TYPE: " .. kind.name .. "  >") or (kind.name .. " IN " .. Format.monthYear(kind.fromDay):upper()), function()
 		local idx = 1
 		for i, k in ipairs(MT.list) do
@@ -165,9 +165,15 @@ local function buildModels(body, s)
 		end
 		newKind = MT.list[idx % #MT.list + 1].id
 		Lab.mount(Lab.ctx, Net.state)
-	end, open and kind.color or "ghost", { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 0, 1, -132), Size = UDim2.new(1, 0, 0, 54), TextSize = 13 })
+	end, open and kind.color or Color3.fromRGB(90, 70, 20), { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 0, 1, -132), Size = UDim2.new(1, 0, 0, 54), TextSize = 13 })
 	UI.button(left, s.training and "TRAINING..." or "+ CREATE MODEL", function()
 		if s.training then
+			return
+		end
+		if not open then
+			if Lab.openShop then
+				Lab.openShop("unlockkind", nil)
+			end
 			return
 		end
 		if Net.act("createModel", newName, newKind) then

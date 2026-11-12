@@ -70,7 +70,14 @@ function Format.money(n: number): string
 	local neg = n < 0
 	n = math.abs(n)
 	local s
-	if n >= 1e12 then
+	if n ~= n or n == math.huge then
+		s = "INFINITY"
+	elseif n >= 1e18 then
+		local e = math.floor(math.log10(n))
+		s = string.format("%.2fe%d", n / 10 ^ e, e)
+	elseif n >= 1e15 then
+		s = string.format("%.2fQa", n / 1e15)
+	elseif n >= 1e12 then
 		s = string.format("%.2fT", n / 1e12)
 	elseif n >= 1e9 then
 		s = string.format("%.2fB", n / 1e9)

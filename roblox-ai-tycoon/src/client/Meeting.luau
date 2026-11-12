@@ -1,102 +1,23 @@
 --!strict
--- Negotiation meeting: you sit across the desk from a banker or investor.
--- 3D scene in a ViewportFrame, offer paper on the desk, dialog box with moves.
+-- DEAL ROOM: a video call with a banker or investor. Left: their call window and what they say.
+-- Right: the contract with the numbers, a patience meter, and your moves as big tiles.
 local RS = game:GetService("ReplicatedStorage")
 local Format = require(RS:WaitForChild("Shared"):WaitForChild("Format"))
 local Net = require(script.Parent.Net)
 local UI = require(script.Parent.UI)
+local T = UI.T
 local new = UI.new
 
 local Meeting = {}
 
-local GOTHAM = Font.fromEnum(Enum.Font.GothamBold)
-local GOTHAM_REG = Font.fromEnum(Enum.Font.Gotham)
-local BLUE = Color3.fromRGB(0, 160, 230)
-local GREEN = Color3.fromRGB(70, 170, 85)
-local PANEL = Color3.fromRGB(222, 222, 222)
-local INK = Color3.fromRGB(15, 15, 15)
+local NAVY = Color3.fromRGB(16, 20, 44)
+local LINE = Color3.fromRGB(8, 10, 24)
+local GOLD = Color3.fromRGB(255, 196, 30)
 
 local root: Frame? = nil
 local seedShown: number? = nil
 local refs: any = {}
-local showMoves = false
-
-local function part(parent, size, cf, color, shape: Enum.PartType?, material: Enum.Material?)
-	local p = Instance.new("Part")
-	p.Anchored = true
-	p.Size = size
-	p.CFrame = cf
-	p.Color = color
-	p.Material = material or Enum.Material.SmoothPlastic
-	if shape then
-		p.Shape = shape
-	end
-	p.Parent = parent
-	return p
-end
-
-local function buildScene(vp: ViewportFrame, seed: number)
-	local r = Random.new(seed)
-	local world = Instance.new("WorldModel")
-	world.Parent = vp
-	-- window bars and sill
-	for x = -16, 16, 8 do
-		part(world, Vector3.new(0.5, 30, 0.5), CFrame.new(x, 10, -8), INK)
-	end
-	part(world, Vector3.new(60, 0.4, 1.2), CFrame.new(0, 1.6, -7.6), Color3.fromRGB(60, 60, 60))
-	part(world, Vector3.new(60, 8, 0.5), CFrame.new(0, -2.4, -7.4), Color3.fromRGB(175, 175, 170))
-	-- city outside
-	for i = 1, 9 do
-		local h = r:NextNumber(3, 10)
-		local g = r:NextInteger(110, 170)
-		part(world, Vector3.new(r:NextNumber(5, 9), h, 5), CFrame.new(-34 + i * 7 + r:NextNumber(-1, 1), -4 + h / 2, -40), Color3.fromRGB(g, g + 5, g + 15))
-	end
-	-- desk
-	part(world, Vector3.new(40, 0.6, 12), CFrame.new(0, 0.5, 2), Color3.fromRGB(92, 42, 30), nil, Enum.Material.Wood)
-	-- the person
-	local suits = { Color3.fromRGB(60, 110, 170), Color3.fromRGB(45, 45, 55), Color3.fromRGB(120, 40, 40), Color3.fromRGB(50, 110, 70) }
-	local hairs = { INK, Color3.fromRGB(90, 55, 30), Color3.fromRGB(200, 160, 60), Color3.fromRGB(150, 60, 30) }
-	local hats = { Color3.fromRGB(220, 50, 160), Color3.fromRGB(240, 180, 30), Color3.fromRGB(60, 200, 120), Color3.fromRGB(240, 90, 60) }
-	local suit = suits[r:NextInteger(1, #suits)]
-	local skin = Color3.fromRGB(225, 190, 20)
-	local z = -2
-	part(world, Vector3.new(3.4, 2.6, 1.4), CFrame.new(0, 2.1, z), suit)
-	part(world, Vector3.new(1.2, 0.4, 1.42), CFrame.new(0, 3.2, z), Color3.fromRGB(215, 215, 215))
-	part(world, Vector3.new(0.35, 2.2, 1.44), CFrame.new(0, 2.0, z), INK)
-	local head = CFrame.new(0, 4.3, z)
-	part(world, Vector3.new(2, 2, 2), head, skin)
-	part(world, Vector3.new(0.3, 0.45, 0.05), head * CFrame.new(-0.5, 0.2, 1.01), INK)
-	part(world, Vector3.new(0.3, 0.45, 0.05), head * CFrame.new(0.5, 0.2, 1.01), INK)
-	part(world, Vector3.new(0.7, 0.15, 0.05), head * CFrame.new(0, -0.5, 1.01), INK)
-	local hair = hairs[r:NextInteger(1, #hairs)]
-	part(world, Vector3.new(0.9, 2.2, 2.1), head * CFrame.new(-1.35, -0.2, -0.1), hair)
-	part(world, Vector3.new(0.9, 2.2, 2.1), head * CFrame.new(1.35, -0.2, -0.1), hair)
-	if r:NextNumber() < 0.6 then
-		local hat = hats[r:NextInteger(1, #hats)]
-		part(world, Vector3.new(2.4, 0.45, 2.2), head * CFrame.new(0, 1.2, 0), hat)
-		part(world, Vector3.new(0.9, 0.9, 0.9), head * CFrame.new(0, 1.7, 0), hat, Enum.PartType.Ball)
-	else
-		part(world, Vector3.new(2.1, 0.5, 2.1), head * CFrame.new(0, 1.2, -0.05), hair)
-	end
-	-- arms resting on the desk
-	part(world, Vector3.new(1, 2.4, 1), CFrame.new(-2.1, 1.7, z + 1) * CFrame.Angles(math.rad(-55), 0, math.rad(-20)), skin)
-	part(world, Vector3.new(1, 2.4, 1), CFrame.new(2.1, 1.7, z + 1) * CFrame.Angles(math.rad(-55), 0, math.rad(20)), skin)
-	-- cup and the offer paper
-	part(world, Vector3.new(1.6, 1, 1), CFrame.new(4.6, 1.6, 0) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(235, 235, 235), Enum.PartType.Cylinder)
-	part(world, Vector3.new(6, 0.05, 4.2), CFrame.new(-3.6, 0.83, 5.2) * CFrame.Angles(0, math.rad(6), 0), Color3.fromRGB(238, 238, 238))
-	local cam = Instance.new("Camera")
-	cam.FieldOfView = 55
-	cam.CFrame = CFrame.lookAt(Vector3.new(0, 4.6, 10.5), Vector3.new(0, 2.6, 0))
-	cam.Parent = vp
-	vp.CurrentCamera = cam
-end
-
-local function button(parent, text, color, onClick, order)
-	local b = UI.button(parent, text, onClick, color, { Size = UDim2.new(1, 0, 1, 0), LayoutOrder = order or 0 })
-	b.FontFace = GOTHAM
-	b.TextSize = 20
-	return b
-end
+local callStart = 0
 
 local function close()
 	if root then
@@ -104,8 +25,15 @@ local function close()
 	end
 	root = nil
 	seedShown = nil
-	showMoves = false
 end
+
+local MOVES = {
+	{ id = "earnings", name = "SHOW EARNINGS", desc = "Charts. Growth. Numbers.", color = Color3.fromRGB(0, 200, 110), icon = "bank", once = true },
+	{ id = "demo", name = "LIVE DEMO", desc = "Risky. Could crash.", color = Color3.fromRGB(150, 80, 255), icon = "lab", once = true },
+	{ id = "more", name = "ASK FOR MORE", desc = "Bigger amount.", color = Color3.fromRGB(255, 150, 0), icon = "cash" },
+	{ id = "less", name = "BETTER TERMS", desc = "", color = Color3.fromRGB(0, 170, 255), icon = "shield" },
+	{ id = "others", name = "OTHERS WANT IN", desc = "Bluff a rival offer.", color = Color3.fromRGB(255, 60, 120), icon = "fire", once = true },
+}
 
 local function render(s)
 	local mt = s.meeting
@@ -113,101 +41,129 @@ local function render(s)
 		return
 	end
 	local loan = mt.kind == "loan"
-	refs.who.Text = mt.who .. "  ·  " .. mt.firm .. (mt.stage and ("  ·  " .. mt.stage) or "")
-	refs.quote.Text = "\"" .. (mt.line or "") .. "\""
+	refs.who.Text = (mt.who or "Someone"):upper()
+	refs.firm.Text = (mt.firm or "") .. (mt.stage and ("  |  " .. mt.stage) or "")
+	refs.quote.Text = mt.line or ""
+	refs.kind.Text = loan and "BANK LOAN" or "INVESTMENT ROUND"
+	refs.big.Text = Format.money(mt.amount)
 	if loan then
-		refs.offer.Text = string.format("Offer: %s at %.1f%% a year", Format.money(mt.amount), mt.rate * 100)
 		local r = mt.rate / 12
 		local pay = mt.amount * r / (1 - (1 + r) ^ -mt.months)
-		refs.sub.Text = string.format("You'd pay %s a month for %d months  ·  %d moves left", Format.money(pay), mt.months, mt.moves)
-		refs.paperBig.Text = Format.money(mt.amount)
-		refs.paperSmall.Text = string.format("at %.1f%%", mt.rate * 100)
+		refs.terms.Text = string.format("%.1f%% A YEAR", mt.rate * 100)
+		refs.small.Text = string.format("You pay %s a month for %d months", Format.money(pay), mt.months)
 	else
-		refs.offer.Text = string.format("Offer: %s for %.1f%%", Format.money(mt.amount), mt.stake * 100)
-		refs.sub.Text = string.format("You'd keep %.1f%% of %s  ·  %d moves left", (s.equity or 1) * (1 - mt.stake) * 100, s.company or "your company", mt.moves)
-		refs.paperBig.Text = Format.money(mt.amount)
-		refs.paperSmall.Text = string.format("for %.1f%%", mt.stake * 100)
+		refs.terms.Text = string.format("FOR %.1f%% OF THE COMPANY", mt.stake * 100)
+		refs.small.Text = string.format("You keep %.1f%% of %s", (s.equity or 1) * (1 - mt.stake) * 100, s.company or "your company")
 	end
-	for i, sq in ipairs(refs.mood) do
-		sq.BackgroundColor3 = i <= mt.mood and Color3.fromRGB(70, 200, 90) or Color3.fromRGB(120, 120, 125)
-	end
-	UI.clear(refs.buttons)
-	local grid = new("UIGridLayout", { CellPadding = UDim2.fromOffset(6, 6), SortOrder = Enum.SortOrder.LayoutOrder, Parent = refs.buttons })
-	if not showMoves then
-		grid.CellSize = UDim2.new(1 / 3, -4, 0, 58)
-		refs.buttons.Size = UDim2.new(1, 0, 0, 58)
-		button(refs.buttons, "Take the deal", GREEN, function()
-			Net.act("meetAccept")
-		end, 1)
-		button(refs.buttons, "Make a move", mt.moves > 0 and BLUE or "ghost", function()
-			if mt.moves > 0 then
-				showMoves = true
-				render(Net.state)
+	refs.movesLeft.Text = mt.moves .. " MOVES LEFT"
+	local mood = math.clamp(mt.mood or 3, 0, 5)
+	refs.patience.Size = UDim2.fromScale(mood / 5, 1)
+	refs.patience.BackgroundColor3 = mood >= 4 and T.green or (mood >= 2 and T.yellow or T.red)
+	refs.patienceText.Text = ({ "WALKING OUT", "ANNOYED", "UNSURE", "INTERESTED", "HAPPY", "LOVES YOU" })[mood + 1]
+	UI.clear(refs.moves)
+	new("UIGridLayout", { CellSize = UDim2.new(1 / 3, -8, 0, 96), CellPadding = UDim2.fromOffset(10, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = refs.moves })
+	for i, mv in ipairs(MOVES) do
+		local used = mv.once and mt.used and mt.used[mv.id]
+		local can = mt.moves > 0 and not used
+		local b = new("TextButton", { Text = "", AutoButtonColor = false, BackgroundColor3 = can and mv.color or Color3.fromRGB(60, 64, 90), LayoutOrder = i, Parent = refs.moves })
+		UI.corner(b, 2)
+		UI.stroke(b, LINE, 3)
+		new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(160, 160, 160)), Parent = b })
+		local ic = UI.icon(b, mv.icon, mv.color, 54)
+		ic.Position = UDim2.fromOffset(10, 21)
+		new("TextLabel", { Text = mv.name, FontFace = UI.HEAVY, TextSize = 12, Position = UDim2.fromOffset(74, 20), Size = UDim2.new(1, -82, 0, 20), Parent = b })
+		new("TextLabel", { Text = used and "USED" or (mv.id == "less" and (loan and "Lower interest." or "Give less of the company.") or mv.desc), TextSize = 14, Position = UDim2.fromOffset(74, 46), Size = UDim2.new(1, -82, 0, 34), TextYAlignment = Enum.TextYAlignment.Top, Parent = b })
+		local id = mv.id
+		b.MouseButton1Click:Connect(function()
+			if can then
+				Net.act("meetMove", id)
 			end
-		end, 2)
-		button(refs.buttons, "Leave", BLUE, function()
-			Net.act("meetLeave")
-			close()
-		end, 3)
-	else
-		grid.CellSize = UDim2.new(1 / 3, -4, 0, 58)
-		refs.buttons.Size = UDim2.new(1, 0, 0, 122)
-		local moves = {
-			{ "Show earnings", "earnings" },
-			{ "Live demo", "demo" },
-			{ "Ask for more", "more" },
-			{ loan and "Lower the rate" or "Give them less", "less" },
-			{ "Others want in", "others" },
-		}
-		for i, mv in ipairs(moves) do
-			local used = mt.used and mt.used[mv[2]] and (mv[2] == "earnings" or mv[2] == "demo" or mv[2] == "others")
-			button(refs.buttons, mv[1], used and "ghost" or BLUE, function()
-				if not used then
-					showMoves = false
-					Net.act("meetMove", mv[2])
-				end
-			end, i)
-		end
-		button(refs.buttons, "Back", BLUE, function()
-			showMoves = false
-			render(Net.state)
-		end, 6)
+		end)
 	end
+	-- the 6th tile: sign
+	local sign = new("TextButton", { Text = "", AutoButtonColor = false, BackgroundColor3 = GOLD, LayoutOrder = 6, Parent = refs.moves })
+	UI.corner(sign, 2)
+	UI.stroke(sign, LINE, 3)
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(255, 240, 140), Color3.fromRGB(220, 140, 0)), Parent = sign })
+	new("TextLabel", { Text = "SIGN THE DEAL", FontFace = UI.HEAVY, TextSize = 16, TextColor3 = Color3.fromRGB(40, 24, 0), TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromScale(1, 1), Parent = sign })
+	sign.MouseButton1Click:Connect(function()
+		Net.act("meetAccept")
+	end)
 end
 
 local function open(host: Instance, s)
 	close()
 	local mt = s.meeting
-	local o = new("TextButton", { Text = "", AutoButtonColor = false, BackgroundColor3 = Color3.fromRGB(110, 205, 245), Size = UDim2.fromScale(1, 1), ZIndex = 70, Parent = host })
+	callStart = os.clock()
+	local o = new("TextButton", { Text = "", AutoButtonColor = false, BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.35, Size = UDim2.fromScale(1, 1), ZIndex = 70, Parent = host })
 	root = o
 	seedShown = mt.seed
-	local vp = new("ViewportFrame", { BackgroundColor3 = Color3.fromRGB(110, 205, 245), Size = UDim2.fromScale(1, 1), Ambient = Color3.fromRGB(170, 170, 170), LightColor = Color3.new(1, 1, 1), LightDirection = Vector3.new(-0.4, -1, -0.6), ZIndex = 70, Parent = o })
-	buildScene(vp, mt.seed or 1)
-	-- writing on the paper
-	local paper = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromScale(0.17, 0.63), Size = UDim2.fromScale(0.3, 0.2), Rotation = -5, ZIndex = 71, Parent = o })
-	new("TextLabel", { Text = "THE OFFER", FontFace = GOTHAM, TextScaled = true, TextColor3 = INK, BackgroundTransparency = 1, Size = UDim2.fromScale(1, 0.16), Parent = paper })
-	refs.paperBig = new("TextLabel", { Text = "", FontFace = Font.fromEnum(Enum.Font.GothamBlack), TextScaled = true, TextColor3 = INK, BackgroundTransparency = 1, Position = UDim2.fromScale(0, 0.22), Size = UDim2.fromScale(1, 0.4), Parent = paper })
-	refs.paperSmall = new("TextLabel", { Text = "", FontFace = GOTHAM, TextScaled = true, TextColor3 = INK, BackgroundTransparency = 1, Position = UDim2.fromScale(0, 0.66), Size = UDim2.fromScale(1, 0.2), Parent = paper })
-	-- dialog box
-	local box = new("Frame", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -16), Size = UDim2.new(0, 860, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = PANEL, ZIndex = 72, Parent = o })
-	UI.stroke(box, INK, 4)
-	UI.pad(box, 14)
-	UI.list(box, 8)
-	local speech = new("Frame", { BackgroundColor3 = Color3.fromRGB(232, 232, 232), Size = UDim2.new(1, 0, 0, 74), LayoutOrder = 1, Parent = box })
-	UI.stroke(speech, INK, 3)
-	refs.who = new("TextLabel", { Text = "", FontFace = GOTHAM, TextSize = 17, TextColor3 = Color3.fromRGB(95, 95, 95), BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left, Position = UDim2.fromOffset(18, 8), Size = UDim2.new(1, -36, 0, 20), Parent = speech })
-	refs.quote = new("TextLabel", { Text = "", FontFace = GOTHAM_REG, TextSize = 22, TextColor3 = INK, BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true, Position = UDim2.fromOffset(18, 30), Size = UDim2.new(1, -36, 0, 40), Parent = speech })
-	local offerRow = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 30), LayoutOrder = 2, Parent = box })
-	refs.offer = new("TextLabel", { Text = "", FontFace = GOTHAM, TextSize = 24, TextColor3 = INK, BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left, Size = UDim2.new(0.7, 0, 1, 0), Parent = offerRow })
-	local moodBox = new("Frame", { BackgroundColor3 = INK, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0), Size = UDim2.fromOffset(5 * 32 + 6, 30), Parent = offerRow })
-	new("TextLabel", { Text = "Mood", FontFace = GOTHAM_REG, TextSize = 18, TextColor3 = Color3.fromRGB(95, 95, 95), BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -172, 0.5, 0), Size = UDim2.fromOffset(60, 30), TextXAlignment = Enum.TextXAlignment.Right, Parent = offerRow })
-	refs.mood = {}
-	for i = 1, 5 do
-		refs.mood[i] = new("Frame", { Position = UDim2.fromOffset(4 + (i - 1) * 32, 3), Size = UDim2.fromOffset(28, 24), BorderSizePixel = 0, Parent = moodBox })
-	end
-	refs.sub = new("TextLabel", { Text = "", FontFace = GOTHAM_REG, TextSize = 18, TextColor3 = Color3.fromRGB(95, 95, 95), BackgroundTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left, Size = UDim2.new(1, 0, 0, 22), LayoutOrder = 3, Parent = box })
-	refs.buttons = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 58), LayoutOrder = 4, Parent = box })
+	local win = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(1240, 700), BackgroundColor3 = NAVY, Parent = o })
+	UI.skin(win, NAVY)
+	-- top bar
+	local bar = new("Frame", { BackgroundColor3 = Color3.fromRGB(0, 170, 255), Size = UDim2.new(1, 0, 0, 56), Parent = win })
+	new("UIGradient", { Color = ColorSequence.new(Color3.fromRGB(0, 200, 255), Color3.fromRGB(110, 70, 255)), Parent = bar })
+	new("TextLabel", { Text = "DEAL ROOM", FontFace = UI.HEAVY, TextSize = 22, Position = UDim2.fromOffset(20, 0), Size = UDim2.new(0, 300, 1, 0), Parent = bar })
+	local live = new("TextLabel", { Text = "LIVE  00:00", FontFace = UI.BOLD, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Center, BackgroundTransparency = 0, BackgroundColor3 = T.red, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -150, 0.5, 0), Size = UDim2.fromOffset(150, 32), Parent = bar })
+	UI.button(bar, "HANG UP", function()
+		Net.act("meetLeave")
+		close()
+	end, T.red, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), Size = UDim2.fromOffset(126, 40), TextSize = 12 })
+	task.spawn(function()
+		while o.Parent do
+			local t = math.floor(os.clock() - callStart)
+			live.Text = string.format("LIVE  %02d:%02d", t // 60, t % 60)
+			task.wait(1)
+		end
+	end)
+
+	-- left: their call window
+	local call = new("Frame", { BackgroundColor3 = Color3.fromRGB(30, 36, 70), Position = UDim2.fromOffset(20, 76), Size = UDim2.fromOffset(420, 604), Parent = win })
+	UI.skin(call, Color3.fromRGB(30, 36, 70))
+	local rnd = Random.new(mt.seed or 1)
+	local bgCol = ({ Color3.fromRGB(0, 160, 230), Color3.fromRGB(150, 80, 255), Color3.fromRGB(255, 120, 40), Color3.fromRGB(0, 190, 120) })[rnd:NextInteger(1, 4)]
+	local cam = new("Frame", { BackgroundColor3 = bgCol, Position = UDim2.fromOffset(14, 14), Size = UDim2.new(1, -28, 0, 300), Parent = call })
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(bgCol:Lerp(Color3.new(1, 1, 1), 0.2), bgCol:Lerp(Color3.new(0, 0, 0), 0.5)), Parent = cam })
+	local face = UI.icon(cam, mt.kind == "loan" and "bank" or "crown", bgCol, 170)
+	face.AnchorPoint = Vector2.new(0.5, 0.5)
+	face.Position = UDim2.fromScale(0.5, 0.5)
+	refs.face = face
+	task.spawn(function()
+		local t0 = os.clock()
+		while o.Parent do
+			face.Position = UDim2.new(0.5, 0, 0.5, math.sin((os.clock() - t0) * 2.4) * 6)
+			task.wait(1 / 30)
+		end
+	end)
+	refs.who = new("TextLabel", { Text = "", FontFace = UI.HEAVY, TextSize = 18, Position = UDim2.fromOffset(18, 330), Size = UDim2.new(1, -36, 0, 24), Parent = call })
+	refs.firm = new("TextLabel", { Text = "", TextSize = 16, TextColor3 = T.sub, Position = UDim2.fromOffset(18, 358), Size = UDim2.new(1, -36, 0, 22), Parent = call })
+	local bubble = new("Frame", { BackgroundColor3 = Color3.fromRGB(255, 255, 255), Position = UDim2.fromOffset(14, 396), Size = UDim2.new(1, -28, 0, 190), Parent = call })
+	UI.corner(bubble, 2)
+	UI.stroke(bubble, LINE, 3)
+	refs.quote = new("TextLabel", { Text = "", TextSize = 20, TextColor3 = Color3.fromRGB(20, 22, 40), TextYAlignment = Enum.TextYAlignment.Top, Position = UDim2.fromOffset(16, 14), Size = UDim2.new(1, -32, 1, -28), Parent = bubble })
+
+	-- right: the contract
+	local right = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(460, 76), Size = UDim2.new(1, -480, 0, 604), Parent = win })
+	local contract = new("Frame", { BackgroundColor3 = Color3.fromRGB(255, 248, 225), Size = UDim2.new(1, 0, 0, 220), Parent = right })
+	UI.corner(contract, 2)
+	UI.stroke(contract, GOLD, 5)
+	refs.kind = new("TextLabel", { Text = "", FontFace = UI.HEAVY, TextSize = 14, TextColor3 = Color3.fromRGB(150, 100, 0), Position = UDim2.fromOffset(20, 16), Size = UDim2.new(1, -40, 0, 20), Parent = contract })
+	refs.big = new("TextLabel", { Text = "", FontFace = UI.HEAVY, TextSize = 58, TextColor3 = Color3.fromRGB(0, 150, 70), Position = UDim2.fromOffset(20, 44), Size = UDim2.new(1, -40, 0, 70), Parent = contract })
+	new("UIStroke", { Color = Color3.fromRGB(0, 60, 30), Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual, Parent = refs.big })
+	refs.terms = new("TextLabel", { Text = "", FontFace = UI.HEAVY, TextSize = 20, TextColor3 = Color3.fromRGB(30, 30, 50), Position = UDim2.fromOffset(20, 122), Size = UDim2.new(1, -40, 0, 28), Parent = contract })
+	refs.small = new("TextLabel", { Text = "", TextSize = 17, TextColor3 = Color3.fromRGB(90, 90, 110), Position = UDim2.fromOffset(20, 156), Size = UDim2.new(1, -40, 0, 24), Parent = contract })
+	refs.movesLeft = new("TextLabel", { Text = "", FontFace = UI.BOLD, TextSize = 12, TextColor3 = Color3.fromRGB(255, 255, 255), TextXAlignment = Enum.TextXAlignment.Center, BackgroundTransparency = 0, BackgroundColor3 = Color3.fromRGB(110, 70, 255), AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, 14), Size = UDim2.fromOffset(170, 28), Parent = contract })
+	-- patience meter
+	local pRow = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 236), Size = UDim2.new(1, 0, 0, 40), Parent = right })
+	new("TextLabel", { Text = "PATIENCE", FontFace = UI.HEAVY, TextSize = 14, Size = UDim2.fromOffset(150, 40), Parent = pRow })
+	local track = new("Frame", { BackgroundColor3 = Color3.fromRGB(30, 34, 60), Position = UDim2.fromOffset(150, 8), Size = UDim2.new(1, -330, 0, 24), Parent = pRow })
+	UI.stroke(track, LINE, 3)
+	refs.patience = new("Frame", { BackgroundColor3 = T.green, Size = UDim2.fromScale(0.6, 1), Parent = track })
+	refs.patienceText = new("TextLabel", { Text = "", FontFace = UI.BOLD, TextSize = 12, TextColor3 = T.yellow, TextXAlignment = Enum.TextXAlignment.Right, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.fromOffset(170, 40), Parent = pRow })
+	refs.moves = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 292), Size = UDim2.new(1, 0, 0, 202), Parent = right })
 	render(s)
+	local sc = new("UIScale", { Scale = 0.85, Parent = win })
+	UI.tween(sc, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
 end
 
 function Meeting.update(host: Instance, s)

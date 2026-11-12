@@ -12,6 +12,7 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local Modules = script.Parent:WaitForChild("Modules")
 local Game = require(Modules.Game)
 local Saves = require(Modules.Saves)
+local Avatars = require(Modules.Avatars)
 
 -- No walking around: the player sees the office from a fixed camera and clicks things.
 Players.CharacterAutoLoads = false
@@ -53,6 +54,22 @@ end
 
 local function push(player: Player, s: Session)
 	StateRE:FireClient(player, Game.snapshot(s.state))
+	-- seat avatars when the team or the office changes
+	local st = s.state
+	local key = tostring(st.office)
+	for _, n in pairs(st.staff or {}) do
+		key ..= "," .. n
+	end
+	for i, p in ipairs(st.people or {}) do
+		if i > 40 then
+			break
+		end
+		key ..= ":" .. tostring(p.id)
+	end
+	if (s :: any).avatarKey ~= key then
+		(s :: any).avatarKey = key
+		task.spawn(Avatars.sync, st)
+	end
 	s.lastPush = os.clock()
 	s.dirty = false
 end
@@ -89,8 +106,37 @@ local function refreshPasses(player: Player)
 	end
 end
 
+-- Your Roblox friends can show up as job candidates (with their real avatar).
+local friendCache: { [number]: { any } } = {}
+local function loadFriends(player: Player)
+	if friendCache[player.UserId] then
+		return friendCache[player.UserId]
+	end
+	local list = {}
+	local ok, pages = pcall(Players.GetFriendsAsync, Players, player.UserId)
+	if ok and pages then
+		while #list < 80 do
+			for _, f in ipairs(pages:GetCurrentPage()) do
+				table.insert(list, { id = f.Id, name = f.DisplayName or f.Username })
+			end
+			if pages.IsFinished then
+				break
+			end
+			local ok2 = pcall(function()
+				pages:AdvanceToNextPageAsync()
+			end)
+			if not ok2 then
+				break
+			end
+		end
+	end
+	friendCache[player.UserId] = list
+	return list
+end
+
 Players.PlayerAdded:Connect(function(player)
 	refreshPasses(player)
+	task.spawn(loadFriends, player)
 end)
 for _, pl in ipairs(Players:GetPlayers()) do
 	task.spawn(refreshPasses, pl)
@@ -218,6 +264,7 @@ local function reconcile(state)
 			state.stats[k] = v
 		end
 	end
+	Game.migrateStaff(state)
 	return state
 end
 
@@ -253,6 +300,9 @@ SlotsRF.OnServerInvoke = function(player: Player, action: string, slot: number?,
 		end
 		sessions[player] = { state = state, slot = slot :: number, acc = 0, lastPush = 0, dirty = true, lastSaveMonth = -1 }
 		refreshPasses(player)
+		task.spawn(function()
+			state.friendPool = loadFriends(player)
+		end)
 		push(player, sessions[player])
 		return { ok = true, persistent = Saves.available or RunService:IsStudio() }
 	elseif action == "delete" then

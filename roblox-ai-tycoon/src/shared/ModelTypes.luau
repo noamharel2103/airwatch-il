@@ -6,14 +6,14 @@ local Format = require(script.Parent:WaitForChild("Format"))
 local MT = {}
 
 MT.list = {
-	{ id = "chat", name = "CHAT AI", short = "CHAT", from = "2023-01", cost = 1, market = 0, color = Color3.fromRGB(0, 190, 255), icon = "chat", desc = "Your main app. Brings users and subscriptions." },
-	{ id = "code", name = "CODE AI", short = "CODE", from = "2023-01", cost = 1.2, market = 3e6, color = Color3.fromRGB(0, 205, 95), icon = "code", desc = "Writes code for developers. Companies pay a lot." },
-	{ id = "image", name = "IMAGE AI", short = "IMAGE", from = "2023-01", cost = 0.8, market = 2e6, color = Color3.fromRGB(255, 70, 160), icon = "image", desc = "Draws pictures from text." },
-	{ id = "voice", name = "VOICE AI", short = "VOICE", from = "2023-06", cost = 0.9, market = 1.6e6, color = Color3.fromRGB(255, 150, 0), icon = "voice", desc = "Talks with any voice, in any language." },
-	{ id = "music", name = "MUSIC AI", short = "MUSIC", from = "2024-01", cost = 1.1, market = 2.2e6, color = Color3.fromRGB(150, 80, 255), icon = "music", desc = "Makes full songs with singing." },
-	{ id = "video", name = "VIDEO AI", short = "VIDEO", from = "2024-02", cost = 2, market = 5e6, color = Color3.fromRGB(255, 60, 70), icon = "video", desc = "Films movie clips from one sentence. Very hungry for GPUs." },
-	{ id = "world3d", name = "3D WORLD AI", short = "3D", from = "2025-01", cost = 1.8, market = 6e6, color = Color3.fromRGB(0, 200, 190), icon = "cube", desc = "Builds 3D worlds and game assets." },
-	{ id = "robot", name = "ROBOT BRAIN", short = "ROBOT", from = "2026-01", cost = 3, market = 12e6, color = Color3.fromRGB(255, 200, 0), icon = "robot", desc = "Runs real robots in factories and homes." },
+	{ id = "chat", name = "CHAT AI", short = "CHAT", from = "2023-01", cost = 1, time = 1, market = 0, color = Color3.fromRGB(0, 190, 255), icon = "chat", desc = "Your main app. Brings users and subscriptions." },
+	{ id = "code", name = "CODE AI", short = "CODE", from = "2023-01", cost = 1.2, time = 1.3, market = 3e6, color = Color3.fromRGB(0, 205, 95), icon = "code", desc = "Writes code for developers. Companies pay a lot." },
+	{ id = "image", name = "IMAGE AI", short = "IMAGE", from = "2023-01", cost = 0.8, time = 1.5, market = 2e6, color = Color3.fromRGB(255, 70, 160), icon = "image", desc = "Draws pictures from text." },
+	{ id = "voice", name = "VOICE AI", short = "VOICE", from = "2023-06", cost = 0.9, time = 2.5, market = 1.6e6, color = Color3.fromRGB(255, 150, 0), icon = "voice", desc = "Talks with any voice, in any language." },
+	{ id = "music", name = "MUSIC AI", short = "MUSIC", from = "2024-01", cost = 1.1, time = 3, market = 2.2e6, color = Color3.fromRGB(150, 80, 255), icon = "music", desc = "Makes full songs with singing." },
+	{ id = "video", name = "VIDEO AI", short = "VIDEO", from = "2024-02", cost = 2, time = 4, market = 5e6, color = Color3.fromRGB(255, 60, 70), icon = "video", desc = "Films movie clips from one sentence. Very hungry for GPUs." },
+	{ id = "world3d", name = "3D WORLD AI", short = "3D", from = "2025-01", cost = 1.8, time = 4, market = 6e6, color = Color3.fromRGB(0, 200, 190), icon = "cube", desc = "Builds 3D worlds and game assets." },
+	{ id = "robot", name = "ROBOT BRAIN", short = "ROBOT", from = "2026-01", cost = 3, time = 6, market = 12e6, color = Color3.fromRGB(255, 200, 0), icon = "robot", desc = "Runs real robots in factories and homes." },
 }
 
 MT.byId = {}

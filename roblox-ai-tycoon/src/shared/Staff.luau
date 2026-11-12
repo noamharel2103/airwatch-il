@@ -101,4 +101,52 @@ function Staff.searchCandidate(rng: Random, roleId: string, filters)
 	return c
 end
 
+-- Rarity: every person rolls one. Better rarity = much more work done, but pricier and pickier.
+Staff.RARITIES = {
+	{ id = "common", name = "COMMON", mult = 1, color = Color3.fromRGB(150, 160, 180) },
+	{ id = "uncommon", name = "UNCOMMON", mult = 1.6, color = Color3.fromRGB(40, 200, 90) },
+	{ id = "rare", name = "RARE", mult = 2.6, color = Color3.fromRGB(30, 140, 255) },
+	{ id = "epic", name = "EPIC", mult = 4.2, color = Color3.fromRGB(170, 80, 255) },
+	{ id = "legend", name = "LEGENDARY", mult = 7, color = Color3.fromRGB(255, 185, 0) },
+	{ id = "mythic", name = "MYTHIC", mult = 12, color = Color3.fromRGB(255, 50, 110) },
+}
+
+-- Places you pay to find people. weights = chance per rarity (common..mythic).
+Staff.PLACES = {
+	{ id = "board", name = "JOB BOARD", cost = 2e3, n = 6, office = 1, weights = { 62, 27, 9, 2, 0, 0 }, color = Color3.fromRGB(40, 160, 255), desc = "Cheap. Mostly regular people." },
+	{ id = "uni", name = "UNIVERSITY FAIR", cost = 25e3, n = 6, office = 2, weights = { 28, 36, 26, 8, 2, 0 }, color = Color3.fromRGB(40, 200, 110), desc = "Fresh PhDs. Some hidden gems." },
+	{ id = "hunter", name = "HEADHUNTER", cost = 400e3, n = 6, office = 3, weights = { 0, 22, 42, 26, 9, 1 }, color = Color3.fromRGB(170, 80, 255), desc = "Poaches good people from big labs." },
+	{ id = "elite", name = "ELITE AGENCY", cost = 8e6, n = 5, office = 4, weights = { 0, 0, 18, 44, 30, 8 }, color = Color3.fromRGB(255, 175, 0), desc = "Only the best. Legends live here." },
+}
+Staff.placeById = {}
+for _, pl in ipairs(Staff.PLACES) do
+	Staff.placeById[pl.id] = pl
+end
+
+function Staff.searchCost(place, year: number, minRarity: number, roleFilter: boolean): number
+	return place.cost * (1 + math.max(0, year - 2023) * 0.5) * (1 + 0.7 * math.max(0, minRarity - 1)) * (roleFilter and 1.3 or 1)
+end
+
+function Staff.rollRarity(rng: Random, weights: { number }, minRarity: number): number
+	local total = 0
+	for i, w in ipairs(weights) do
+		if i >= minRarity then
+			total += w
+		end
+	end
+	if total <= 0 then
+		return math.clamp(minRarity, 1, #Staff.RARITIES)
+	end
+	local r = rng:NextNumber() * total
+	for i, w in ipairs(weights) do
+		if i >= minRarity then
+			r -= w
+			if r <= 0 then
+				return i
+			end
+		end
+	end
+	return minRarity
+end
+
 return Staff

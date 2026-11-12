@@ -29,9 +29,13 @@ local cam = workspace.CurrentCamera
 local LinkedIn = require(Modules.AppLinkedIn)
 local Cameras = require(Modules.AppCameras)
 local ShopApp = require(Modules.AppShop)
-for _, app in ipairs({ ShopApp, Lab, Parts, Team, LinkedIn, Bank, Social, MailGoals.Mail, MailGoals.Goals, Company, Cameras }) do
+local WebsiteApp = require(Modules.AppWebsite)
+local Promo = require(Modules.Promo)
+local _ = LinkedIn
+for _, app in ipairs({ ShopApp, Lab, Parts, Team, WebsiteApp, Bank, Social, MailGoals.Mail, MailGoals.Goals, Company, Cameras }) do
 	Shell.register(app)
 end
+Promo.start(Shell.gui, ShopApp)
 Shell.openShop = function(key: string?)
 	ShopApp.focus(key)
 	if Shell.isOpen() then
@@ -39,6 +43,9 @@ Shell.openShop = function(key: string?)
 	else
 		Shell.openComputer("shop")
 	end
+end
+Team.openShop = function(key: string?)
+	Shell.openShop(key)
 end
 Lab.openShop = function(key: string?, modelId: number?)
 	ShopApp.targetModel = modelId
@@ -70,6 +77,7 @@ end)
 -- ===== room view =====
 local rooms = workspace:WaitForChild("Rooms", 30)
 local currentStage = 0
+local orbit: any
 local baseCF: CFrame? = nil
 local function setRoom(stage: number)
 	if not rooms then
@@ -89,6 +97,30 @@ local function setRoom(stage: number)
 end
 setRoom(1)
 local t0 = os.clock()
+-- free look around the room
+orbit = { yaw = 0, yawT = 0, pitch = 0, pitchT = 0, zoom = 1, zoomT = 1, dist = 26, idle = 0 }
+UIS.InputChanged:Connect(function(input, processed)
+	if processed or Shell.isOpen() then
+		return
+	end
+	if input.UserInputType == Enum.UserInputType.MouseWheel then
+		orbit.zoomT = math.clamp(orbit.zoomT - input.Position.Z * 0.08, 0.45, 1.25)
+		orbit.idle = os.clock()
+	end
+end)
+UIS.InputBegan:Connect(function(input, processed)
+	if processed or Shell.isOpen() then
+		return
+	end
+	if input.KeyCode == Enum.KeyCode.Q then
+		orbit.yawT = math.clamp(orbit.yawT + 20, -45, 45)
+		orbit.idle = os.clock()
+	elseif input.KeyCode == Enum.KeyCode.E then
+		orbit.yawT = math.clamp(orbit.yawT - 20, -45, 45)
+		orbit.idle = os.clock()
+	end
+end)
+
 -- camera zoom toward whatever you clicked (computer, rig...) before it opens
 local zoomCF: CFrame? = nil
 local zoomA, zoomTarget = 0, 0
@@ -114,8 +146,31 @@ RunService.RenderStepped:Connect(function(dt)
 			mx += ((mouse.X / math.max(v.X, 1) - 0.5) - mx) * math.min(1, dt * 4)
 			my += ((mouse.Y / math.max(v.Y, 1) - 0.5) - my) * math.min(1, dt * 4)
 		end
-		-- gentle parallax toward the mouse + idle breathing
-		local room = baseCF * CFrame.Angles(math.rad(-my * 2 + math.sin(t * 0.4) * 0.15), math.rad(-mx * 3), 0)
+		-- orbit around the middle of the room: drag with the right mouse, scroll to zoom, Q/E to turn
+		local roomOpen = not (Shell.isOpen() or zooming or zoomTarget > 0 or overlayBusy())
+		if Shell.viewBar then
+			Shell.viewBar.Visible = roomOpen
+		end
+		local dragging = roomOpen and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+		local wantLock = dragging and Enum.MouseBehavior.LockCurrentPosition or Enum.MouseBehavior.Default
+		if UIS.MouseBehavior ~= wantLock then
+			UIS.MouseBehavior = wantLock
+		end
+		if dragging then
+			local d = UIS:GetMouseDelta()
+			orbit.yawT = math.clamp(orbit.yawT - d.X * 0.25, -45, 45)
+			orbit.pitchT = math.clamp(orbit.pitchT - d.Y * 0.2, -12, 22)
+			orbit.idle = os.clock()
+		end
+		local k = math.min(1, dt * 6)
+		orbit.yaw += (orbit.yawT - orbit.yaw) * k
+		orbit.pitch += (orbit.pitchT - orbit.pitch) * k
+		orbit.zoom += (orbit.zoomT - orbit.zoom) * k
+		local drift = os.clock() - orbit.idle > 6 and math.sin(t * 0.15) * 4 or 0
+		local pivot = baseCF.Position + baseCF.LookVector * orbit.dist
+		local rot = CFrame.Angles(0, math.rad(orbit.yaw + drift - mx * 3), 0) * CFrame.Angles(math.rad(orbit.pitch - my * 2), 0, 0)
+		local offset = (baseCF - baseCF.Position) * rot * Vector3.new(0, 0, orbit.dist * orbit.zoom)
+		local room = CFrame.lookAt(pivot + offset, pivot)
 		-- never get stuck zoomed in once every screen is closed
 		if zoomTarget > 0 and not zooming and not Shell.isOpen() and not overlayBusy() then
 			zoomTarget = 0
@@ -326,6 +381,15 @@ Net.onState(function(s)
 			end
 		end
 	end
+	-- desks where a real avatar already sits hide their block worker
+	local avatarSlots = {}
+	local av = workspace:FindFirstChild("Avatars")
+	for _, m in ipairs(av and av:GetChildren() or {}) do
+		local slot = m:GetAttribute("Slot")
+		if slot then
+			avatarSlots[slot] = true
+		end
+	end
 	local gpus = totalGpus(s) - 1 -- the laptop does not count
 	for _, d in ipairs(room:GetDescendants()) do
 		local slot = d:GetAttribute("GpuSlot")
@@ -336,7 +400,7 @@ Net.onState(function(s)
 		end
 		local w = d:GetAttribute("WorkerSlot")
 		if w and (d:IsA("BasePart") or d:IsA("Decal")) then
-			(d :: any).Transparency = w <= s.headcount and 0 or 1
+			(d :: any).Transparency = (w <= s.headcount and not avatarSlots[w]) and 0 or 1
 		end
 	end
 	local board = room:FindFirstChild("GoalsBoard", true)
@@ -362,4 +426,43 @@ Title.show(Shell.gui, function()
 	if Net.state then
 		setRoom(Net.state.office)
 	end
+end)
+
+-- when avatars sit down (or leave), hide or show the block worker at that desk right away
+task.spawn(function()
+	local av = workspace:WaitForChild("Avatars", 60)
+	if not av then
+		return
+	end
+	local pending = false
+	local function refresh()
+		if pending then
+			return
+		end
+		pending = true
+		task.delay(0.3, function()
+			pending = false
+			local s = Net.state
+			local room = s and rooms and rooms:FindFirstChild("Stage" .. s.office)
+			if not room then
+				return
+			end
+			local taken = {}
+			for _, m in ipairs(av:GetChildren()) do
+				local slot = m:GetAttribute("Slot")
+				if slot then
+					taken[slot] = true
+				end
+			end
+			for _, d in ipairs(room:GetDescendants()) do
+				local w = d:GetAttribute("WorkerSlot")
+				if w and (d:IsA("BasePart") or d:IsA("Decal")) then
+					(d :: any).Transparency = (w <= s.headcount and not taken[w]) and 0 or 1
+				end
+			end
+		end)
+	end
+	av.ChildAdded:Connect(refresh)
+	av.ChildRemoved:Connect(refresh)
+	refresh()
 end)

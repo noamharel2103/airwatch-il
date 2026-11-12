@@ -19,6 +19,7 @@ local PcParts = require(game:GetService("ReplicatedStorage").Shared.PcParts)
 local Decor = require(game:GetService("ReplicatedStorage").Shared.Decor)
 local MT = require(Shared.ModelTypes)
 local Shop = require(Shared.Shop)
+local Website = require(Shared.Website)
 local rng = Random.new()
 
 local function year(state)
@@ -276,6 +277,17 @@ function Game.staffEffects(state)
 	for _, r in ipairs(Staff.roles) do
 		e[r.effect] += (state.staff[r.id] or 0) * r.power
 	end
+	-- rare people do the work of several
+	for _, p in ipairs(state.people or {}) do
+		local r = Staff.byId[p.role]
+		local rar = Staff.RARITIES[p.rarity or 1]
+		if r and rar and rar.mult > 1 then
+			e[r.effect] += r.power * (rar.mult - 1)
+		end
+	end
+	for k, v in pairs(state.staffLegacy or {}) do
+		e[k] = (e[k] or 0) + v
+	end
 	local f = Game.teamFactor(state)
 	for k, v in pairs(e) do
 		e[k] = v * f
@@ -462,6 +474,103 @@ function TeamActions.linkedinSearch(state, filters)
 	return true
 end
 
+-- Pay a place to find people. filters = { role = id or "any", minRarity = 1..6 }
+function TeamActions.recruitSearch(state, placeId, filters)
+	local place = Staff.placeById[placeId]
+	if not place then
+		return false, "Unknown place"
+	end
+	if state.office < place.office then
+		return false, place.name .. " only talks to companies with a bigger office"
+	end
+	filters = type(filters) == "table" and filters or {}
+	local minR = math.clamp(math.floor(tonumber(filters.minRarity) or 1), 1, #Staff.RARITIES)
+	local role = Staff.byId[filters.role] and filters.role or nil
+	local cost = Staff.searchCost(place, year(state), minR, role ~= nil)
+	if state.cash < cost then
+		return false, "A search here costs " .. Format.money(cost)
+	end
+	spend(state, cost, "salaries")
+	state.search = Game.rollCandidates(state, place, minR, role, place.n)
+	state.searchPlace = place.id
+	return true
+end
+
+function Game.rollCandidates(state, place, minR, role, n)
+	local results = {}
+	for i = 1, n do
+		local rid = role or Staff.roles[rng:NextInteger(1, #Staff.roles)].id
+		local c = Staff.randomCandidate(rng, rid)
+		-- sometimes it is one of your Roblox friends (their real avatar shows up at a desk)
+		local pool = state.friendPool or {}
+		if #pool > 0 and rng:NextNumber() < 0.45 then
+			local taken = {}
+			for _, p in ipairs(state.people or {}) do
+				if p.userId then
+					taken[p.userId] = true
+				end
+			end
+			for _, x in ipairs(results) do
+				if x.userId then
+					taken[x.userId] = true
+				end
+			end
+			local free = {}
+			for _, f in ipairs(pool) do
+				if not taken[f.id] then
+					table.insert(free, f)
+				end
+			end
+			if #free > 0 then
+				local f = free[rng:NextInteger(1, #free)]
+				c.name, c.userId, c.from = f.name, f.id, "Your Roblox friend"
+			end
+		end
+		c.rarity = Staff.rollRarity(rng, place.weights, minR)
+		c.skill = math.floor((0.85 + c.rarity * 0.08 + rng:NextNumber(0, 0.1)) * 100) / 100
+		c.demand = math.clamp((c.rarity - 2) * 0.09, 0, 0.6)
+		c.key = state.day .. "_" .. i .. "_" .. rng:NextInteger(1, 1e6)
+		table.insert(results, c)
+	end
+	table.sort(results, function(a, b)
+		return a.rarity > b.rarity
+	end)
+	return results
+end
+
+function TeamActions.letGo(state, id)
+	for i, p in ipairs(state.people or {}) do
+		if p.id == id then
+			table.remove(state.people, i)
+			state.staff[p.role] = math.max(0, (state.staff[p.role] or 0) - 1)
+			Game.chatMsg(state, "general", p.name, "Thanks for everything. Good luck!")
+			return true
+		end
+	end
+	return false, "Not found"
+end
+
+-- Old saves had thousands of staff. The office cap is small now, so extra heads become team power.
+function Game.migrateStaff(state)
+	local cap = Catalog.officeStages[state.office].maxStaff
+	local total = Game.headcount(state)
+	if total <= cap then
+		return
+	end
+	local f = cap / total
+	state.staffLegacy = state.staffLegacy or {}
+	for _, r in ipairs(Staff.roles) do
+		local n = state.staff[r.id] or 0
+		local keep = math.floor(n * f)
+		state.staffLegacy[r.effect] = (state.staffLegacy[r.effect] or 0) + (n - keep) * r.power
+		state.staff[r.id] = keep
+	end
+	local people = state.people or {}
+	while #people > cap do
+		table.remove(people)
+	end
+end
+
 function TeamActions.recruit(state, key)
 	local c, idx
 	for i, x in ipairs(state.search or {}) do
@@ -476,14 +585,15 @@ function TeamActions.recruit(state, key)
 	if Game.headcount(state) + 1 > stage.maxStaff then
 		return false, "Office is full. Upgrade in Company (max " .. stage.maxStaff .. ")."
 	end
-	local signing = Staff.monthlyCash(c.role, year(state)) * (0.6 + c.skill ^ 3) * (c.hot and 2 or 1) * locationOf(state).salary
+	local rar = Staff.RARITIES[c.rarity or 1]
+	local signing = Staff.monthlyCash(c.role, year(state)) * 1.5 * (rar and rar.mult or 1) * (c.hot and 2 or 1) * locationOf(state).salary
 	if state.cash < signing then
 		return false, "Signing bonus is " .. Format.money(signing)
 	end
 	-- top people say no unless you are hot, famous or rich
 	local pull = state.hype / 100 * 0.4 + state.reputation / 100 * 0.4 + math.min(0.3, math.log10(1 + state.valuation / 1e8) * 0.1)
 	table.remove(state.search, idx)
-	if rng:NextNumber() < c.demand - pull then
+	if rng:NextNumber() < (c.demand or 0) - pull then
 		Game.chatMsg(state, "dms", c.name, ({ "Thanks, but I'm staying where I am.", "I got a better offer from a bigger lab. Sorry!", "Your company is cool, but not yet. Maybe next year." })[rng:NextInteger(1, 3)])
 		return true, "declined"
 	end
@@ -494,7 +604,7 @@ function TeamActions.recruit(state, key)
 	ensurePeople(state)
 	c.id = state.nextPersonId
 	state.nextPersonId += 1
-	c.morale, c.rank, c.pc = 80, c.skill > 1.3 and 3 or (c.skill > 1.05 and 2 or 1), 0
+	c.morale, c.rank, c.pc = 80, math.clamp((c.rarity or 1) - 1, 1, 4), 0
 	c.key = nil
 	table.insert(state.people, c)
 	state.stats.hired += 1
@@ -1038,12 +1148,11 @@ function Actions.createModel(state, name, kindId)
 		return false, "You have no GPUs. Get some in Parts."
 	end
 	local kind = MT.get(type(kindId) == "string" and kindId or "chat")
-	if not MT.unlocked(kind, state.day) then
+	if not MT.unlocked(kind, state.day) and not (state.earlyKinds and state.earlyKinds[kind.id]) then
 		return false, kind.name .. " is not invented yet. It unlocks in " .. Format.monthYear(kind.fromDay) .. "."
 	end
 	local recipe = Opts.defaultRecipe()
 	recipe.name = tostring(name or "")
-	recipe.kind = kind.id
 	local chosen = Opts.SIZES[1]
 	for _, sz in ipairs(Opts.SIZES) do
 		recipe.size = sz
@@ -1095,6 +1204,8 @@ function Actions.createModel(state, name, kindId)
 	elseif d.rope then
 		recipe.choices.ctx = "128k"
 	end
+	-- model types like VOICE or VIDEO take several times longer to train
+	recipe.kind = kind.id
 	return Actions.train(state, recipe)
 end
 
@@ -1142,6 +1253,9 @@ function Game.boostDays(state, m)
 	local d = 6 * (m.size / 7) ^ 0.55 / power ^ 0.5 / (1 + infra * 0.08) / pcSpeed
 	if perk(state, "train2x") then
 		d /= 2
+	end
+	if state.turboUntil and state.day < state.turboUntil then
+		d /= 3
 	end
 	return math.clamp(math.ceil(d), 1, 30)
 end
@@ -2062,6 +2176,38 @@ function Actions.markRead(state, mailId)
 	return true
 end
 
+-- ===== website =====
+function Game.websiteBonus(state)
+	return Website.bonus(state.website)
+end
+
+function Actions.buildSite(state, partId)
+	local p = Website.byId[partId]
+	if not p then
+		return false, "Unknown page"
+	end
+	state.website = state.website or { parts = {}, theme = "cyan" }
+	if state.website.parts[partId] then
+		return false, "Already built"
+	end
+	if state.cash < p.cost then
+		return false, "Costs " .. Format.money(p.cost)
+	end
+	spend(state, p.cost, "office")
+	state.website.parts[partId] = true
+	Game.chatMsg(state, "general", "Web team", p.name .. " is live on the website.")
+	return true
+end
+
+function Actions.siteTheme(state, themeId)
+	if not Website.themeById[themeId] then
+		return false, "Unknown colour"
+	end
+	state.website = state.website or { parts = {}, theme = "cyan" }
+	state.website.theme = themeId
+	return true
+end
+
 -- ===== other AI products =====
 -- Your best launched model of every non-chat kind earns a little every day.
 function Game.sideIncome(state)
@@ -2139,6 +2285,45 @@ function Game.grantProduct(state, key: string, modelId: number?)
 		state.boxes = state.boxes or {}
 		table.insert(state.boxes, { kind = "buy", id = best.id, n = n })
 		Game.chatMsg(state, "infra", "Infra team", "A truck just dropped " .. n .. " " .. best.name .. " at the door. Open the boxes!")
+	elseif key == "legendhire" then
+		local place = Staff.placeById.elite
+		state.search = Game.rollCandidates(state, place, 5, nil, 4)
+		for _, c in ipairs(state.search) do
+			c.demand = 0
+		end
+		state.searchPlace = "elite"
+		Game.chatMsg(state, "general", "Recruiting", "The Elite Agency sent 4 LEGENDARY people who want to join. Open Team > Hire.")
+	elseif key == "turbo" then
+		state.turboUntil = math.max(state.turboUntil or 0, state.day) + 60
+		Game.chatMsg(state, "research", "Training bot", "TURBO mode on: every training runs 3x faster for 60 days.")
+	elseif key == "mega" then
+		local m = modelId and state.models[modelId]
+		if not m or not m.stats then
+			m = state.product.activeModel and state.models[state.product.activeModel] or state.models[#state.models]
+		end
+		if not m or not m.stats then
+			return false, "No model to boost"
+		end
+		for k, v in pairs(m.stats) do
+			m.stats[k] = v + 30
+		end
+		Game.applyStats(m)
+		m.lastGain = "+30 ALL (MEGA BOOST)"
+		Game.chatMsg(state, "research", "Training bot", m.name .. " got a MEGA BOOST. +30 to every stat.")
+	elseif key == "unlockkind" then
+		local nextKind
+		for _, k in ipairs(MT.list) do
+			if not MT.unlocked(k, state.day) and not (state.earlyKinds and state.earlyKinds[k.id]) then
+				nextKind = k
+				break
+			end
+		end
+		if not nextKind then
+			return false, "Every model type is already unlocked"
+		end
+		state.earlyKinds = state.earlyKinds or {}
+		state.earlyKinds[nextKind.id] = true
+		Game.chatMsg(state, "research", "Research team", "Early access: we can build " .. nextKind.name .. " models now, years before everyone else.")
 	elseif key == "stars" then
 		local before, mCosts, mSal = state.cash, state.month.costs, state.month.salaries
 		state.cash = math.huge
@@ -2765,6 +2950,9 @@ function Game.tickDay(state)
 		if perk(state, "train2x") then
 			step *= 2
 		end
+		if state.turboUntil and state.day < state.turboUntil then
+			step *= 3
+		end
 		if Game.hasProblem(state, "overheat") then
 			step *= 0.4
 		end
@@ -2823,7 +3011,7 @@ function Game.tickDay(state)
 	local rivalAttr = 0
 	for labId, lb in pairs(state.world.labBest) do
 		local lab = Labs.byId[labId]
-		rivalAttr += (lab and lab.brand or 0.5) * math.exp((lb.cap - F) / 6)
+		rivalAttr += (lab and lab.brand or 0.5) * math.exp(math.clamp(lb.cap - F, -60, 30) / 6)
 	end
 	local revenue, inference = 0, 0
 	if active then
@@ -2833,10 +3021,12 @@ function Game.tickDay(state)
 		end
 		local quality = (1 + 0.12 * math.log(1 + fx.product)) * (1 + feats * 0.05)
 		local priceF = (20 / math.max(state.product.subPrice, 1)) ^ 0.25
-		local attr = (state.brand + state.users / 5e8) * math.exp((active.cap - F) / 6) * quality * priceF * (1 + state.reputation / 200)
+		local attr = (state.brand + state.users / 5e8) * math.exp(math.clamp(active.cap - F, -60, 30) / 6) * quality * priceF * (1 + state.reputation / 200)
 		attr /= math.sqrt(Config.DIFFICULTY)
 		local share = attr / (attr + rivalAttr)
-		local target = math.min(state.world.marketUsers * 1e6, state.world.marketUsers * 1e6 * share * (perk(state, "vip") and 1.5 or 1))
+		local web = Website.bonus(state.website)
+		local target = math.min(state.world.marketUsers * 1e6, state.world.marketUsers * 1e6 * share * (perk(state, "vip") and 1.5 or 1) * (1 + web.users))
+		state.brand += web.brand / 30
 		local rate = target > state.users and 0.03 or 0.012
 		state.users = math.max(0, state.users + (target - state.users) * rate)
 		state.brand += fx.hype * 0.00002 + 0.00001
@@ -2850,7 +3040,7 @@ function Game.tickDay(state)
 		end
 		-- API: volume in millions of tokens/day. Cheaper than rivals = more volume, capped.
 		local elastic = math.min((refPrice / math.max(state.product.apiPrice, 0.05)) ^ 0.8, 5)
-		local quality = math.exp((active.cap - F) / 10)
+		local quality = math.exp(math.clamp(active.cap - F, -40, 20) / 10)
 		local apiVol = state.users * 0.0004 * elastic * quality * (1 + fx.sales * 0.15) * (1 + math.max(0, (active.abilities.coding or 0)) / 20)
 		local api = apiVol * state.product.apiPrice
 		revenue = subs + pro + api
@@ -3119,6 +3309,7 @@ function Game.snapshot(state)
 			end
 			return nil
 		end)(),
+		searchPlace = state.searchPlace, earlyKinds = state.earlyKinds or {}, turboUntil = state.turboUntil or 0, website = state.website or { parts = {} }, websiteBonus = Game.websiteBonus(state),
 		perks = state.perks or {}, sideIncome = Game.sideIncome(state), calmUntil = state.calmUntil,
 		eraCeiling = Game.eraCeiling(state), achievements = state.achievements or {}, lastAchievement = state.lastAchievement, boxes = #(state.boxes or {}), problems = state.problems or {}, acquired = state.acquired or {}, location = state.location, loans = state.loans, loanLimit = Game.loanLimit(state), gpuCap = Game.gpuCap(state),
 	}

@@ -36,6 +36,7 @@ return {
 		video = "rbxassetid://123812002589130",
 		cube = "rbxassetid://102655105927120",
 		robot = "rbxassetid://83066118906298",
+		web = "rbxassetid://83005253001648",
 	},
 	icons = {
 		lab = "rbxassetid://110952761663378",

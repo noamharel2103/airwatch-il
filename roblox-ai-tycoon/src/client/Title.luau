@@ -163,7 +163,7 @@ function Title.show(gui: ScreenGui, onPlay: () -> ())
 		if info then
 			new("TextLabel", { Text = tostring(info.company):upper(), FontFace = UI.HEAVY, TextSize = 20, TextColor3 = Color3.new(1, 1, 1), TextXAlignment = Enum.TextXAlignment.Center, TextTruncate = Enum.TextTruncate.AtEnd, TextWrapped = false, Position = UDim2.fromOffset(14, 176), Size = UDim2.new(1, -28, 0, 26), Parent = f })
 			new("TextLabel", { Text = tostring(info.date or "") .. "   |   " .. tostring(info.stage or ""), TextSize = 15, TextColor3 = T.sub, TextXAlignment = Enum.TextXAlignment.Center, Position = UDim2.fromOffset(14, 208), Size = UDim2.new(1, -28, 0, 40), TextYAlignment = Enum.TextYAlignment.Top, Parent = f })
-			new("TextLabel", { Text = "WORTH " .. Format.money(info.valuation or 0), FontFace = UI.BOLD, TextSize = 17, TextColor3 = Color3.fromRGB(0, 230, 120), TextXAlignment = Enum.TextXAlignment.Center, Position = UDim2.fromOffset(14, 254), Size = UDim2.new(1, -28, 0, 24), Parent = f })
+			new("TextLabel", { Text = "WORTH " .. Format.money(info.valuation or 0), FontFace = UI.BOLD, TextSize = 17, TextScaled = true, TextWrapped = false, TextColor3 = Color3.fromRGB(0, 230, 120), TextXAlignment = Enum.TextXAlignment.Center, Position = UDim2.fromOffset(14, 254), Size = UDim2.new(1, -28, 0, 22), Parent = f })
 			UI.button(f, "PLAY", function()
 				status.Text = "LOADING " .. tostring(info.company):upper() .. "..."
 				local r = Net.slots("play", slot)

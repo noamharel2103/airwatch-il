@@ -144,7 +144,7 @@ local comp = new("Frame", { Name = "Computer", BackgroundColor3 = Color3.new(0, 
 Shell.computer = comp
 local screen = new("Frame", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -24), Size = UDim2.new(0.84, 0, 1, -150), BackgroundColor3 = Color3.fromRGB(20, 28, 52), ZIndex = 10, Parent = comp })
 UI.corner(screen, 22)
-UI.grad(screen, Color3.fromRGB(120, 190, 250), Color3.fromRGB(80, 150, 235), 90)
+UI.grad(screen, Color3.fromRGB(70, 120, 255), Color3.fromRGB(150, 60, 220), 135)
 -- blocky city skyline wallpaper
 
 local desk = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(40, 40), Size = UDim2.new(0, 400, 1, -120), ZIndex = 11, Parent = screen })
@@ -244,15 +244,78 @@ function Shell.closeApp()
 	end
 end
 
+-- Boot screen: the company OS starts up (long the first time, quick after that).
+local booted = false
+local booting = false
+local function osName(): string
+	local c = (Net.state and Net.state.company) or "NOMAD"
+	local first = c:match("^(%S+)") or c
+	return first:upper() .. " OS"
+end
+local function bootThen(after: () -> ())
+	if booting then
+		return
+	end
+	booting = true
+	local long = not booted
+	booted = true
+	local dur = long and 2.2 or 0.8
+	local boot = new("Frame", { BackgroundColor3 = Color3.fromRGB(6, 8, 20), Size = UDim2.fromScale(1, 1), ZIndex = 80, Parent = screen })
+	UI.corner(boot, 22)
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(14, 18, 48), Color3.fromRGB(4, 4, 12)), Parent = boot })
+	-- logo: four coloured blocks turning into a diamond
+	local logo = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.4), Size = UDim2.fromOffset(120, 120), Rotation = 0, ZIndex = 81, Parent = boot })
+	local cols = { Color3.fromRGB(0, 200, 255), Color3.fromRGB(255, 70, 160), Color3.fromRGB(255, 196, 30), Color3.fromRGB(0, 215, 105) }
+	for i = 0, 3 do
+		local b = new("Frame", { BackgroundColor3 = cols[i + 1], Position = UDim2.fromOffset((i % 2) * 62, math.floor(i / 2) * 62), Size = UDim2.fromOffset(56, 56), BackgroundTransparency = 1, ZIndex = 82, Parent = logo })
+		UI.corner(b, 2)
+		task.delay(i * 0.08, function()
+			UI.tween(b, 0.3, { BackgroundTransparency = 0 })
+		end)
+	end
+	UI.tween(logo, dur * 0.8, { Rotation = 45 }, Enum.EasingStyle.Back)
+	local name = new("TextLabel", { Text = osName(), FontFace = UI.HEAVY, TextSize = 34, TextColor3 = Color3.new(1, 1, 1), TextXAlignment = Enum.TextXAlignment.Center, TextTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.4, 100), Size = UDim2.fromOffset(700, 44), ZIndex = 81, Parent = boot })
+	UI.tween(name, 0.4, { TextTransparency = 0 })
+	local ver = new("TextLabel", { Text = "VERSION " .. tostring(Net.state and Net.state.year or 2023) .. "." .. tostring(Net.state and Net.state.launches or 0), FontFace = UI.BOLD, TextSize = 12, TextColor3 = Color3.fromRGB(120, 140, 200), TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.4, 150), Size = UDim2.fromOffset(700, 18), ZIndex = 81, Parent = boot })
+	local _ = ver
+	local track = new("Frame", { BackgroundColor3 = Color3.fromRGB(30, 36, 70), AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.4, 186), Size = UDim2.fromOffset(360, 12), ZIndex = 81, Parent = boot })
+	local fill = new("Frame", { BackgroundColor3 = Color3.fromRGB(0, 200, 255), Size = UDim2.fromScale(0, 1), ZIndex = 82, Parent = track })
+	new("UIGradient", { Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, cols[1]), ColorSequenceKeypoint.new(0.33, cols[2]), ColorSequenceKeypoint.new(0.66, cols[3]), ColorSequenceKeypoint.new(1, cols[4]) }), Parent = fill })
+	local line = new("TextLabel", { Text = "", TextSize = 13, TextColor3 = Color3.fromRGB(150, 165, 220), TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.4, 208), Size = UDim2.fromOffset(700, 18), ZIndex = 81, Parent = boot })
+	UI.tween(fill, dur, { Size = UDim2.fromScale(1, 1) }, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
+	task.spawn(function()
+		local steps = long and { "Waking up the GPUs...", "Loading AI models...", "Checking the bank account...", "Connecting to the office..." } or { "Welcome back" }
+		for _, st in ipairs(steps) do
+			line.Text = st
+			task.wait(dur / #steps)
+		end
+		booting = false
+		after()
+		UI.tween(boot, 0.25, { BackgroundTransparency = 1 })
+		for _, d in ipairs(boot:GetDescendants()) do
+			if d:IsA("TextLabel") then
+				UI.tween(d, 0.2, { TextTransparency = 1 })
+			elseif d:IsA("Frame") then
+				UI.tween(d, 0.2, { BackgroundTransparency = 1 })
+			end
+		end
+		task.delay(0.3, function()
+			boot:Destroy()
+		end)
+	end)
+end
+
 function Shell.openComputer(appId: string?)
 	comp.Visible = true
 	hud.Visible = true
 	screen.Size = UDim2.new(0.8, 0, 1, -190)
 	UI.tween(screen, 0.2, { Size = UDim2.new(0.84, 0, 1, -150) })
 	hint.Visible = false
-	if appId then
-		Shell.open(appId)
-	end
+	bootThen(function()
+		if appId then
+			Shell.open(appId)
+		end
+	end)
 end
 function Shell.closeComputer()
 	Shell.closeApp()

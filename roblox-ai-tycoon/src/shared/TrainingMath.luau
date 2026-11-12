@@ -5,6 +5,7 @@ local Shared = script.Parent
 local Config = require(Shared:WaitForChild("Config"))
 local Opts = require(Shared:WaitForChild("TrainingOptions"))
 local Hardware = require(Shared:WaitForChild("Hardware"))
+local MT = require(Shared:WaitForChild("ModelTypes"))
 
 local M = {}
 
@@ -148,7 +149,7 @@ function M.evaluate(recipe, ctx)
 	local infraEff = 1 + 0.1 * math.log(1 + (staff.infra or 0))
 	local days = flop / (Hardware.H100_FLOP_PER_DAY * power * infraEff) * time
 	-- Post-training takes a minimum of a few days.
-	days = math.max(days, 3)
+	days = math.max(days, 3) * (MT.get(recipe.kind).time or 1)
 
 	f.safety += 15 + 3 * math.log(1 + (staff.safety or 0)) * 3
 	local agentsLevel = dom.agents
