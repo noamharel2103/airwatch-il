@@ -8,10 +8,10 @@ Config.START_MONTH = 1
 
 -- Pacing: ~2 real minutes per in-game month at x1 (owner's target).
 Config.SECONDS_PER_DAY = 4
-Config.SPEEDS = { 0, 1, 2, 4 }
+Config.SPEEDS = { 0, 1, 2, 4 } -- x8 comes with the TIME WARP pass
 
 -- Risk multiplier per speed: faster = more can go wrong while you aren't watching.
-Config.RISK_BY_SPEED = { [0] = 0, [1] = 1, [2] = 2.2, [4] = 5 }
+Config.RISK_BY_SPEED = { [0] = 0, [1] = 1, [2] = 1.3, [4] = 1.7, [8] = 1.7 }
 
 -- Starting position: a laptop, $150K of savings, and a dream. Loans and investors come later.
 Config.START_CASH = 150e3

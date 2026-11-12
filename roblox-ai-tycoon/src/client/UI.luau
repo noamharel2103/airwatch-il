@@ -266,6 +266,12 @@ end
 
 -- Icon: the drawn PNG from our art set (fallback: glyph tile below).
 function UI.icon(parent: Instance, kind: string, color: Color3, size: number)
+	local v2 = Assets.icons2 and Assets.icons2[kind]
+	if v2 and v2 ~= "" then
+		local holder = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(size, size), Parent = parent })
+		new("ImageLabel", { Name = "Img", BackgroundTransparency = 1, Image = v2, Size = UDim2.fromScale(1, 1), Parent = holder })
+		return holder
+	end
 	if Assets.icons[kind] then
 		local holder = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(size, size), Parent = parent })
 		new("ImageLabel", { Name = "Img", BackgroundTransparency = 1, Image = Assets.icons[kind], Size = UDim2.fromScale(1, 1), Parent = holder })

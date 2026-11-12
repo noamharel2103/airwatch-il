@@ -34,15 +34,21 @@ workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale
 -- ===== HUD =====
 local hud = new("Frame", { Name = "HUD", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 60, Parent = gui })
 Shell.hud = hud
-local topRight = new("Frame", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, 14), Size = UDim2.fromOffset(330, 96), BackgroundColor3 = T.bg, BackgroundTransparency = 0.12, Parent = hud })
+local topRight = new("Frame", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, 14), Size = UDim2.fromOffset(400, 96), BackgroundColor3 = T.bg, BackgroundTransparency = 0.12, Parent = hud })
 UI.skin(topRight)
 local dateL = new("TextLabel", { Text = "Jan 1, 2023", FontFace = UI.HEAVY, TextSize = 26, Position = UDim2.fromOffset(18, 10), Size = UDim2.new(1, -36, 0, 30), TextXAlignment = Enum.TextXAlignment.Right, Parent = topRight })
 local speedRow = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(14, 50), Size = UDim2.new(1, -28, 0, 34), Parent = topRight })
 UI.list(speedRow, 6, true, Enum.HorizontalAlignment.Right)
 local speedBtns = {}
-for _, sp in ipairs({ 0, 1, 2, 4 }) do
+for _, sp in ipairs({ 0, 1, 2, 4, 8 }) do
 	local label = sp == 0 and "II" or ("x" .. sp)
 	local b = UI.button(speedRow, label, function()
+		if sp == 8 and not (Net.state and Net.state.perks and Net.state.perks.speed8) then
+			if Shell.openShop then
+				Shell.openShop("speed8")
+			end
+			return
+		end
 		Net.act("setSpeed", sp)
 	end, "ghost", { Size = UDim2.fromOffset(62, 32), TextSize = 15 })
 	speedBtns[sp] = b
@@ -54,6 +60,30 @@ UI.skin(topLeft)
 local compL = new("TextLabel", { Text = "", FontFace = UI.BOLD, TextSize = 15, TextColor3 = T.sub, Position = UDim2.fromOffset(18, 10), Size = UDim2.new(1, -36, 0, 18), Parent = topLeft })
 local cashL = new("TextLabel", { Text = "$0", FontFace = UI.HEAVY, TextSize = 30, TextColor3 = T.green, Position = UDim2.fromOffset(18, 30), Size = UDim2.new(1, -36, 0, 34), Parent = topLeft })
 local subL = new("TextLabel", { Text = "", TextSize = 13, TextColor3 = T.sub, Position = UDim2.fromOffset(18, 66), Size = UDim2.new(1, -36, 0, 18), Parent = topLeft })
+
+-- big SHOP button under the money (always on screen)
+local shopBtn = UI.button(hud, "SHOP", function()
+	if Shell.openShop then
+		Shell.openShop(nil)
+	end
+end, Color3.fromRGB(255, 175, 0), { Position = UDim2.fromOffset(16, 122), Size = UDim2.fromOffset(150, 58), TextSize = 20 })
+do
+	local ic = UI.icon(shopBtn, "shop", Color3.fromRGB(255, 175, 0), 40)
+	ic.Position = UDim2.fromOffset(8, 9)
+	shopBtn.TextXAlignment = Enum.TextXAlignment.Right
+	new("UIPadding", { PaddingRight = UDim.new(0, 14), Parent = shopBtn })
+	-- gentle pulse so it gets noticed
+	task.spawn(function()
+		local s = new("UIScale", { Parent = shopBtn })
+		while shopBtn.Parent do
+			UI.tween(s, 0.6, { Scale = 1.06 }, Enum.EasingStyle.Sine)
+			task.wait(0.6)
+			UI.tween(s, 0.6, { Scale = 1 }, Enum.EasingStyle.Sine)
+			task.wait(1.6)
+		end
+	end)
+end
+Shell.shopBtn = shopBtn
 
 -- live problems (servers down, hacked...) with the team's fix progress
 local problemBox = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 70), Size = UDim2.fromOffset(820, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = hud })
@@ -282,8 +312,11 @@ Net.onState(function(s)
 	for sp, b in pairs(speedBtns) do
 		local on = s.speed == sp
 		b.BackgroundColor3 = on and T.accent or Color3.fromRGB(150, 170, 205)
+		if sp == 8 and not on then
+			b.BackgroundColor3 = (s.perks and s.perks.speed8) and Color3.fromRGB(150, 170, 205) or Color3.fromRGB(255, 60, 130)
+		end
 	end
-	warn.Text = s.speed == 4 and "x4: things break faster when you are not watching" or (s.speed == 2 and "x2: a bit riskier" or "")
+	warn.Text = s.speed >= 4 and "x" .. s.speed .. ": things break a bit more when you are not watching" or (s.speed == 2 and "x2: a bit riskier" or "")
 	tbName.Text = s.company .. "   " .. Format.money(s.cash)
 	tbClock.Text = Format.date(s.day)
 	local pkey = tostring(math.floor((s.misuse or 0))) .. tostring(s.cash >= 0)
@@ -325,14 +358,19 @@ Net.onState(function(s)
 		local f = new("Frame", { BackgroundColor3 = T.red, Size = UDim2.new(1, 0, 0, 44), Parent = problemBox })
 		UI.stroke(f, T.line, 3)
 		new("TextLabel", { Text = PROBLEM_LABEL[p.kind] or p.kind, FontFace = UI.HEAVY, TextSize = 12, TextColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 0), Size = UDim2.new(0, 240, 1, 0), TextXAlignment = Enum.TextXAlignment.Left, Parent = f })
-		local h = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(260, 15), Size = UDim2.new(1, -490, 0, 14), Parent = f })
+		local h = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(260, 15), Size = UDim2.new(1, -620, 0, 14), Parent = f })
 		UI.bar(h, p.progress, T.yellow, 14)
 		if not p.rushed and p.rushCost then
 			local kind = p.kind
 			UI.button(f, "FIX IT NOW  " .. Format.money(p.rushCost), function()
 				Net.act("rushFix", kind)
-			end, T.yellow, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -6, 0.5, 0), Size = UDim2.fromOffset(210, 34), TextSize = 11 })
+			end, T.yellow, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -136, 0.5, 0), Size = UDim2.fromOffset(210, 34), TextSize = 11 })
 		end
+		UI.button(f, "INSTANT", function()
+			if Shell.openShop then
+				Shell.openShop("fixall")
+			end
+		end, Color3.fromRGB(0, 200, 90), { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -6, 0.5, 0), Size = UDim2.fromOffset(122, 34), TextSize = 11 })
 	end
 	afterProblems(s)
 end)

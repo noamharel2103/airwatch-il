@@ -59,6 +59,26 @@ function Net.act(name: string, ...): (boolean, any)
 	return true, res.data
 end
 
+-- Robux shop. kind = "pass" | "product". Returns the server reply table.
+function Net.shop(kind: string, key: string, target: any?): any
+	local rf = Remotes:FindFirstChild("Shop") :: RemoteFunction?
+	if not rf then
+		Net.toast("Shop is loading", "error")
+		return nil
+	end
+	local ok, res = pcall(function()
+		return (rf :: RemoteFunction):InvokeServer(kind, key, target)
+	end)
+	if not ok or type(res) ~= "table" then
+		Net.toast("Connection problem", "error")
+		return nil
+	end
+	if not res.ok then
+		Net.toast(tostring(res.err or "Failed"), "error")
+	end
+	return res
+end
+
 function Net.slots(action: string, ...)
 	local ok, res = pcall(function(...)
 		return SlotsRF:InvokeServer(action, ...)

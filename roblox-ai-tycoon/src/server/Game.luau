@@ -17,6 +17,8 @@ local Launch = require(script.Parent.Launch)
 local Game = {}
 local PcParts = require(game:GetService("ReplicatedStorage").Shared.PcParts)
 local Decor = require(game:GetService("ReplicatedStorage").Shared.Decor)
+local MT = require(Shared.ModelTypes)
+local Shop = require(Shared.Shop)
 local rng = Random.new()
 
 local function year(state)
@@ -176,6 +178,12 @@ function Game.advanceWorld(state)
 end
 
 -- ===== helpers =====
+-- Robux passes the player owns (set by the server on load, never trusted from the client).
+local function perk(state, key): boolean
+	return state.perks ~= nil and state.perks[key] == true
+end
+Game.perk = perk
+
 function Game.clusterPower(state): number
 	local p = 0
 	for id, n in pairs(state.gpus.owned) do
@@ -187,6 +195,9 @@ function Game.clusterPower(state): number
 	if state.research.done.ownchip then
 		p *= 1.25
 	end
+	if perk(state, "gpu3x") then
+		p *= 1.5
+	end
 	return p
 end
 
@@ -194,7 +205,7 @@ end
 function Game.gpuCap(state): number
 	local y = year(state)
 	local base = Config.yearValue(Config.GPU_ALLOCATION, y)
-	return math.floor(base * (0.6 + state.reputation / 125) * math.min(2.5, math.sqrt(1 + state.valuation / 2e10)))
+	return math.floor(base * (0.6 + state.reputation / 125) * math.min(2.5, math.sqrt(1 + state.valuation / 2e10)) * (perk(state, "gpu3x") and 3 or 1))
 end
 
 -- GPU places: your room plus any garages or datacenters you bought
@@ -552,7 +563,7 @@ end
 function Game.bestModel(state)
 	local best
 	for _, m in ipairs(state.models) do
-		if m.status == "released" and (not best or m.cap > best.cap) then
+		if m.status == "released" and (m.kind or "chat") == "chat" and (not best or m.cap > best.cap) then
 			best = m
 		end
 	end
@@ -730,7 +741,7 @@ Actions.buyStorage = function(...) return Game.buyStorage(...) end
 Game.Actions = Actions
 
 function Actions.setSpeed(state, s)
-	if table.find(Config.SPEEDS, s) then
+	if table.find(Config.SPEEDS, s) or (s == 8 and perk(state, "speed8")) then
 		state.speed = s
 	end
 	return true
@@ -927,14 +938,15 @@ function Actions.train(state, recipe)
 	if state.cash < ev.extraCost then
 		return false, "Not enough cash for data and post-training costs (" .. Format.money(ev.extraCost) .. ")"
 	end
-	ev.extraCost *= Config.DIFFICULTY / 2 * Game.smallDiscount(state)
+	ev.extraCost *= Config.DIFFICULTY / 2 * Game.smallDiscount(state) * MT.get(recipe.kind).cost
 	if state.cash < ev.extraCost then
 		return false, "Not enough cash for data and post-training (" .. Format.money(ev.extraCost) .. ")"
 	end
 	spend(state, ev.extraCost, "compute")
 	local name = tostring(recipe.name or "")
 	if #name < 2 then
-		name = state.company .. "-" .. (#state.models + 1)
+		local kk = MT.get(recipe.kind)
+		name = state.company .. (kk.id == "chat" and "" or (" " .. kk.short)) .. "-" .. (#state.models + 1)
 	end
 	name = name:sub(1, 32)
 	local noiseSd = 2.5 * ev.noise
@@ -1017,7 +1029,7 @@ function Game.applyStats(m)
 end
 
 -- One button: the game picks the biggest model your GPUs can train in about a month.
-function Actions.createModel(state, name)
+function Actions.createModel(state, name, kindId)
 	if state.training then
 		return false, "Already training a model"
 	end
@@ -1025,8 +1037,13 @@ function Actions.createModel(state, name)
 	if ctx.clusterPower <= 0 then
 		return false, "You have no GPUs. Get some in Parts."
 	end
+	local kind = MT.get(type(kindId) == "string" and kindId or "chat")
+	if not MT.unlocked(kind, state.day) then
+		return false, kind.name .. " is not invented yet. It unlocks in " .. Format.monthYear(kind.fromDay) .. "."
+	end
 	local recipe = Opts.defaultRecipe()
 	recipe.name = tostring(name or "")
+	recipe.kind = kind.id
 	local chosen = Opts.SIZES[1]
 	for _, sz in ipairs(Opts.SIZES) do
 		recipe.size = sz
@@ -1041,7 +1058,7 @@ function Actions.createModel(state, name)
 		if sz <= chosen then
 			recipe.size = sz
 			local ev = TM.evaluate(recipe, ctx)
-			if ev.extraCost * Config.DIFFICULTY / 2 * Game.smallDiscount(state) <= state.cash * 0.6 then
+			if ev.extraCost * Config.DIFFICULTY / 2 * Game.smallDiscount(state) * kind.cost <= state.cash * 0.6 then
 				break
 			end
 		end
@@ -1096,7 +1113,7 @@ Game.avgStat = avgStat
 -- Smarter models get very expensive: compute + electricity, growing ~6% per point.
 function Game.boostCost(state, m)
 	local D = Config.DIFFICULTY
-	local level = 1.06 ^ math.max(0, avgStat(m) - 15)
+	local level = 1.035 ^ math.max(0, avgStat(m) - 15)
 	return math.floor(1500 * (1 + m.size) ^ 0.75 * (1 + (year(state) - 2023) * 0.3) * D * level * Game.smallDiscount(state) / 100) * 100
 end
 
@@ -1113,7 +1130,7 @@ end
 
 -- You need enough ML people to push a model further.
 function Game.boostStaffNeeded(m)
-	return math.max(0, math.floor((avgStat(m) - 32) / 12))
+	return math.max(0, math.floor((avgStat(m) - 40) / 15))
 end
 
 -- Better GPUs and more infra engineers = faster training.
@@ -1122,7 +1139,11 @@ function Game.boostDays(state, m)
 	local infra = Game.staffEffects(state).infra
 	local ramF = Game.pcFactors(state)
 	local pcSpeed = PcParts.get(state.pc, "cpu").speed * PcParts.get(state.pc, "storage").speed * ramF * Decor.speed(state.decor)
-	return math.clamp(math.ceil(6 * (m.size / 7) ^ 0.55 / power ^ 0.5 / (1 + infra * 0.08) / pcSpeed), 1, 40)
+	local d = 6 * (m.size / 7) ^ 0.55 / power ^ 0.5 / (1 + infra * 0.08) / pcSpeed
+	if perk(state, "train2x") then
+		d /= 2
+	end
+	return math.clamp(math.ceil(d), 1, 30)
 end
 
 -- What is possible right now: you can beat today's best models, but not by decades.
@@ -1173,16 +1194,17 @@ local function finishBoost(state, m)
 		-- more GPUs, a better team and a bigger model all give bigger jumps
 		local base = 3 + rng:NextNumber(0, 4) + math.log(1 + power, 2) * 0.8 + math.log(1 + fx.research) * 1.6 + math.log10(1 + m.size) * 1.2
 		-- no hard cap, but going past what is possible this year gets very slow
+		-- past this year's best it slows down, but it never stops: everything is reachable with time
 		local over = m.stats[k] - ceil
-		local mult = over < -15 and 1 or (over < 0 and math.clamp(-over / 15, 0.35, 1) or 0.12 / (1 + over / 5))
-		local g = over >= 0 and 1 or math.max(1, math.floor(base * mult * (bst.b and 1 or 1.5) + 0.5))
+		local mult = over < -10 and 1 or (over < 0 and math.clamp(0.55 - over / 22, 0.55, 1) or math.max(0.08, 0.5 / (1 + over / 8)))
+		local g = math.max(2, math.floor(base * mult * (bst.b and 1 or 1.5) * (perk(state, "train2x") and 2 or 1) + 0.5))
 		m.stats[k] += g
 		table.insert(gains, (g > 0 and ("+" .. g) or "MAXED") .. " " .. k:sub(1, 1):upper() .. k:sub(2))
 	end
 	Game.applyStats(m)
 	-- pushing GPUs this hard can fry some of them
 	local fx2 = Game.staffEffects(state)
-	if rng:NextNumber() < 0.18 * (1 + avgStat(m) / 60) / (1 + fx2.infra * 0.2) * select(2, Game.pcFactors(state)) * 0.5 then
+	if rng:NextNumber() < 0.08 * (1 + avgStat(m) / 80) / (1 + fx2.infra * 0.2) * select(2, Game.pcFactors(state)) * 0.5 then
 		local best, bestN, bucket
 		for _, b in ipairs({ state.gpus.owned, state.gpus.rented }) do
 			for id, n in pairs(b) do
@@ -1228,6 +1250,7 @@ local function finishTraining(state)
 		systemCard = c.evals and c.evals.card or false,
 		recipe = t.recipe,
 		status = "ready",
+		kind = t.recipe.kind or "chat",
 		users = 0,
 		trainedDay = state.day,
 		updates = {},
@@ -1375,6 +1398,10 @@ function Actions.release(state, modelId, opts)
 	goalProgress(state, "release", 1)
 	-- effects
 	local eff = result.effects
+	if (m.kind or "chat") ~= "chat" then
+		eff.signups = 0
+		Game.chatMsg(state, "general", "Sales", m.name .. " is live as its own product. It earns money every day by itself.")
+	end
 	state.users = math.min(state.users + eff.signups, state.world.marketUsers * 1e6 * Config.MAX_MARKET_SHARE)
 	state.brand = math.max(0.005, state.brand + eff.brand)
 	state.hype = math.clamp(state.hype + eff.hype, 0, 100)
@@ -1562,6 +1589,9 @@ function Actions.setActive(state, modelId)
 	if not m or m.status ~= "released" then
 		return false, "Release it first"
 	end
+	if (m.kind or "chat") ~= "chat" then
+		return false, "Only chat models go in the app. This one earns by itself."
+	end
 	state.product.activeModel = modelId
 	return true
 end
@@ -1581,6 +1611,9 @@ function Actions.investor(state, idx, accept)
 	end
 	table.remove(state.investors, idx)
 	if accept then
+		if perk(state, "vip") then
+			inv.amount *= 1.5
+		end
 		state.cash += inv.amount
 		state.equity *= (1 - inv.stake)
 		state.valuation = inv.post
@@ -1809,6 +1842,9 @@ function Actions.meetAccept(state)
 		Game.chatMsg(state, "general", "Finance", string.format("Loan of %s from %s at %.1f%% a year.", Format.money(mt.amount), mt.firm, mt.rate * 100))
 	else
 		local post = mt.amount / mt.stake
+		if perk(state, "vip") then
+			mt.amount *= 1.5
+		end
 		state.cash += mt.amount
 		state.equity *= (1 - mt.stake)
 		state.valuation = math.max(state.valuation, post)
@@ -2023,6 +2059,109 @@ function Actions.markRead(state, mailId)
 			m.read = true
 		end
 	end
+	return true
+end
+
+-- ===== other AI products =====
+-- Your best launched model of every non-chat kind earns a little every day.
+function Game.sideIncome(state)
+	local best = {}
+	for _, m in ipairs(state.models) do
+		local k = m.kind or "chat"
+		if k ~= "chat" and m.status == "released" and m.stats then
+			if not best[k] or avgStat(m) > avgStat(best[k]) then
+				best[k] = m
+			end
+		end
+	end
+	local out = { total = 0, byKind = {} }
+	local F = math.max(state.world.frontier, 1)
+	for k, m in pairs(best) do
+		local v = MT.dailyIncome(MT.get(k), avgStat(m) / F, year(state), Config.DIFFICULTY)
+		out.byKind[k] = { model = m.name, day = v }
+		out.total += v
+	end
+	return out
+end
+
+-- ===== Robux products (granted by the server's receipt handler only) =====
+function Game.grantProduct(state, key: string, modelId: number?)
+	local p = Shop.productByKey[key]
+	if not p then
+		return false, "Unknown product"
+	end
+	local y = year(state)
+	if p.cash then
+		local amount = Shop.cashFor(p, y)
+		state.cash += amount
+		Game.chatMsg(state, "general", "Finance", "Robux deal: " .. Format.money(amount) .. " just landed in the bank.")
+	elseif key == "finish" then
+		if state.training then
+			state.training.progress = 1
+			finishTraining(state)
+		end
+		for _, m in ipairs(state.models) do
+			if m.boosting then
+				finishBoost(state, m)
+			end
+		end
+		Game.chatMsg(state, "research", "Training bot", "Overclocked everything. All training finishes today.")
+	elseif key == "stats10" then
+		local m = modelId and state.models[modelId]
+		if not m or not m.stats then
+			m = state.product.activeModel and state.models[state.product.activeModel] or state.models[#state.models]
+		end
+		if not m or not m.stats then
+			return false, "No model to boost"
+		end
+		for k, v in pairs(m.stats) do
+			m.stats[k] = v + 10
+		end
+		Game.applyStats(m)
+		m.lastGain = "+10 ALL (SUPER BOOST)"
+		Game.chatMsg(state, "research", "Training bot", m.name .. " got a SUPER BOOST. +10 to every stat.")
+	elseif key == "fixall" then
+		state.problems = {}
+		state.misuse = 0
+		state.calmUntil = state.day + 90
+		Game.chatMsg(state, "general", "Ops", "Every fire is out. Nothing can break for 90 days.")
+	elseif key == "gpudrop" then
+		local best
+		for _, h in ipairs(Hardware.list) do
+			if h.id ~= "laptop" and Hardware.available(h, state.day) and (not best or h.power > best.power) then
+				best = h
+			end
+		end
+		if not best then
+			return false, "No GPUs on the market yet"
+		end
+		local n = math.max(8, math.floor(Config.yearValue(Config.GPU_ALLOCATION, y) * 0.15 / best.power))
+		state.boxes = state.boxes or {}
+		table.insert(state.boxes, { kind = "buy", id = best.id, n = n })
+		Game.chatMsg(state, "infra", "Infra team", "A truck just dropped " .. n .. " " .. best.name .. " at the door. Open the boxes!")
+	elseif key == "stars" then
+		local before, mCosts, mSal = state.cash, state.month.costs, state.month.salaries
+		state.cash = math.huge
+		local stage = Catalog.officeStages[state.office]
+		local room = math.max(0, stage.maxStaff - Game.headcount(state))
+		local n = math.min(5, room)
+		if n > 0 then
+			Actions.hire(state, "star", n)
+		end
+		state.cash, state.month.costs, state.month.salaries = before, mCosts, mSal
+		if n < 5 then
+			-- no desks left: the rest become a cash bonus instead of being lost
+			state.cash += (5 - n) * Staff.monthlyCash("star", y) * 3
+		end
+		Game.chatMsg(state, "general", "Recruiting", n .. " star researchers signed today" .. (n < 5 and ". The office is full, so the rest paid you a finder's bonus." or "."))
+	elseif key == "viral" then
+		local cap = state.world.marketUsers * 1e6 * Config.MAX_MARKET_SHARE
+		state.users = math.min(cap, state.users * 1.4 + 5000)
+		state.hype = math.min(100, state.hype + 40)
+		state.brand += 0.03
+		Game.newsItem(state, state.product.appName .. " is the most downloaded app in the world today", "you")
+	end
+	state.stats.robux = (state.stats.robux or 0) + 1
 	return true
 end
 
@@ -2275,7 +2414,7 @@ local function tickProblems(state, fx)
 		local crew = fx[def.fixer] or 0
 		p.rushCost = Game.rushCost(state, p.kind)
 		-- you and your laptop fix it slowly; every engineer helps
-		p.progress += (0.6 + crew * 0.8) / def.need
+		p.progress += (0.6 + crew * 0.8) / def.need * (perk(state, "shield") and 3 or 1)
 		if p.kind == "outage" then
 			state.users *= 0.985
 		elseif p.kind == "hack" or p.kind == "exploit" then
@@ -2302,8 +2441,14 @@ local function tickProblems(state, fx)
 			Game.chatMsg(state, def.fixer, names[def.fixer], def.done)
 		end
 	end
-	-- new problems (more often at high speed, fewer with a good team)
+	-- new problems: at most one at a time, and a calm stretch after each one
 	local risk = Config.RISK_BY_SPEED[state.speed] or 1
+	if perk(state, "shield") then
+		risk *= 0.25
+	end
+	if (state.calmUntil and state.day < state.calmUntil) or #state.problems > 0 or (state.lastCrisisDay and state.day - state.lastCrisisDay < 40) then
+		risk = 0
+	end
 	if state.users > 2000 and rng:NextNumber() < 0.004 * risk * (1 + math.log10(1 + state.users / 1e4)) / (1 + fx.infra * 0.15) then
 		Game.startProblem(state, "outage")
 	end
@@ -2617,6 +2762,9 @@ function Game.tickDay(state)
 		local power = Game.clusterPower(state)
 		local ctxEval = TM.evaluate(t.recipe, Game.trainCtx(state))
 		local step = power > 0 and (1 / math.max(ctxEval.days, 1)) or 0
+		if perk(state, "train2x") then
+			step *= 2
+		end
 		if Game.hasProblem(state, "overheat") then
 			step *= 0.4
 		end
@@ -2688,7 +2836,7 @@ function Game.tickDay(state)
 		local attr = (state.brand + state.users / 5e8) * math.exp((active.cap - F) / 6) * quality * priceF * (1 + state.reputation / 200)
 		attr /= math.sqrt(Config.DIFFICULTY)
 		local share = attr / (attr + rivalAttr)
-		local target = state.world.marketUsers * 1e6 * share
+		local target = math.min(state.world.marketUsers * 1e6, state.world.marketUsers * 1e6 * share * (perk(state, "vip") and 1.5 or 1))
 		local rate = target > state.users and 0.03 or 0.012
 		state.users = math.max(0, state.users + (target - state.users) * rate)
 		state.brand += fx.hype * 0.00002 + 0.00001
@@ -2744,6 +2892,13 @@ function Game.tickDay(state)
 	local office = (Catalog.officeStages[state.office].rent + storageRent) / 30 * loc.rent
 	if Game.hasProblem(state, "outage") then
 		revenue *= 0.2
+	end
+	-- other AI products (code, image, music...): your best launched model of each kind earns daily
+	local side = Game.sideIncome(state)
+	revenue += side.total
+	state.month.side = (state.month.side or 0) + side.total
+	if perk(state, "cash2x") then
+		revenue *= 2
 	end
 	state.cash += revenue
 	state.month.revenue += revenue
@@ -2820,6 +2975,12 @@ function Game.monthly(state, y)
 		if l.left <= 1 or l.months <= 0 then
 			table.remove(state.loans, i)
 		end
+	end
+	-- VIP: a monthly bonus from your famous-CEO side gigs
+	if perk(state, "vip") then
+		local bonus = 250e3 * (1 + math.max(0, y - 2023) * 1.5)
+		state.cash += bonus
+		Game.chatMsg(state, "general", "VIP", "Your keynote fees came in: " .. Format.money(bonus) .. ".")
 	end
 	-- being in the red is allowed, but the bank charges you for every dollar under zero
 	if state.cash < 0 then
@@ -2907,7 +3068,7 @@ function Game.snapshot(state)
 			rank = m.rank, reception = m.reception, benchmarks = m.benchmarks, flaws = flaws, revealed = m.revealed,
 			character = m.character, abilities = m.abilities, updating = m.updating, updates = m.updates, open = m.open,
 			apiPrice = m.apiPrice, delayUntil = m.delayUntil, serve = m.serve, losses = m.losses, speed = m.speed,
-			stats = m.stats, boosting = m.boosting, lastGain = m.lastGain, bannedUntil = m.bannedUntil,
+			kind = m.kind or "chat", stats = m.stats, boosting = m.boosting, lastGain = m.lastGain, bannedUntil = m.bannedUntil,
 			boostPower = m.stats and Game.boostPower(state, m) or 0, boostStaff = m.stats and Game.boostStaffNeeded(m) or 0,
 			boostCost = m.stats and Game.boostCost(state, m) or 0, boostDays = m.stats and Game.boostDays(state, m) or 0,
 		})
@@ -2958,6 +3119,7 @@ function Game.snapshot(state)
 			end
 			return nil
 		end)(),
+		perks = state.perks or {}, sideIncome = Game.sideIncome(state), calmUntil = state.calmUntil,
 		eraCeiling = Game.eraCeiling(state), achievements = state.achievements or {}, lastAchievement = state.lastAchievement, boxes = #(state.boxes or {}), problems = state.problems or {}, acquired = state.acquired or {}, location = state.location, loans = state.loans, loanLimit = Game.loanLimit(state), gpuCap = Game.gpuCap(state),
 	}
 end

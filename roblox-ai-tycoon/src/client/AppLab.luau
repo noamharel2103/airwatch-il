@@ -5,6 +5,7 @@
 local RS = game:GetService("ReplicatedStorage")
 local Shared = RS:WaitForChild("Shared")
 local Format = require(Shared.Format)
+local MT = require(Shared.ModelTypes)
 local UI = require(script.Parent.UI)
 local Net = require(script.Parent.Net)
 local T = UI.T
@@ -14,6 +15,7 @@ local Lab = { id = "lab", name = "AI Lab", icon = "lab", color = Color3.fromRGB(
 local selected: number? = nil
 local picks: { string } = {}
 local newName = ""
+local newKind = "chat"
 local Playground -- set by Main
 local page = "models"
 
@@ -116,7 +118,7 @@ local function buildModels(body, s)
 	local left = new("Frame", { Size = UDim2.new(0, 340, 1, 0), Parent = body })
 	UI.skin(left, T.bg)
 	UI.pad(left, 14)
-	local list = UI.scroll(left, { Size = UDim2.new(1, 0, 1, -140) })
+	local list = UI.scroll(left, { Size = UDim2.new(1, 0, 1, -204) })
 	UI.list(list, 10)
 	UI.pad(list, 4, 4)
 	if not selected or not s.models[selected] then
@@ -124,14 +126,20 @@ local function buildModels(body, s)
 	end
 	for i = #s.models, 1, -1 do
 		local m = s.models[i]
-		UI.button(list, m.name, function()
+		local kk = MT.get(m.kind)
+		UI.button(list, (kk.id == "chat" and "" or (kk.short .. "  ")) .. m.name, function()
 			selected = m.id
 			picks = {}
 			Lab.mount(Lab.ctx, Net.state)
-		end, m.id == selected and T.accent or "ghost", { Size = UDim2.new(1, -10, 0, 58), TextSize = 15 })
+		end, m.id == selected and T.accent or (kk.id == "chat" and "ghost" or kk.color:Lerp(Color3.new(0, 0, 0), 0.35)), { Size = UDim2.new(1, -10, 0, 58), TextSize = 15 })
 	end
 	if s.training then
 		local t = s.training
+		UI.button(list, "FINISH TRAINING NOW", function()
+			if Lab.openShop then
+				Lab.openShop("finish", nil)
+			end
+		end, Color3.fromRGB(0, 200, 90), { Size = UDim2.new(1, -10, 0, 44), TextSize = 12 })
 		local box = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -10, 0, 60), Parent = list })
 		UI.label(box, "TRAINING " .. t.name, 13, T.yellow, { FontFace = UI.BOLD })
 		local h = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 28), Size = UDim2.new(1, 0, 0, 18), Parent = box })
@@ -145,11 +153,24 @@ local function buildModels(body, s)
 	nameBox:GetPropertyChangedSignal("Text"):Connect(function()
 		newName = nameBox.Text:sub(1, 24)
 	end)
+	-- what kind of AI to build (cycles through every type; newer ones unlock over the years)
+	local kind = MT.get(newKind)
+	local open = MT.unlocked(kind, s.day)
+	UI.button(left, open and ("TYPE: " .. kind.name .. "  >") or (kind.name .. " IN " .. Format.monthYear(kind.fromDay):upper()), function()
+		local idx = 1
+		for i, k in ipairs(MT.list) do
+			if k.id == newKind then
+				idx = i
+			end
+		end
+		newKind = MT.list[idx % #MT.list + 1].id
+		Lab.mount(Lab.ctx, Net.state)
+	end, open and kind.color or "ghost", { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 0, 1, -132), Size = UDim2.new(1, 0, 0, 54), TextSize = 13 })
 	UI.button(left, s.training and "TRAINING..." or "+ CREATE MODEL", function()
 		if s.training then
 			return
 		end
-		if Net.act("createModel", newName) then
+		if Net.act("createModel", newName, newKind) then
 			newName = ""
 			Net.toast("Training started!", "good")
 		end
@@ -166,7 +187,13 @@ local function buildModels(body, s)
 		return
 	end
 	local status = m.status == "released" and ("LIVE   " .. Format.count(m.users or 0) .. " USERS") or (m.status == "banned" and "SHUT DOWN BY GOVERNMENT" or (m.status == "delayed" and "DELAYED" or "NOT LAUNCHED"))
-	UI.label(right, m.name, 26, T.accent, { FontFace = UI.HEAVY })
+	local mk = MT.get(m.kind)
+	if mk.id ~= "chat" then
+		local side = s.sideIncome and s.sideIncome.byKind and s.sideIncome.byKind[mk.id]
+		local earns = (side and side.model == m.name) and ("EARNS " .. Format.money(side.day * 30) .. " / MONTH") or (m.status == "released" and "YOUR BETTER " .. mk.short .. " MODEL EARNS INSTEAD" or "LAUNCH IT TO START EARNING")
+		status = mk.name .. "   " .. earns
+	end
+	UI.label(right, m.name, 26, mk.id == "chat" and T.accent or mk.color, { FontFace = UI.HEAVY })
 	UI.label(right, "QUALITY " .. quality(m, s) .. "%  OF TODAY'S BEST      " .. status, 14, m.status == "released" and T.green or T.sub, { FontFace = UI.BOLD, Position = UDim2.fromOffset(0, 44) })
 	local rows = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 82), Size = UDim2.new(1, 0, 0, 6 * 46), Parent = right })
 	UI.list(rows, 6)
@@ -204,7 +231,7 @@ local function buildModels(body, s)
 		local total = math.max(1, m.boosting.doneDay - m.boosting.startDay)
 		local frac = math.clamp((s.day - m.boosting.startDay) / total, 0, 1)
 		UI.label(trainRow, "TRAINING " .. m.boosting.a:upper() .. (m.boosting.b and (" + " .. m.boosting.b:upper()) or ""), 13, T.yellow, { FontFace = UI.BOLD })
-		local h = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 26), Size = UDim2.new(1, 0, 0, 22), Parent = trainRow })
+		local h = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 26), Size = UDim2.new(1, -240, 0, 22), Parent = trainRow })
 		local _, f = UI.bar(h, frac, T.purple, 22)
 		live.boostFill = f
 		live.boostModel = m.id
@@ -217,9 +244,24 @@ local function buildModels(body, s)
 			if Net.act("boost", m.id, picks[1], picks[2] or "") then
 				picks = {}
 			end
-		end, T.purple, { Size = UDim2.new(1, 0, 0, 52), TextSize = 15 })
+		end, T.purple, { Size = UDim2.new(1, -230, 0, 52), TextSize = 15 })
 	else
-		UI.label(trainRow, m.lastGain and ("LAST TRAINING " .. m.lastGain:upper()) or "PICK 1 OR 2 STATS TO TRAIN", 13, T.sub, { FontFace = UI.BOLD })
+		UI.label(trainRow, m.lastGain and ("LAST TRAINING " .. m.lastGain:upper()) or "PICK 1 OR 2 STATS TO TRAIN", 13, T.sub, { FontFace = UI.BOLD, Size = UDim2.new(1, -230, 0, 20) })
+	end
+	-- pay to win shortcuts
+	local mid = m.id
+	if busy then
+		UI.button(trainRow, "FINISH NOW", function()
+			if Lab.openShop then
+				Lab.openShop("finish", mid)
+			end
+		end, Color3.fromRGB(0, 200, 90), { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.fromOffset(220, 52), TextSize = 13 })
+	else
+		UI.button(trainRow, "SUPER BOOST", function()
+			if Lab.openShop then
+				Lab.openShop("stats10", mid)
+			end
+		end, Color3.fromRGB(255, 60, 130), { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.fromOffset(220, 52), TextSize = 13 })
 	end
 	-- bottom buttons
 	local bottom = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 0, 1, 0), Size = UDim2.new(1, 0, 0, 66), Parent = right })
@@ -228,6 +270,8 @@ local function buildModels(body, s)
 		UI.button(bottom, "LAUNCH", function()
 			releaseDialog(Lab.host or body, m, Net.state)
 		end, T.green, { Size = UDim2.fromOffset(340, 64), TextSize = 22 })
+	elseif m.status == "released" and mk.id ~= "chat" then
+		UI.button(bottom, "SELLING", function() end, mk.color, { Size = UDim2.fromOffset(300, 64), TextSize = 16 })
 	elseif m.status == "released" then
 		local inApp = s.product.activeModel == m.id
 		UI.button(bottom, inApp and "IN YOUR APP" or "PUT IN APP", function()
@@ -288,7 +332,7 @@ function Lab.key(s)
 	if page == "arena" then
 		return "a" .. #s.leaderboard .. math.floor(s.frontier)
 	end
-	local k = "m" .. (s.training and "t" or "") .. tostring(s.product.activeModel)
+	local k = "m" .. (s.training and "t" or "") .. tostring(s.product.activeModel) .. tostring(s.day // 30)
 	for _, m in ipairs(s.models) do
 		k ..= m.status .. (m.boosting and "b" or "") .. (m.lastGain or "") .. math.floor((m.users or 0) / 1000)
 	end

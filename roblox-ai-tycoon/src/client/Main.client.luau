@@ -28,9 +28,27 @@ local cam = workspace.CurrentCamera
 
 local LinkedIn = require(Modules.AppLinkedIn)
 local Cameras = require(Modules.AppCameras)
-for _, app in ipairs({ Lab, Parts, Team, LinkedIn, Bank, Social, MailGoals.Mail, MailGoals.Goals, Company, Cameras }) do
+local ShopApp = require(Modules.AppShop)
+for _, app in ipairs({ ShopApp, Lab, Parts, Team, LinkedIn, Bank, Social, MailGoals.Mail, MailGoals.Goals, Company, Cameras }) do
 	Shell.register(app)
 end
+Shell.openShop = function(key: string?)
+	ShopApp.focus(key)
+	if Shell.isOpen() then
+		Shell.open("shop")
+	else
+		Shell.openComputer("shop")
+	end
+end
+Lab.openShop = function(key: string?, modelId: number?)
+	ShopApp.targetModel = modelId
+	Shell.openShop(key)
+end
+Net.onEvent(function(kind, data)
+	if kind == "purchase" then
+		Shell.toast("PURCHASE COMPLETE. THANK YOU!", "good")
+	end
+end)
 Lab.setPlayground(Playground)
 Lab.host = Shell.overlay
 Lab.social = Social
