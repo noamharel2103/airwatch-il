@@ -166,6 +166,26 @@ UIS.InputChanged:Connect(function(input, processed)
 		orbit.idle = os.clock()
 	end
 end)
+-- phones: drag with one finger to look around, pinch to zoom
+UIS.TouchPan:Connect(function(_touches, delta, state, processed)
+	if processed or Shell.isOpen() or state ~= Enum.UserInputState.Change then
+		return
+	end
+	orbit.yawT = math.clamp(orbit.yawT - delta.X * 0.15, -45, 45)
+	orbit.pitchT = math.clamp(orbit.pitchT - delta.Y * 0.12, -12, 22)
+	orbit.idle = os.clock()
+end)
+UIS.TouchPinch:Connect(function(_touches, pinchScale, _velocity, state, processed)
+	if processed or Shell.isOpen() then
+		return
+	end
+	if state == Enum.UserInputState.Begin then
+		orbit.pinchStart = orbit.zoomT
+	elseif state == Enum.UserInputState.Change then
+		orbit.zoomT = math.clamp((orbit.pinchStart or orbit.zoomT) / math.max(pinchScale, 0.2), 0.45, 1.25)
+		orbit.idle = os.clock()
+	end
+end)
 UIS.InputBegan:Connect(function(input, processed)
 	if processed or Shell.isOpen() then
 		return

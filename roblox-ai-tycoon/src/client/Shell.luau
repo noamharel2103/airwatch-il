@@ -25,7 +25,8 @@ Shell.overlay = overlay
 local function rescale()
 	local cam = workspace.CurrentCamera
 	local v = cam and cam.ViewportSize or Vector2.new(1600, 900)
-	scale.Scale = math.clamp(math.min(v.X / 1450, v.Y / 820), 0.6, 1.5)
+	-- phones are tiny: let everything shrink until the whole layout fits on the screen
+	scale.Scale = math.clamp(math.min(v.X / 1450, v.Y / 820), 0.3, 1.5)
 end
 rescale()
 overlayScale.Scale = scale.Scale

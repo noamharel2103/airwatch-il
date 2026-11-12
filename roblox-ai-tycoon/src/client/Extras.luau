@@ -14,7 +14,8 @@ local new = UI.new
 local Extras = {}
 local Fx: any = nil
 local host: Instance? = nil
-local settings = { music = true, musicVol = 0.5, sfx = true, sfxVol = 1, hover = true }
+-- no hover on phones, so no hover sounds there by default
+local settings = { music = true, musicVol = 0.5, sfx = true, sfxVol = 1, hover = not game:GetService("UserInputService").TouchEnabled }
 
 local function meta(action: string, arg: any?): any
 	local rf = RS:FindFirstChild("Remotes") and RS.Remotes:FindFirstChild("Meta")
