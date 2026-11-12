@@ -219,16 +219,16 @@ local function buildModels(body, s)
 	UI.label(right, m.name, 26, mk.id == "chat" and T.accent or mk.color, { FontFace = UI.HEAVY })
 	UI.label(right, "TO RUN IT: " .. Lab.runNeeds(m.size or 1), 11, T.yellow, { FontFace = UI.BOLD, Position = UDim2.fromOffset(0, 66), Size = UDim2.new(1, 0, 0, 14) })
 	UI.label(right, "QUALITY " .. quality(m, s) .. "%  OF TODAY'S BEST      " .. status, 14, m.status == "released" and T.green or T.sub, { FontFace = UI.BOLD, Position = UDim2.fromOffset(0, 44) })
-	local rows = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 82), Size = UDim2.new(1, 0, 0, 6 * 46), Parent = right })
-	UI.list(rows, 6)
+	local rows = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 86), Size = UDim2.new(1, 0, 0, 6 * 38), Parent = right })
+	UI.list(rows, 4)
 	local busy = m.boosting ~= nil
 	for _, st in ipairs(STATS) do
 		local v = m.stats and m.stats[st.id] or 0
 		local picked = table.find(picks, st.id) ~= nil
 		local isTraining = busy and (m.boosting.a == st.id or m.boosting.b == st.id)
-		local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 40), Parent = rows })
+		local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 34), Parent = rows })
 		new("TextLabel", { Text = st.name, FontFace = UI.BOLD, TextSize = 17, TextColor3 = (picked or isTraining) and T.yellow or T.text, Size = UDim2.new(0, 190, 1, 0), Parent = row })
-		local track = new("Frame", { BackgroundColor3 = Color3.fromRGB(18, 22, 40), Position = UDim2.new(0, 200, 0, 7), Size = UDim2.new(1, -440, 0, 26), Parent = row })
+		local track = new("Frame", { BackgroundColor3 = Color3.fromRGB(18, 22, 40), Position = UDim2.new(0, 200, 0, 5), Size = UDim2.new(1, -440, 0, 24), Parent = row })
 		UI.corner(track, 2)
 		UI.stroke(track, T.line, 3)
 		new("Frame", { BackgroundColor3 = st.color, Size = UDim2.fromScale(math.clamp(v / math.max(s.eraCeiling or 100, 1), 0, 1), 1), Parent = track })
@@ -247,7 +247,7 @@ local function buildModels(body, s)
 				picks[2] = st.id
 			end
 			Lab.mount(Lab.ctx, Net.state)
-		end, isTraining and T.purple or (picked and T.yellow or (busy and "ghost" or T.green)), { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.fromOffset(150, 40), TextSize = 14 })
+		end, isTraining and T.purple or (picked and T.yellow or (busy and "ghost" or T.green)), { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.fromOffset(150, 34), TextSize = 13 })
 	end
 	-- train line
 	local trainRow = new("Frame", { BackgroundTransparency = 1, Position = UDim2.new(0, 0, 1, -128), Size = UDim2.new(1, 0, 0, 54), Parent = right })
@@ -255,7 +255,7 @@ local function buildModels(body, s)
 		local total = math.max(1, m.boosting.doneDay - m.boosting.startDay)
 		local frac = math.clamp((s.day - m.boosting.startDay) / total, 0, 1)
 		UI.label(trainRow, "TRAINING " .. m.boosting.a:upper() .. (m.boosting.b and (" + " .. m.boosting.b:upper()) or ""), 13, T.yellow, { FontFace = UI.BOLD })
-		local h = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 26), Size = UDim2.new(1, -240, 0, 22), Parent = trainRow })
+		local h = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 26), Size = UDim2.new(1, 0, 0, 22), Parent = trainRow })
 		local _, f = UI.bar(h, frac, T.purple, 22)
 		live.boostFill = f
 		live.boostModel = m.id
@@ -268,24 +268,24 @@ local function buildModels(body, s)
 			if Net.act("boost", m.id, picks[1], picks[2] or "") then
 				picks = {}
 			end
-		end, T.purple, { Size = UDim2.new(1, -230, 0, 52), TextSize = 15 })
+		end, T.purple, { Size = UDim2.new(1, 0, 0, 52), TextSize = 15 })
 	else
-		UI.label(trainRow, m.lastGain and ("LAST TRAINING " .. m.lastGain:upper()) or "PICK 1 OR 2 STATS TO TRAIN", 13, T.sub, { FontFace = UI.BOLD, Size = UDim2.new(1, -230, 0, 20) })
+		UI.label(trainRow, m.lastGain and ("LAST TRAINING " .. m.lastGain:upper()) or "PICK 1 OR 2 STATS TO TRAIN", 13, T.sub, { FontFace = UI.BOLD, Size = UDim2.new(1, 0, 0, 20) })
 	end
 	-- pay to win shortcuts
 	local mid = m.id
 	if busy then
-		UI.button(trainRow, "FINISH NOW", function()
+		UI.button(right, "FINISH NOW", function()
 			if Lab.buyProduct then
 				Lab.buyProduct("finish", mid)
 			end
-		end, Color3.fromRGB(0, 200, 90), { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.fromOffset(220, 52), TextSize = 13 })
+		end, Color3.fromRGB(0, 200, 90), { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.fromOffset(200, 44), TextSize = 12 })
 	else
-		UI.button(trainRow, "SUPER BOOST", function()
+		UI.button(right, "SUPER BOOST", function()
 			if Lab.buyProduct then
 				Lab.buyProduct("stats10", mid)
 			end
-		end, Color3.fromRGB(255, 60, 130), { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.fromOffset(220, 52), TextSize = 13 })
+		end, Color3.fromRGB(255, 60, 130), { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.fromOffset(200, 44), TextSize = 12 })
 	end
 	-- bottom buttons
 	local bottom = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 0, 1, 0), Size = UDim2.new(1, 0, 0, 66), Parent = right })
