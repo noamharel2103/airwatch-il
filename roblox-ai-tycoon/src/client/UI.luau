@@ -30,14 +30,46 @@ UI.ICON_IMAGES = {
 }
 local T = UI.T
 -- Chunky and readable: rounded blocky font for text, pixel font for titles/buttons.
-UI.FONT = Font.fromEnum(Enum.Font.FredokaOne)
-UI.BOLD = Font.new("rbxasset://fonts/families/PressStart2P.json")
-UI.HEAVY = Font.new("rbxasset://fonts/families/PressStart2P.json")
-UI.MONO = Font.fromEnum(Enum.Font.FredokaOne)
--- normalise sizes so callers can keep "normal" sizes (everything a bit bigger than default)
-local SIZE_MULT = { [UI.FONT.Family] = 1.25, ["rbxasset://fonts/families/PressStart2P.json"] = 0.8 }
+-- GLASS = the new modern look: dark see-through glass panels, soft light edges, rounded
+-- corners, clean sans font. false = the old blocky pixel look.
+UI.GLASS = true
+local BUILDER = "rbxasset://fonts/families/BuilderSans.json"
+local SIZE_MULT
+if UI.GLASS then
+	UI.FONT = Font.new(BUILDER, Enum.FontWeight.Medium)
+	UI.BOLD = Font.new(BUILDER, Enum.FontWeight.Bold)
+	UI.HEAVY = Font.new(BUILDER, Enum.FontWeight.ExtraBold)
+	UI.MONO = Font.new(BUILDER, Enum.FontWeight.Medium)
+	SIZE_MULT = { [BUILDER] = 1.2 }
+else
+	UI.FONT = Font.fromEnum(Enum.Font.FredokaOne)
+	UI.BOLD = Font.new("rbxasset://fonts/families/PressStart2P.json")
+	UI.HEAVY = Font.new("rbxasset://fonts/families/PressStart2P.json")
+	UI.MONO = Font.fromEnum(Enum.Font.FredokaOne)
+	-- normalise sizes so callers can keep "normal" sizes (everything a bit bigger than default)
+	SIZE_MULT = { [UI.FONT.Family] = 1.25, ["rbxasset://fonts/families/PressStart2P.json"] = 0.8 }
+end
 
 function UI.new(class: string, props: { [string]: any }?, children: { Instance }?): any
+	-- glass look everywhere: the old thick black outlines become thin light rims and the
+	-- square corners get rounded, even where screens build them by hand
+	if UI.GLASS and props then
+		if class == "UIStroke" and props.Color == UI.T.line then
+			local contextual = props.ApplyStrokeMode == Enum.ApplyStrokeMode.Contextual
+			props = table.clone(props)
+			if contextual then
+				props.Transparency = math.max(props.Transparency or 0, 0.35)
+				props.Thickness = math.min(props.Thickness or 1, 1.5)
+			else
+				props.Color = Color3.new(1, 1, 1)
+				props.Transparency = 0.8
+				props.Thickness = math.min(props.Thickness or 1, 1.5)
+			end
+		elseif class == "UICorner" and props.CornerRadius and props.CornerRadius.Scale == 0 and props.CornerRadius.Offset <= 4 then
+			props = table.clone(props)
+			props.CornerRadius = UDim.new(0, 12)
+		end
+	end
 	local inst = Instance.new(class)
 	if class == "Frame" or class == "ScrollingFrame" or class == "TextButton" or class == "TextLabel" or class == "TextBox" or class == "ImageLabel" or class == "ImageButton" then
 		(inst :: any).BorderSizePixel = 0
@@ -138,6 +170,17 @@ function UI.skin(frame: GuiObject, color: Color3?)
 			c:Destroy()
 		end
 	end
+	if UI.GLASS then
+		-- frosted glass: see-through tint, light top fading down, thin bright rim
+		frame.BackgroundColor3 = (color or T.panel):Lerp(Color3.fromRGB(10, 14, 30), 0.35)
+		frame.BackgroundTransparency = 0.06
+		new("UICorner", { CornerRadius = UDim.new(0, 16), Parent = frame })
+		new("UIStroke", { Color = Color3.new(1, 1, 1), Transparency = 0.78, Thickness = 1.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = frame })
+		local g = frame:FindFirstChild("GlassSheen") or new("UIGradient", { Name = "GlassSheen", Parent = frame })
+		g.Rotation = 90
+		g.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(150, 160, 190))
+		return frame
+	end
 	new("UICorner", { CornerRadius = UDim.new(0, 2), Parent = frame })
 	new("UIStroke", { Color = T.line, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = frame })
 	if frame.AutomaticSize == Enum.AutomaticSize.None then
@@ -186,19 +229,28 @@ function UI.button(parent: Instance, text: string, onClick: (() -> ())?, kind: a
 		Size = UDim2.new(0, math.max(110, #text * 10 + 40), 0, 46),
 		Parent = parent,
 	})
-	new("UICorner", { CornerRadius = UDim.new(0, 2), Parent = b })
-	new("UIStroke", { Color = Color3.fromRGB(10, 12, 24), Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = b })
-	local textStroke = new("UIStroke", { Color = color:Lerp(Color3.new(0, 0, 0), 0.6), Thickness = 1.2, ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual, Parent = b })
-	textStroke.Enabled = false
-	new("Frame", { Name = "Shade", BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.7, Size = UDim2.new(1, 0, 0, 5), Position = UDim2.new(0, 0, 1, -5), Parent = b })
-	new("Frame", { Name = "Shine", BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.55, Size = UDim2.new(1, 0, 0, 3), Parent = b })
+	if UI.GLASS then
+		-- glass pill: coloured glass with a light top, a thin bright rim and a soft glow edge
+		new("UICorner", { CornerRadius = UDim.new(0, 14), Parent = b })
+		new("UIStroke", { Color = Color3.new(1, 1, 1), Transparency = 0.6, Thickness = 1.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = b })
+		new("UIGradient", { Name = "GlassSheen", Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(185, 190, 210)), Parent = b })
+		b.BackgroundTransparency = 0.12
+		b.FontFace = UI.BOLD
+	else
+		new("UICorner", { CornerRadius = UDim.new(0, 2), Parent = b })
+		new("UIStroke", { Color = Color3.fromRGB(10, 12, 24), Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = b })
+		local textStroke = new("UIStroke", { Color = color:Lerp(Color3.new(0, 0, 0), 0.6), Thickness = 1.2, ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual, Parent = b })
+		textStroke.Enabled = false
+		new("Frame", { Name = "Shade", BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.7, Size = UDim2.new(1, 0, 0, 5), Position = UDim2.new(0, 0, 1, -5), Parent = b })
+		new("Frame", { Name = "Shine", BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.55, Size = UDim2.new(1, 0, 0, 3), Parent = b })
+	end
 	local busy = false
 	local applied: Color3? = nil
 	local function setColor(c)
 		busy = true
 		local ghost = c == UI.GHOST or c == Color3.fromRGB(150, 170, 205)
 		if ghost then
-			applied = Color3.fromRGB(58, 70, 120)
+			applied = UI.GLASS and Color3.fromRGB(70, 82, 125) or Color3.fromRGB(58, 70, 120)
 			b.BackgroundColor3 = applied
 			b.TextColor3 = Color3.fromRGB(220, 228, 255)
 		else
