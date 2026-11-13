@@ -53,11 +53,12 @@ end
 pcall(function()
 	Lighting.Technology = Enum.Technology.Future
 end)
-Lighting.Brightness = 1.6
+Lighting.Brightness = 1.15
+Lighting.ExposureCompensation = -0.5
 Lighting.ClockTime = 16.5
-Lighting.Ambient = rgb(92, 86, 80)
-Lighting.OutdoorAmbient = rgb(128, 122, 118)
-Lighting.EnvironmentDiffuseScale = 0.6
+Lighting.Ambient = rgb(86, 78, 80)
+Lighting.OutdoorAmbient = rgb(96, 90, 110)
+Lighting.EnvironmentDiffuseScale = 0.45
 Lighting.EnvironmentSpecularScale = 0.6
 Lighting.ShadowSoftness = 0.25
 for _, c in ipairs(Lighting:GetChildren()) do
@@ -108,15 +109,48 @@ local function screenGui(scr, accent)
 	return g
 end
 
+-- real 3D models (meshes with PBR textures) from ServerStorage.Props replace the blocky
+-- part builds when they exist. Functional parts (Screen, WorkerSlot, GpuSlot) stay as they are.
+local Props = game:GetService("ServerStorage"):FindFirstChild("Props")
+local function prop(name: string, parent: Instance, cf: CFrame, scale: number?, fit: Vector3?): Model?
+	local src = Props and Props:FindFirstChild(name)
+	if not src then
+		return nil
+	end
+	local m = src:Clone()
+	local one = m:FindFirstChildWhichIsA("BasePart", true)
+	if fit and one and #m:GetDescendants() <= 3 then
+		-- single mesh: stretch it to exactly the space the old build used
+		one.Size = fit
+		m.PrimaryPart = one
+	elseif scale and scale ~= 1 then
+		m:ScaleTo(scale)
+	end
+	local _, size = m:GetBoundingBox()
+	m:PivotTo(cf * CFrame.new(0, size.Y / 2, 0))
+	for _, d in ipairs(m:GetDescendants()) do
+		if d:IsA("BasePart") then
+			d.Anchored = true
+			d.CanCollide = false
+			if d:IsA("Seat") then
+				d.Disabled = true
+			end
+		end
+	end
+	m.Parent = parent
+	return m
+end
+
 local function deskWithPC(parent, cf, laptop, app)
 	local m = model(parent, "Desk", app, app and "Computer" or nil)
-	p(m, "Top", Vector3.new(6, 0.35, 3), cf * CFrame.new(0, 3, 0), WOOD, M.Wood)
-	p(m, "TopEdge", Vector3.new(6.1, 0.12, 3.1), cf * CFrame.new(0, 2.8, 0), rgb(96, 68, 44), M.Wood)
-	p(m, "LegL", Vector3.new(0.3, 2.8, 2.8), cf * CFrame.new(-2.7, 1.4, 0), DARK, M.Metal)
-	-- drawer unit on the right
-	p(m, "Drawers", Vector3.new(1.6, 2.6, 2.6), cf * CFrame.new(2.1, 1.35, 0), rgb(225, 228, 235), M.SmoothPlastic)
-	for i = 0, 2 do
-		p(m, "Handle", Vector3.new(0.7, 0.12, 0.1), cf * CFrame.new(2.1, 0.5 + i * 0.85, 1.32), DARK, M.Metal)
+	if not prop("Desk", m, cf, nil, Vector3.new(6.2, 3.17, 3.1)) then
+		p(m, "Top", Vector3.new(6, 0.35, 3), cf * CFrame.new(0, 3, 0), WOOD, M.Wood)
+		p(m, "TopEdge", Vector3.new(6.1, 0.12, 3.1), cf * CFrame.new(0, 2.8, 0), rgb(96, 68, 44), M.Wood)
+		p(m, "LegL", Vector3.new(0.3, 2.8, 2.8), cf * CFrame.new(-2.7, 1.4, 0), DARK, M.Metal)
+		p(m, "Drawers", Vector3.new(1.6, 2.6, 2.6), cf * CFrame.new(2.1, 1.35, 0), rgb(225, 228, 235), M.SmoothPlastic)
+		for i = 0, 2 do
+			p(m, "Handle", Vector3.new(0.7, 0.12, 0.1), cf * CFrame.new(2.1, 0.5 + i * 0.85, 1.32), DARK, M.Metal)
+		end
 	end
 	local scr
 	if laptop then
@@ -125,10 +159,15 @@ local function deskWithPC(parent, cf, laptop, app)
 		p(m, "Lid", Vector3.new(2.5, 1.7, 0.08), cf * CFrame.new(0, 4, -0.62) * CFrame.Angles(math.rad(-10), 0, 0), rgb(60, 62, 70), M.Metal)
 		scr = p(m, "Screen", Vector3.new(2.3, 1.5, 0.1), cf * CFrame.new(0, 4, -0.55) * CFrame.Angles(math.rad(-10), 0, 0), rgb(18, 20, 26))
 	else
-		p(m, "StandBase", Vector3.new(1.2, 0.1, 0.8), cf * CFrame.new(0, 3.22, -0.9), DARK, M.Metal)
-		p(m, "Stand", Vector3.new(0.25, 1.1, 0.25), cf * CFrame.new(0, 3.75, -1.05), DARK, M.Metal)
-		p(m, "Bezel", Vector3.new(3.3, 2.05, 0.14), cf * CFrame.new(0, 4.65, -0.98), rgb(22, 23, 28), M.SmoothPlastic)
-		scr = p(m, "Screen", Vector3.new(3.05, 1.8, 0.12), cf * CFrame.new(0, 4.68, -0.9), rgb(18, 20, 26))
+		if prop("Monitor", m, cf * CFrame.new(0, 3.17, -0.95), nil, Vector3.new(3.4, 2.75, 0.9)) then
+			-- the glowing screen picture sits just in front of the real monitor's panel
+			scr = p(m, "Screen", Vector3.new(3.1, 1.78, 0.05), cf * CFrame.new(0, 4.86, -0.47), rgb(18, 20, 26))
+		else
+			p(m, "StandBase", Vector3.new(1.2, 0.1, 0.8), cf * CFrame.new(0, 3.22, -0.9), DARK, M.Metal)
+			p(m, "Stand", Vector3.new(0.25, 1.1, 0.25), cf * CFrame.new(0, 3.75, -1.05), DARK, M.Metal)
+			p(m, "Bezel", Vector3.new(3.3, 2.05, 0.14), cf * CFrame.new(0, 4.65, -0.98), rgb(22, 23, 28), M.SmoothPlastic)
+			scr = p(m, "Screen", Vector3.new(3.05, 1.8, 0.12), cf * CFrame.new(0, 4.68, -0.9), rgb(18, 20, 26))
+		end
 		p(m, "Keyboard", Vector3.new(1.9, 0.1, 0.6), cf * CFrame.new(-0.2, 3.22, 0.3), rgb(40, 42, 50))
 		p(m, "KeyLight", Vector3.new(1.75, 0.02, 0.46), cf * CFrame.new(-0.2, 3.28, 0.3), rgb(0, 200, 255), M.Neon)
 		p(m, "Mouse", Vector3.new(0.3, 0.12, 0.45), cf * CFrame.new(1.1, 3.23, 0.35), rgb(40, 42, 50))
@@ -137,7 +176,10 @@ local function deskWithPC(parent, cf, laptop, app)
 	light(scr, "SurfaceLight", { Face = Enum.NormalId.Back, Brightness = 0.8, Range = 6, Color = rgb(140, 190, 255) })
 	-- mug
 	p(m, "Mug", Vector3.new(0.4, 0.45, 0.45), cf * CFrame.new(-2.3, 3.4, 0.4) * CFrame.Angles(0, 0, math.rad(90)), ({ rgb(255, 80, 80), rgb(255, 200, 40), rgb(80, 160, 255) })[(math.floor(math.abs(cf.Position.Z)) % 3) + 1], M.SmoothPlastic, { Shape = Enum.PartType.Cylinder })
-	-- office chair: 5-leg base, gas lift, seat, back, armrests
+	-- office chair: the real model, or the old part build as a fallback
+	if prop("Chair", m, cf * CFrame.new(0, 0, 2.75)) then
+		return m
+	end
 	local chairCol = rgb(36, 38, 46)
 	p(m, "Seat", Vector3.new(2.2, 0.4, 2.2), cf * CFrame.new(0, 1.9, 2.6), chairCol, M.Fabric)
 	p(m, "Back", Vector3.new(2.1, 2.3, 0.35), cf * CFrame.new(0, 3.35, 3.65) * CFrame.Angles(math.rad(-6), 0, 0), chairCol, M.Fabric)
@@ -214,20 +256,29 @@ local gpuN = 0
 local function gpuRack(parent, cf, slots, label)
 	local m = model(parent, "GpuRack", "parts", label or "GPUs")
 	local h = math.max(4, math.ceil(slots / 2) * 0.9 + 1.2)
-	p(m, "Frame", Vector3.new(3, h, 2.4), cf * CFrame.new(0, h / 2, 0), rgb(26, 28, 32), M.Metal)
-	p(m, "Glass", Vector3.new(2.6, h - 0.4, 0.1), cf * CFrame.new(0, h / 2, 1.22), rgb(160, 190, 220), M.Glass, { Transparency = 0.6 })
-	-- top vent, feet, glowing edge strips
-	p(m, "TopVent", Vector3.new(2.6, 0.12, 2), cf * CFrame.new(0, h + 0.06, 0), rgb(50, 52, 60), M.DiamondPlate)
-	p(m, "Feet", Vector3.new(3.1, 0.2, 2.5), cf * CFrame.new(0, 0.1, 0), rgb(15, 16, 20), M.Metal)
-	p(m, "StripL", Vector3.new(0.1, h - 0.3, 0.1), cf * CFrame.new(-1.45, h / 2, 1.22), rgb(0, 200, 255), M.Neon)
-	p(m, "StripR", Vector3.new(0.1, h - 0.3, 0.1), cf * CFrame.new(1.45, h / 2, 1.22), rgb(0, 200, 255), M.Neon)
+	local k = math.clamp(h / 7.6, 0.8, 1.4)
+	local real = prop("Rack", m, cf, k)
+	local front = 1.22
+	if real then
+		-- real rack: an invisible frame keeps the light, GPU lights sit on the rack front
+		p(m, "Frame", Vector3.new(3, h, 2.4), cf * CFrame.new(0, h / 2, 0), rgb(26, 28, 32), M.Metal, { Transparency = 1, CanCollide = false })
+		front = 1.85 * k
+		h = 7.6 * k
+	else
+		p(m, "Frame", Vector3.new(3, h, 2.4), cf * CFrame.new(0, h / 2, 0), rgb(26, 28, 32), M.Metal)
+		p(m, "Glass", Vector3.new(2.6, h - 0.4, 0.1), cf * CFrame.new(0, h / 2, 1.22), rgb(160, 190, 220), M.Glass, { Transparency = 0.6 })
+		p(m, "TopVent", Vector3.new(2.6, 0.12, 2), cf * CFrame.new(0, h + 0.06, 0), rgb(50, 52, 60), M.DiamondPlate)
+		p(m, "Feet", Vector3.new(3.1, 0.2, 2.5), cf * CFrame.new(0, 0.1, 0), rgb(15, 16, 20), M.Metal)
+		p(m, "StripL", Vector3.new(0.1, h - 0.3, 0.1), cf * CFrame.new(-1.45, h / 2, 1.22), rgb(0, 200, 255), M.Neon)
+		p(m, "StripR", Vector3.new(0.1, h - 0.3, 0.1), cf * CFrame.new(1.45, h / 2, 1.22), rgb(0, 200, 255), M.Neon)
+	end
 	for i = 0, slots - 1 do
 		gpuN += 1
 		local row, col = math.floor(i / 2), i % 2
 		local card = p(m, "GPU", Vector3.new(1.15, 0.6, 1.8), cf * CFrame.new(-0.62 + col * 1.24, 0.7 + row * 0.9, 0.1), rgb(70, 74, 82), M.Metal)
 		card:SetAttribute("GpuSlot", i + 1)
 		card.Transparency = 1
-		local led = p(m, "Led", Vector3.new(1.1, 0.12, 0.05), card.CFrame * CFrame.new(0, 0.15, 0.92), rgb(90, 255, 140), M.Neon)
+		local led = p(m, "Led", Vector3.new(1.1, 0.12, 0.05), real and (cf * CFrame.new(-0.62 + col * 1.24, 0.85 + row * 0.9 * k, front)) or (card.CFrame * CFrame.new(0, 0.15, 0.92)), rgb(90, 255, 140), M.Neon)
 		led:SetAttribute("GpuSlot", i + 1)
 		led.Transparency = 1
 		local fan = p(m, "Fan", Vector3.new(0.05, 0.42, 0.42), card.CFrame * CFrame.new(0, -0.07, 0.93) * CFrame.Angles(0, math.rad(90), 0), rgb(30, 32, 38), M.SmoothPlastic, { Shape = Enum.PartType.Cylinder })
@@ -292,11 +343,17 @@ local function shell(stage, origin, w, d, h, floorCol, floorMat, wallCol, opts)
 	p(room, "WindowFrame", Vector3.new(win.wd + 0.6, win.wh + 0.6, 0.4), c * CFrame.new(win.x, h * 0.55, -d / 2 - 0.1), rgb(245, 245, 240))
 	local glass = p(room, "Window", Vector3.new(win.wd, win.wh, 0.2), c * CFrame.new(win.x, h * 0.55, -d / 2 + 0.05), rgb(150, 200, 235), M.Glass, { Transparency = 0.15, Reflectance = 0.15 })
 	light(glass, "SurfaceLight", { Face = Enum.NormalId.Front, Brightness = 1.4, Range = 18, Angle = 70, Color = rgb(255, 236, 205) })
-	-- ceiling lamps (lights only, no ceiling so the camera sees in)
+	-- closed room: a real ceiling (the camera sits under it at the open front) and a header
+	-- beam over the opening, so you never see sky or the void above the walls
+	p(room, "Ceiling", Vector3.new(w + 2, 1, d + 2), c * CFrame.new(0, h + 0.5, 0), wallCol:Lerp(Color3.new(1, 1, 1), 0.4), M.Plaster)
+	p(room, "CrownBack", Vector3.new(w, 0.4, 0.4), c * CFrame.new(0, h - 0.2, -d / 2 + 0.2), rgb(245, 243, 238))
+	-- ceiling light panels: glowing strips with a soft light pointing down
 	for i = 1, opts.lamps or 2 do
 		local x = -w / 2 + i * w / ((opts.lamps or 2) + 1)
-		local lamp = p(room, "LampLight", Vector3.new(0.5, 0.5, 0.5), c * CFrame.new(x, h - 1, 0), rgb(255, 240, 220), M.Neon, { Transparency = 1, CanCollide = false })
-		light(lamp, "PointLight", { Brightness = 1.1, Range = math.max(18, w * 0.5), Color = rgb(255, 230, 200), Shadows = true })
+		for _, z in ipairs(d > 22 and { -d * 0.22, d * 0.18 } or { 0 }) do
+			local panel = p(room, "LampLight", Vector3.new(math.min(8, w * 0.22), 0.15, 2.2), c * CFrame.new(x, h - 0.05, z), rgb(255, 246, 228), M.Neon, { CanCollide = false })
+			light(panel, "SurfaceLight", { Face = Enum.NormalId.Bottom, Brightness = 2.6, Range = math.max(18, h * 1.6), Angle = 120, Color = rgb(255, 236, 210), Shadows = true })
+		end
 	end
 	-- camera: front, a bit high, looking slightly down and left into the room
 	room:SetAttribute("CameraCFrame", CFrame.lookAt(origin + Vector3.new(w * 0.12, h * 0.95, d * 0.55 + 6), origin + Vector3.new(-w * 0.03, h * 0.28, -d * 0.18)))
@@ -365,7 +422,7 @@ end
 
 -- ===== Stage 2: small shared office =====
 do
-	local room, c = shell(2, Vector3.new(120, 0, 0), 30, 20, 12, rgb(150, 150, 152), M.Concrete, rgb(232, 230, 224), { lamps = 2 })
+	local room, c = shell(2, Vector3.new(120, 0, 0), 30, 20, 12, rgb(118, 116, 118), M.Concrete, rgb(232, 230, 224), { lamps = 2 })
 	p(room, "Rug", Vector3.new(14, 0.08, 8), c * CFrame.new(-3, 0.04, 2), rgb(60, 70, 85), M.Fabric)
 	deskWithPC(room, c * CFrame.new(-9, 0, -7), false, "desktop")
 	for i = 0, 2 do
@@ -469,7 +526,7 @@ end
 
 -- ===== Stage 6: campus + datacenter view =====
 do
-	local room, c = shell(6, Vector3.new(840, 0, 0), 84, 46, 16, rgb(200, 200, 196), M.Marble, rgb(244, 244, 242), { lamps = 5, window = { x = 0, wd = 74, wh = 11 } })
+	local room, c = shell(6, Vector3.new(840, 0, 0), 84, 46, 16, rgb(150, 112, 80), M.WoodPlanks, rgb(244, 244, 242), { lamps = 5, window = { x = 0, wd = 74, wh = 11 } })
 	for i = 0, 9 do
 		for j = 0, 2 do
 			p(room, "DCRack", Vector3.new(3, 9, 6), c * CFrame.new(-36 + i * 8, -2, -60 - j * 10), rgb(28, 30, 34), M.Metal)
