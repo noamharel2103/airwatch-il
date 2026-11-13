@@ -65,10 +65,23 @@ function Title.show(gui: ScreenGui, onPlay: () -> ())
 	local _ = glow
 	local tag = new("TextLabel", { Text = "AI COMPANY TYCOON", FontFace = UI.HEAVY, TextSize = 22, TextColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0, BackgroundColor3 = Color3.fromRGB(0, 170, 255), TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 136), Size = UDim2.fromOffset(470, 46), Rotation = -2, Parent = logoHolder })
 	new("UIStroke", { Color = Color3.fromRGB(10, 12, 30), Thickness = 4, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = tag })
-	new("TextLabel", { Text = "FROM ONE LAPTOP IN 2023 TO THE BIGGEST COMPANY ON EARTH", FontFace = UI.BOLD, TextSize = 15, TextColor3 = Color3.fromRGB(190, 210, 255), TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 262), Size = UDim2.fromOffset(1100, 24), Parent = o })
+	local subline = new("TextLabel", { Text = "FROM ONE LAPTOP IN 2023 TO THE BIGGEST COMPANY ON EARTH", FontFace = UI.BOLD, TextSize = 15, TextColor3 = Color3.fromRGB(190, 210, 255), TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 262), Size = UDim2.fromOffset(1100, 24), Parent = o })
 
 	local row = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 312), Size = UDim2.fromOffset(1140, 390), Parent = o })
 	UI.list(row, 28, true, Enum.HorizontalAlignment.Center)
+	-- phones are short: logo, line and cards shrink together so the cards stay on screen
+	local fitScales = { new("UIScale", { Parent = logoHolder }), new("UIScale", { Parent = subline }), new("UIScale", { Parent = row }) }
+	local fitF = 1
+	local function refit()
+		fitF = UI.fitFactor(o, 1140, 790, 0)
+		for _, sc in ipairs(fitScales) do
+			sc.Scale = fitF
+		end
+		subline.Position = UDim2.new(0.5, 0, 0, 262 * fitF)
+		row.Position = UDim2.new(0.5, 0, 0, 312 * fitF)
+	end
+	task.defer(refit)
+	o:GetPropertyChangedSignal("AbsoluteSize"):Connect(refit)
 	local status = new("TextLabel", { Text = "LOADING YOUR COMPANIES...", FontFace = UI.BOLD, TextSize = 13, TextColor3 = Color3.fromRGB(190, 210, 255), BackgroundTransparency = 0.15, BackgroundColor3 = NAVY, TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -24), Size = UDim2.fromOffset(620, 40), Parent = o })
 	new("UIStroke", { Color = Color3.fromRGB(10, 12, 30), Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = status })
 
@@ -77,7 +90,7 @@ function Title.show(gui: ScreenGui, onPlay: () -> ())
 		local t0 = os.clock()
 		while o.Parent do
 			local t = os.clock() - t0
-			logoHolder.Position = UDim2.new(0.5, 0, 0, 56 + math.sin(t * 1.6) * 6)
+			logoHolder.Position = UDim2.new(0.5, 0, 0, (56 + math.sin(t * 1.6) * 6) * fitF)
 			tag.Rotation = -2 + math.sin(t * 2.2) * 1.2
 			bg.Position = UDim2.new(0.5, math.sin(t * 0.08) * 40, 0.5, 0)
 			for i, st in ipairs(stars) do
@@ -90,6 +103,7 @@ function Title.show(gui: ScreenGui, onPlay: () -> ())
 	local function newCompanyDialog(slot)
 		local overlay = new("TextButton", { Text = "", AutoButtonColor = false, BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.35, Size = UDim2.fromScale(1, 1), ZIndex = 230, Parent = o })
 		local d = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.52), Size = UDim2.fromOffset(900, 640), ZIndex = 231, Parent = overlay })
+		UI.fit(d)
 		UI.skin(d, T.bg)
 		local bar = new("Frame", { BackgroundColor3 = SLOT_COLORS[slot] or T.accent, Size = UDim2.new(1, 0, 0, 60), ZIndex = 232, Parent = d })
 		new("TextLabel", { Text = "NEW COMPANY", FontFace = UI.HEAVY, TextSize = 24, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromScale(1, 1), ZIndex = 233, Parent = bar })

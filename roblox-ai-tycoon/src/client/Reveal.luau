@@ -124,6 +124,7 @@ function R.play(gui: ScreenGui, result)
 
 	-- benchmarks
 	local panel = new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 60), Size = UDim2.fromOffset(980, 760), BackgroundTransparency = 1, ZIndex = 101, Parent = o })
+	UI.fit(panel, 90)
 	UI.list(panel, 10, false, Enum.HorizontalAlignment.Center)
 	UI.label(panel, "Benchmarks", 30, T.text, { FontFace = UI.HEAVY, TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 101 })
 	for _, b in ipairs(result.benchmarks) do
@@ -249,6 +250,7 @@ end
 -- Smaller popup for incidents (jailbreak, escape, delay, outage...)
 function R.incident(gui: ScreenGui, inc)
 	local o = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(760, 620), BackgroundColor3 = T.bg, ZIndex = 90, Parent = gui })
+	UI.fit(o)
 	UI.corner(o, 18)
 	UI.stroke(o, inc.kind == "ESCAPE" and T.red or T.yellow, 2)
 	UI.pad(o, 18)

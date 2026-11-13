@@ -336,7 +336,9 @@ RunService.Heartbeat:Connect(function()
 	if inst then
 		local m = UIS:GetMouseLocation()
 		tip.Text = label or "Open"
-		tip.Position = UDim2.fromOffset(m.X / Shell.gui:FindFirstChildOfClass("UIScale").Scale + 18, m.Y / Shell.gui:FindFirstChildOfClass("UIScale").Scale - 10)
+		local s = Shell.gui:FindFirstChildOfClass("UIScale").Scale
+		local o = Shell.gui.AbsolutePosition
+		tip.Position = UDim2.fromOffset((m.X - o.X) / s + 18, (m.Y - o.Y) / s - 10)
 		tip.Visible = true
 	else
 		tip.Visible = false
@@ -513,7 +515,7 @@ end)
 
 -- ===== start =====
 Shell.showHUD(false)
-Title.show(Shell.gui, function()
+Title.show(Shell.overlay, function()
 	blocked = false
 	Shell.showHUD(true)
 	if Net.state then

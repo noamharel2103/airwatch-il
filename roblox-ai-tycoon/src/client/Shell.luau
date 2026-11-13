@@ -22,14 +22,32 @@ scale:GetPropertyChangedSignal("Scale"):Connect(function()
 	overlayScale.Scale = scale.Scale
 end)
 Shell.overlay = overlay
+-- keep the HUD clear of the Roblox top bar buttons and phone notches
+gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
 local function rescale()
 	local cam = workspace.CurrentCamera
-	local v = cam and cam.ViewportSize or Vector2.new(1600, 900)
-	-- phones are tiny: let everything shrink until the whole layout fits on the screen
-	scale.Scale = math.clamp(math.min(v.X / 1450, v.Y / 820), 0.3, 1.5)
+	local v = gui.AbsoluteSize
+	if v.X < 10 then
+		v = cam and cam.ViewportSize or Vector2.new(1600, 900)
+	end
+	local view = cam and cam.ViewportSize or v
+	-- a phone gets a smaller design canvas so text stays readable; big windows shrink
+	-- on their own with UI.fit
+	local phone = UIS.TouchEnabled and math.min(view.X, view.Y) < 600
+	UI.phone = phone
+	Shell.phone = phone
+	local w, h = 1450, 820
+	if phone then
+		w, h = 960, 500
+	end
+	scale.Scale = math.clamp(math.min(v.X / w, v.Y / h), 0.3, 1.5)
+	if Shell.onRescale then
+		Shell.onRescale(phone)
+	end
 end
 rescale()
 overlayScale.Scale = scale.Scale
+gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(rescale)
 workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
 
 -- ===== HUD =====
@@ -258,6 +276,18 @@ local notch = new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2
 UI.corner(notch, 6)
 local brand = new("TextLabel", { Text = "", FontFace = UI.BOLD, TextSize = 10, TextColor3 = Color3.fromRGB(150, 160, 190), TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -4), Size = UDim2.fromOffset(300, 14), ZIndex = 10, Parent = laptop })
 Shell.laptopBrand = brand
+-- phones: the laptop takes almost the whole screen under the money bar
+local function layoutLaptop(phone: boolean)
+	if phone then
+		laptop.Size = UDim2.new(0.96, 0, 1, -142)
+		laptop.Position = UDim2.new(0.5, 0, 1, -30)
+	else
+		laptop.Size = UDim2.new(0.74, 0, 1, -196)
+		laptop.Position = UDim2.new(0.5, 0, 1, -58)
+	end
+end
+Shell.onRescale = layoutLaptop
+layoutLaptop(Shell.phone == true)
 local screen = new("Frame", { Position = UDim2.fromOffset(20, 26), Size = UDim2.new(1, -40, 1, -48), BackgroundColor3 = Color3.fromRGB(20, 28, 52), ClipsDescendants = true, ZIndex = 10, Parent = laptop })
 new("UICorner", { CornerRadius = UDim.new(0, 6), Parent = screen })
 UI.grad(screen, Color3.fromRGB(70, 120, 255), Color3.fromRGB(150, 60, 220), 135)

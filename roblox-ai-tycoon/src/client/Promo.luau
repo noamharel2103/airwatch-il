@@ -75,7 +75,8 @@ local function show(key: string, headline: string, sub: string, target: number?)
 		end
 	end
 	local sc = new("UIScale", { Scale = 0.3, Parent = card })
-	UI.tween(sc, 0.35, { Scale = 1 }, Enum.EasingStyle.Back)
+	local fit = UI.fit(card, 24, sc)
+	UI.tween(sc, 0.35, { Scale = fit() }, Enum.EasingStyle.Back)
 	task.spawn(function()
 		while overlay.Parent do
 			rays.Rotation += 1.2

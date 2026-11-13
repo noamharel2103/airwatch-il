@@ -97,7 +97,8 @@ local function modal(title: string, color: Color3, w: number, h: number)
 	end
 	UI.button(d, "X", close, T.red, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -10, 0, 9), Size = UDim2.fromOffset(42, 40), ZIndex = 330 })
 	local sc = new("UIScale", { Scale = 0.6, Parent = d })
-	UI.tween(sc, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
+	local fit = UI.fit(d, 24, sc)
+	UI.tween(sc, 0.3, { Scale = fit() }, Enum.EasingStyle.Back)
 	if Fx then
 		Fx.sound("Pop")
 	end

@@ -389,6 +389,49 @@ function UI.tween(inst: Instance, t: number, props: { [string]: any }, style: En
 	return tw
 end
 
+-- How much a w x h box (in design units) must shrink to fit inside its ScreenGui
+-- (phones are short, so big windows get smaller instead of running off the screen).
+function UI.fitFactor(inst: Instance, w: number, h: number, margin: number?): number
+	local sg = inst:FindFirstAncestorOfClass("ScreenGui")
+	if not sg then
+		return 1
+	end
+	local gs = sg:FindFirstChildOfClass("UIScale")
+	local g = gs and gs.Scale or 1
+	local m = margin or 24
+	local a = sg.AbsoluteSize / g
+	return math.clamp(math.min((a.X - m) / w, (a.Y - m) / h), 0.25, 1)
+end
+
+-- Keep a fixed size window inside the screen. Uses the frame's own UIScale when it
+-- already has one for an intro tween: pass that UIScale as `sc` and tween to the
+-- returned function's value instead of 1.
+function UI.fit(frame: GuiObject, margin: number?, sc: UIScale?): () -> number
+	local scale = sc or frame:FindFirstChild("FitScale") or UI.new("UIScale", { Name = "FitScale", Parent = frame })
+	local function factor(): number
+		return UI.fitFactor(frame, frame.Size.X.Offset, frame.Size.Y.Offset, margin)
+	end
+	local function apply()
+		if frame.Parent and not sc then
+			scale.Scale = factor()
+		end
+	end
+	task.defer(function()
+		apply()
+		local sg = frame:FindFirstAncestorOfClass("ScreenGui")
+		if sg then
+			local c = sg:GetPropertyChangedSignal("AbsoluteSize"):Connect(apply)
+			frame.Destroying:Connect(function()
+				c:Disconnect()
+			end)
+		end
+	end)
+	return factor
+end
+
+-- true on small touch screens (phones), set by Shell.rescale
+UI.phone = false
+
 function UI.clear(parent: Instance)
 	for _, c in ipairs(parent:GetChildren()) do
 		if not c:IsA("UIListLayout") and not c:IsA("UIPadding") and not c:IsA("UIGridLayout") and not c:IsA("UICorner") and not c:IsA("UIStroke") then

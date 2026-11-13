@@ -163,7 +163,8 @@ local function open(host: Instance, s)
 	refs.moves = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 292), Size = UDim2.new(1, 0, 0, 202), Parent = right })
 	render(s)
 	local sc = new("UIScale", { Scale = 0.85, Parent = win })
-	UI.tween(sc, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
+	local fit = UI.fit(win, 24, sc)
+	UI.tween(sc, 0.3, { Scale = fit() }, Enum.EasingStyle.Back)
 end
 
 function Meeting.update(host: Instance, s)

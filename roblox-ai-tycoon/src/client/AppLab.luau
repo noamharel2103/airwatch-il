@@ -60,6 +60,7 @@ end
 local function releaseDialog(host, m, s)
 	local overlay = new("TextButton", { Text = "", BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.45, Size = UDim2.fromScale(1, 1), ZIndex = 40, Parent = host })
 	local d = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(720, 600), ZIndex = 41, Parent = overlay })
+	UI.fit(d)
 	UI.skin(d, T.bg)
 	local inner = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Parent = d })
 	UI.pad(inner, 26)
