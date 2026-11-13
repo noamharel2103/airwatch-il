@@ -220,16 +220,19 @@ local function buildModels(body, s)
 	UI.label(right, m.name, 26, mk.id == "chat" and T.accent or mk.color, { FontFace = UI.HEAVY })
 	UI.label(right, "TO RUN IT: " .. Lab.runNeeds(m.size or 1), 11, T.yellow, { FontFace = UI.BOLD, Position = UDim2.fromOffset(0, 66), Size = UDim2.new(1, 0, 0, 14) })
 	UI.label(right, "QUALITY " .. quality(m, s) .. "%  OF TODAY'S BEST      " .. status, 14, m.status == "released" and T.green or T.sub, { FontFace = UI.BOLD, Position = UDim2.fromOffset(0, 44) })
-	local rows = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 86), Size = UDim2.new(1, 0, 0, 6 * 38), Parent = right })
+	-- the stat rows share the space between the title and the bottom buttons, so on a short
+	-- screen they get thinner instead of hiding under LAUNCH / REVIEWS
+	local rows = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 86), Size = UDim2.new(1, 0, 1, -218), Parent = right })
+	new("UISizeConstraint", { MaxSize = Vector2.new(math.huge, 6 * 40), Parent = rows })
 	UI.list(rows, 4)
 	local busy = m.boosting ~= nil
 	for _, st in ipairs(STATS) do
 		local v = m.stats and m.stats[st.id] or 0
 		local picked = table.find(picks, st.id) ~= nil
 		local isTraining = busy and (m.boosting.a == st.id or m.boosting.b == st.id)
-		local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 34), Parent = rows })
+		local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1 / 6, -4), Parent = rows })
 		new("TextLabel", { Text = st.name, FontFace = UI.BOLD, TextSize = 17, TextColor3 = (picked or isTraining) and T.yellow or T.text, Size = UDim2.new(0, 190, 1, 0), Parent = row })
-		local track = new("Frame", { BackgroundColor3 = Color3.fromRGB(18, 22, 40), Position = UDim2.new(0, 200, 0, 5), Size = UDim2.new(1, -440, 0, 24), Parent = row })
+		local track = new("Frame", { BackgroundColor3 = Color3.fromRGB(18, 22, 40), Position = UDim2.new(0, 200, 0.15, 0), Size = UDim2.new(1, -440, 0.7, 0), Parent = row })
 		UI.corner(track, 2)
 		UI.stroke(track, T.line, 3)
 		new("Frame", { BackgroundColor3 = st.color, Size = UDim2.fromScale(math.clamp(v / math.max(s.eraCeiling or 100, 1), 0, 1), 1), Parent = track })
@@ -248,7 +251,7 @@ local function buildModels(body, s)
 				picks[2] = st.id
 			end
 			Lab.mount(Lab.ctx, Net.state)
-		end, isTraining and T.purple or (picked and T.yellow or (busy and "ghost" or T.green)), { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.fromOffset(150, 34), TextSize = 13 })
+		end, isTraining and T.purple or (picked and T.yellow or (busy and "ghost" or T.green)), { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.new(0, 150, 1, 0), TextSize = 13 })
 	end
 	-- train line
 	local trainRow = new("Frame", { BackgroundTransparency = 1, Position = UDim2.new(0, 0, 1, -128), Size = UDim2.new(1, 0, 0, 54), Parent = right })
