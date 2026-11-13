@@ -487,6 +487,10 @@ end
 
 -- Upgrade old saves with any fields added later.
 local function reconcile(state)
+	-- companies made before the tutorial existed never see it
+	if state.tut == nil and (state.day or 0) > 30 then
+		state.tut = 99
+	end
 	local fresh = Game.new(state.company or "Company")
 	for k, v in pairs(fresh) do
 		if state[k] == nil then

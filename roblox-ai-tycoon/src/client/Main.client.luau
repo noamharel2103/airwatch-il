@@ -540,8 +540,13 @@ end)
 
 -- ===== start =====
 Shell.showHUD(false)
+local tutorialStarted = false
 Title.show(Shell.overlay, function()
 	blocked = false
+	if not tutorialStarted then
+		tutorialStarted = true
+		require(Modules:WaitForChild("Tutorial")).start(Shell.gui, Shell)
+	end
 	Shell.showHUD(true)
 	if Net.state then
 		setRoom(Net.state.office)

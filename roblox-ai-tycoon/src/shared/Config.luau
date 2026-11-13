@@ -3,6 +3,8 @@
 local Config = {}
 
 Config.GAME_TITLE = "MAKE AN AI COMPANY"
+-- every running cost (salaries, GPU rent, power, office) is multiplied by this
+Config.COST_EASE = 0.5
 Config.START_YEAR = 2023
 Config.START_MONTH = 1
 

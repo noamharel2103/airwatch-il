@@ -403,7 +403,8 @@ local function buildWindow(app)
 	if appWindow then
 		appWindow:Destroy()
 	end
-	local w = new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 16), Size = UDim2.new(1, -32, 1, -96), BackgroundColor3 = T.bg, BackgroundTransparency = 0, ZIndex = 20, Parent = winLayer })
+	-- Active: the window eats clicks, so tapping inside an app never opens the desktop icon behind it
+	local w = new("Frame", { Active = true, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 16), Size = UDim2.new(1, -32, 1, -96), BackgroundColor3 = T.bg, BackgroundTransparency = 0, ZIndex = 20, Parent = winLayer })
 	UI.skin(w, T.bg)
 	local bar = new("Frame", { Size = UDim2.new(1, 0, 0, 56), BackgroundColor3 = T.accent, ZIndex = 21, Parent = w })
 	UI.grad(bar, Color3.fromRGB(60, 200, 255), Color3.fromRGB(0, 120, 210), 0)
@@ -433,6 +434,7 @@ function Shell.open(id: string)
 		openApp.close()
 	end
 	openApp = app
+	desk.Visible = false
 	local body, tabs = buildWindow(app)
 	app.ctx = { body = body, tabs = tabs }
 	app.lastKey = nil
@@ -447,6 +449,7 @@ function Shell.closeApp()
 		openApp.close()
 	end
 	openApp = nil
+	desk.Visible = true
 	if appWindow then
 		appWindow:Destroy()
 		appWindow = nil

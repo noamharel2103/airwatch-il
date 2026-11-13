@@ -95,7 +95,14 @@ function App.mount(ctx, s)
 	end
 	-- loans
 	UI.label(sc, "Bank loans", 18, T.text, { FontFace = UI.HEAVY })
-	UI.label(sc, string.format("Banks lend you up to about %s. Small loans start near %.0f%% a year, borrowing close to your limit can cost 25%%+ a year. Paid back monthly over 2 years. Big loans need a hard negotiation.", Format.money(s.loanLimit), (s.loanRate or 0.1) * 100), 13, T.sub)
+	-- plain words for new players: what a loan is and when to take one
+	local how = UI.card(sc)
+	UI.list(how, 6)
+	UI.label(how, "HOW A LOAN WORKS", 15, T.yellow, { FontFace = UI.HEAVY })
+	UI.label(how, "1.  The bank gives you money right now.", 15, T.text)
+	UI.label(how, "2.  You pay it back a little every month for 2 years.", 15, T.text)
+	UI.label(how, string.format("3.  You pay back a bit more than you took (about %.0f%% a year). Big loans cost more.", (s.loanRate or 0.1) * 100), 15, T.text)
+	UI.label(how, string.format("Take a loan to buy GPUs or hire people that make you more money. You can borrow up to %s.", Format.money(s.loanLimit)), 14, T.sub)
 	local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 40), Parent = sc })
 	UI.list(row, 8, true)
 	local box = new("TextBox", { Text = "", PlaceholderText = "Amount, like 5000000", ClearTextOnFocus = false, FontFace = UI.FONT, TextSize = 18, TextColor3 = T.text, PlaceholderColor3 = T.dim, BackgroundColor3 = T.panel2 or T.panel, Size = UDim2.fromOffset(260, 38), Parent = row })

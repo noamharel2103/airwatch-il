@@ -51,6 +51,7 @@ function Game.new(companyName: string, locationId: string?)
 		company = companyName,
 		location = locationId or "paloalto",
 		loans = {},
+		tut = 1,
 		day = 0,
 		speed = 1,
 		cash = Config.START_CASH,
@@ -1013,6 +1014,11 @@ function Actions.autoSupply(state)
 	return true
 end
 Actions.buyStorage = function(...) return Game.buyStorage(...) end
+-- tutorial step for this company (99 = finished or skipped)
+function Actions.tutStep(state, n)
+	state.tut = math.clamp(math.floor(tonumber(n) or 99), 1, 99)
+	return true
+end
 Game.Actions = Actions
 
 function Actions.setSpeed(state, s)
@@ -3408,9 +3414,11 @@ function Game.tickDay(state)
 	revenue *= Game.eventFx().cash
 	state.cash += revenue
 	state.month.revenue += revenue
-	spend(state, salaries, "salaries")
-	spend(state, rent - fromCredits + power, "compute")
-	spend(state, office, "office")
+	-- easier game: every running cost is cut so money does not melt away so fast
+	local ease = Config.COST_EASE or 1
+	spend(state, salaries * ease, "salaries")
+	spend(state, (rent - fromCredits + power) * ease, "compute")
+	spend(state, office * ease, "office")
 	spend(state, inference, "inference")
 
 	tickProblems(state, fx)
@@ -3641,7 +3649,7 @@ function Game.snapshot(state)
 			return out
 		end)(),
 		taps = state.taps or 0, tapKey = state.tapKey, trendyNext = state.trendyNext,
-		searchPlace = state.searchPlace, autoHire = state.autoHire == true, earlyKinds = state.earlyKinds or {}, turboUntil = state.turboUntil or 0, website = state.website or { parts = {} }, websiteBonus = Game.websiteBonus(state),
+		searchPlace = state.searchPlace, autoHire = state.autoHire == true, tut = state.tut or 99, earlyKinds = state.earlyKinds or {}, turboUntil = state.turboUntil or 0, website = state.website or { parts = {} }, websiteBonus = Game.websiteBonus(state),
 		friendBonus = state.friendBonus or 0, luck = Game.luck(state), events = (function()
 			local out = {}
 			local now = os.time()
