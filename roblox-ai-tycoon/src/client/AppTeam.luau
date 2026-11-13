@@ -294,7 +294,7 @@ function App.mount(ctx, s)
 	-- the store: one card per job
 	local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = sc })
 	local cols = narrow and 2 or 3
-	new("UIGridLayout", { CellSize = UDim2.new(1 / cols, -8, 0, 262), CellPadding = UDim2.fromOffset(10, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = grid })
+	new("UIGridLayout", { CellSize = UDim2.new(1 / cols, -8, 0, 312), CellPadding = UDim2.fromOffset(10, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = grid })
 	for i, role in ipairs(Staff.roles) do
 		local each = Staff.signing(role.id, s.year, buyRarity, ls)
 		local total = each * buyQty
@@ -333,7 +333,19 @@ function App.mount(ctx, s)
 			if ok and type(res) == "string" then
 				Net.toast(res, "good")
 			end
-		end, why and "ghost" or T.green, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -10), Size = UDim2.new(1, -20, 0, 50), TextSize = 14 })
+		end, why and "ghost" or T.green, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -60), Size = UDim2.new(1, -20, 0, 50), TextSize = 14 })
+		-- let go: how many you have of this job, and fire some with one tap
+		local have = (s.staff and s.staff[role.id]) or 0
+		new("TextLabel", { Text = "YOU HAVE " .. have, FontFace = UI.BOLD, TextSize = 13, TextColor3 = have > 0 and T.text or T.dim, AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 12, 1, -10), Size = UDim2.new(0.45, -12, 0, 42), Parent = f })
+		if have > 0 then
+			local n = math.min(q, have)
+			UI.button(f, "LET GO x" .. n, function()
+				local ok, res = Net.act("letGoRole", rid, n)
+				if ok and type(res) == "string" then
+					Net.toast(res, "warn")
+				end
+			end, T.red, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -10, 1, -10), Size = UDim2.new(0.55, -10, 0, 42), TextSize = 13 })
+		end
 	end
 
 	-- Robux: legend people right now

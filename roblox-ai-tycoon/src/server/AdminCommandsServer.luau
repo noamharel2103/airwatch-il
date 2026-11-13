@@ -253,6 +253,24 @@ Commands.pm = function(context, players: { Player }, text: string)
 end
 
 Commands.give = function(_context, players: { Player }, item: string)
+	-- give all: every pass forever + every product once
+	if item == "all" then
+		return onSessions(players, function(p, s)
+			s.state.giftPerks = s.state.giftPerks or {}
+			for _, pass in ipairs(Shop.passes) do
+				s.state.giftPerks[pass.key] = true
+				if s.state.giftPerkEnds then
+					s.state.giftPerkEnds[pass.key] = nil
+				end
+			end
+			Bridge.refreshPasses(p)
+			for _, product in ipairs(Shop.products) do
+				pcall(grantFree, s.state, product.key, nil)
+			end
+			gift(p, "EVERYTHING IN THE SHOP")
+			return nil
+		end)
+	end
 	if Shop.passByKey[item] then
 		return onSessions(players, function(p, s)
 			s.state.giftPerks = s.state.giftPerks or {}
@@ -280,6 +298,14 @@ Commands.give = function(_context, players: { Player }, item: string)
 end
 
 Commands.take = function(_context, players: { Player }, item: string)
+	if item == "all" then
+		return onSessions(players, function(p, s)
+			s.state.giftPerks = {}
+			s.state.giftPerkEnds = nil
+			Bridge.refreshPasses(p)
+			return nil
+		end)
+	end
 	if not Shop.passByKey[item] then
 		return tostring(item) .. " is a one time product, only passes can be taken back"
 	end

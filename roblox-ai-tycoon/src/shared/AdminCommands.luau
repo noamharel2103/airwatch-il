@@ -6,7 +6,8 @@
 local Shop = require(script.Parent:WaitForChild("Shop"))
 local Staff = require(script.Parent:WaitForChild("Staff"))
 
-local shopItems = {}
+-- "all" = every pass and every product at once (give all / take all)
+local shopItems = { "all" }
 local passKeys = {}
 for _, p in ipairs(Shop.passes) do
 	table.insert(shopItems, p.key)
@@ -73,6 +74,7 @@ local Panel = {
 			{ id = "cash1m", label = "+$1M", icon = "cash", color = GREEN, op = "givecash", args = { 1e6 } },
 			{ id = "cash100m", label = "+$100M", icon = "vault", color = GREEN, op = "givecash", args = { 100e6 } },
 			{ id = "cash10b", label = "+$10B", icon = "crown", color = GOLD, op = "givecash", args = { 10e9 } },
+			{ id = "giveall", label = "GIVE EVERYTHING", icon = "crown", color = PINK, op = "give", args = { "all" } },
 		},
 	},
 	{
@@ -157,7 +159,7 @@ return {
 			players(),
 			{ Type = "string", Name = "text", Description = "The message" },
 		}),
-		cmd("give", "Give a shop item (pass forever, or product) for free", {
+		cmd("give", "Give a shop item for free (pass forever, or product). Use all to give EVERYTHING in the shop", {
 			players(),
 			{ Type = "shopItem", Name = "item", Description = "Shop item" },
 		}),

@@ -604,6 +604,47 @@ function Game.rollCandidates(state, place, minR, role, n)
 	return results
 end
 
+-- let go of several people of one job at once (lowest rarity first)
+function TeamActions.letGoRole(state, roleId, count)
+	if not Staff.byId[roleId] then
+		return false, "Unknown job"
+	end
+	count = math.clamp(math.floor(tonumber(count) or 1), 1, 50)
+	if count ~= count then
+		return false, "Bad amount"
+	end
+	local mine = {}
+	for i, p in ipairs(state.people or {}) do
+		if p.role == roleId then
+			table.insert(mine, { i = i, r = p.rarity or 1 })
+		end
+	end
+	table.sort(mine, function(a, b)
+		if a.r ~= b.r then
+			return a.r < b.r
+		end
+		return a.i > b.i
+	end)
+	local removeIdx = {}
+	for k = 1, math.min(count, #mine) do
+		table.insert(removeIdx, mine[k].i)
+	end
+	table.sort(removeIdx, function(a, b)
+		return a > b
+	end)
+	for _, i in ipairs(removeIdx) do
+		table.remove(state.people, i)
+	end
+	local have = state.staff[roleId] or 0
+	local gone = math.min(have, math.max(#removeIdx, count))
+	state.staff[roleId] = have - gone
+	if gone == 0 then
+		return false, "Nobody to let go"
+	end
+	Game.chatMsg(state, "general", "HR", string.format("%d %s left the company.", gone, Staff.byId[roleId].name .. (gone == 1 and "" or "s")))
+	return true, string.format("Let go %d %s", gone, Staff.byId[roleId].name)
+end
+
 function TeamActions.letGo(state, id)
 	for i, p in ipairs(state.people or {}) do
 		if p.id == id then

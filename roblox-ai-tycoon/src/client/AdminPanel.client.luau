@@ -241,3 +241,70 @@ Players.PlayerRemoving:Connect(function()
 		task.defer(buildTargets)
 	end
 end)
+
+-- ===== /help in chat: every admin command with a plain explanation (admins only) =====
+local helpGui: Frame? = nil
+local function showHelp()
+	if helpGui then
+		helpGui:Destroy()
+		helpGui = nil
+		return
+	end
+	local o = new("TextButton", { Text = "", AutoButtonColor = false, BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.45, Size = UDim2.fromScale(1, 1), ZIndex = 50, Parent = gui })
+	helpGui = o
+	local d = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(0.9, 0, 0.88, 0), BackgroundColor3 = T.bg, ZIndex = 51, Parent = o })
+	new("UISizeConstraint", { MaxSize = Vector2.new(900, 700), Parent = d })
+	UI.corner(d, 12)
+	new("UIStroke", { Color = RED, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = d })
+	new("TextLabel", { Text = "ADMIN COMMANDS", FontFace = UI.HEAVY, TextSize = 22, TextColor3 = Color3.new(1, 1, 1), TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.new(1, 0, 0, 50), ZIndex = 52, Parent = d })
+	new("TextLabel", { Text = "Type them in the F2 console, or tap the ADMIN button for the easy panel. Who: a name, me, all or others.", TextSize = 14, TextColor3 = T.sub, TextXAlignment = Enum.TextXAlignment.Center, Position = UDim2.fromOffset(16, 46), Size = UDim2.new(1, -32, 0, 34), ZIndex = 52, Parent = d })
+	local close = UI.button(d, "X", function()
+		o:Destroy()
+		helpGui = nil
+	end, RED, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -10, 0, 8), Size = UDim2.fromOffset(44, 40), ZIndex = 53 })
+	local _ = close
+	local sc = UI.scroll(d, { Position = UDim2.fromOffset(12, 86), Size = UDim2.new(1, -24, 1, -98), ZIndex = 52 })
+	UI.list(sc, 8)
+	local list = table.clone(Defs.Commands)
+	table.sort(list, function(a, b)
+		return a.Name < b.Name
+	end)
+	for _, c in ipairs(list) do
+		local usage = c.Name
+		for _, a in ipairs(c.Args or {}) do
+			usage ..= a.Optional and (" [" .. a.Name .. "]") or (" <" .. a.Name .. ">")
+		end
+		local row = new("Frame", { BackgroundColor3 = T.panel2, Size = UDim2.new(1, -10, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, ZIndex = 52, Parent = sc })
+		UI.corner(row, 8)
+		UI.pad(row, 8, 12)
+		UI.list(row, 2)
+		UI.label(row, usage, 15, T.yellow, { FontFace = UI.BOLD, ZIndex = 53 })
+		UI.label(row, c.Description or "", 14, T.text, { ZIndex = 53 })
+		if c.Aliases and #c.Aliases > 0 then
+			UI.label(row, "Also: " .. table.concat(c.Aliases, ", "), 12, T.dim, { ZIndex = 53 })
+		end
+	end
+	o.MouseButton1Click:Connect(function()
+		o:Destroy()
+		helpGui = nil
+	end)
+end
+
+-- the chat command lives only on this client (and this script only runs for admins)
+task.spawn(function()
+	local TextChatService = game:GetService("TextChatService")
+	-- Roblox has its own /help: switch it off for admins so ours opens instead
+	local builtin = TextChatService:WaitForChild("TextChatCommands", 10)
+	local rbxHelp = builtin and builtin:WaitForChild("RBXHelpCommand", 5)
+	if rbxHelp then
+		(rbxHelp :: TextChatCommand).Enabled = false
+	end
+	local cmd = Instance.new("TextChatCommand")
+	cmd.Name = "AdminHelpCommand"
+	cmd.PrimaryAlias = "/help"
+	cmd.SecondaryAlias = "/admin"
+	cmd.Triggered:Connect(function()
+		showHelp()
+	end)
+	cmd.Parent = TextChatService
+end)
