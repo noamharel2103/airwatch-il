@@ -10,7 +10,7 @@ local Net = require(script.Parent.Net)
 local T = UI.T
 local new = UI.new
 
-local App = { id = "cameras", name = "Cameras", icon = "cameras", color = Color3.fromRGB(60, 60, 70) }
+local App = { id = "cameras", name = "Cameras", icon = "cameras", color = Color3.fromRGB(18, 184, 214) }
 local conns: { RBXScriptConnection } = {}
 
 local function feed(parent: Instance, title: string, build: (WorldModel) -> (CFrame, Vector3))

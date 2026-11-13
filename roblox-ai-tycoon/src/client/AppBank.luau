@@ -8,9 +8,31 @@ local Net = require(script.Parent.Net)
 local T = UI.T
 local new = UI.new
 
-local App = { id = "bank", name = "Bank", icon = "bank", color = Color3.fromRGB(230, 180, 50) }
+local App = { id = "bank", name = "Bank", icon = "bank", color = Color3.fromRGB(31, 203, 114) }
 
+local STAT_ICON = { ["Company value"] = "company", Cash = "cash", ["Your stake"] = "crown", ["Last month"] = "fire" }
 local function bigStat(parent, label, value, color)
+	if UI.POP then
+		-- bold coloured tile: gradient, dark rim of its own colour, big outlined number, icon on the right
+		local col = color or T.accent
+		if col == T.yellow then
+			col = T.accent -- gold belongs to the shop only
+		elseif col == T.text then
+			col = T.purple
+		end
+		local edge = col:Lerp(Color3.fromRGB(20, 8, 40), 0.62)
+		local c = new("Frame", { BackgroundColor3 = col, ClipsDescendants = true, Parent = parent })
+		UI.corner(c, 18)
+		new("UIStroke", { Color = edge, Thickness = 4, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = c })
+		new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(190, 190, 190)), Parent = c })
+		local ic = UI.icon(c, STAT_ICON[label] or "cash", col, 64)
+		ic.AnchorPoint = Vector2.new(1, 0.5)
+		ic.Position = UDim2.new(1, -10, 0.5, 0)
+		new("TextLabel", { Text = string.upper(label), FontFace = UI.FONT, TextSize = 13, TextColor3 = Color3.new(1, 1, 1), TextTransparency = 0.08, Position = UDim2.fromOffset(16, 10), Size = UDim2.new(1, -90, 0, 16), Parent = c })
+		local v = new("TextLabel", { Text = value, FontFace = UI.HEAVY, TextSize = 30, TextColor3 = Color3.new(1, 1, 1), TextScaled = false, Position = UDim2.fromOffset(16, 30), Size = UDim2.new(1, -90, 0, 40), Parent = c })
+		new("UIStroke", { Color = edge, Thickness = 3.5, LineJoinMode = Enum.LineJoinMode.Round, ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual, Parent = v })
+		return
+	end
 	local c = new("Frame", { BackgroundColor3 = T.panel2, Parent = parent })
 	UI.corner(c, 14)
 	UI.pad(c, 12, 16)

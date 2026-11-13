@@ -9,7 +9,7 @@ local Extras: any = require(script.Parent.Extras)
 local T = UI.T
 local new = UI.new
 
-local App: any = { id = "settings", name = "Settings", icon = "gear", color = Color3.fromRGB(120, 128, 150) }
+local App: any = { id = "settings", name = "Settings", icon = "gear", color = Color3.fromRGB(110, 120, 170) }
 -- set by Main: the sound module (Fx) so volume and hover changes apply at once
 App.fx = nil
 

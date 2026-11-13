@@ -10,7 +10,7 @@ local Net = require(script.Parent.Net)
 local T = UI.T
 local new = UI.new
 
-local App = { id = "company", name = "Company", icon = "company", color = Color3.fromRGB(90, 110, 140) }
+local App = { id = "company", name = "Company", icon = "company", color = Color3.fromRGB(61, 123, 255) }
 local page = "app"
 
 function App.mount(ctx, s)

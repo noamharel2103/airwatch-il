@@ -33,9 +33,9 @@ UI.ICON_IMAGES = {
 UI.POP = true
 if UI.POP then
 	UI.T = {
-		bg = Color3.fromRGB(34, 18, 92),
+		bg = Color3.fromRGB(28, 17, 74),
 		panel = Color3.fromRGB(70, 38, 168),
-		panel2 = Color3.fromRGB(96, 56, 204),
+		panel2 = Color3.fromRGB(51, 34, 138),
 		line = Color3.fromRGB(26, 15, 58),
 		text = Color3.fromRGB(255, 255, 255),
 		sub = Color3.fromRGB(222, 210, 255),
@@ -664,7 +664,7 @@ function UI.chart(parent: Instance, values: { number }, color: Color3?, height: 
 			local W, H = box.AbsoluteSize.X, box.AbsoluteSize.Y - 6
 			local ax, ay, bx, by = x1 * W, y1 * H + 3, x2 * W, y2 * H + 3
 			local len = math.sqrt((bx - ax) ^ 2 + (by - ay) ^ 2)
-			seg.Size = UDim2.fromOffset(len + 1, 2.5)
+			seg.Size = UDim2.fromOffset(len + 1, UI.POP and 5 or 2.5)
 			seg.Position = UDim2.fromOffset((ax + bx) / 2, (ay + by) / 2)
 			seg.Rotation = math.deg(math.atan2(by - ay, bx - ax))
 		end

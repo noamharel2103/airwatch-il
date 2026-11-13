@@ -375,7 +375,7 @@ function Shell.register(app)
 			d.ZIndex = 13
 		end
 	end
-	new("TextLabel", { Text = app.name, FontFace = UI.BOLD, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Center, Position = UDim2.fromOffset(0, 82), Size = UDim2.new(1, 0, 0, 20), ZIndex = 12, Parent = btn })
+	new("TextLabel", { Text = UI.POP and string.upper(app.name) or app.name, FontFace = UI.HEAVY, TextSize = UI.POP and 16 or 14, TextXAlignment = Enum.TextXAlignment.Center, Position = UDim2.fromOffset(0, 82), Size = UDim2.new(1, 0, 0, 20), ZIndex = 12, Parent = btn })
 	local badge = new("TextLabel", { Text = "", FontFace = UI.BOLD, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Center, BackgroundTransparency = 0, BackgroundColor3 = T.red, Position = UDim2.fromOffset(74, -2), Size = UDim2.fromOffset(22, 22), Visible = false, ZIndex = 14, Parent = btn })
 	UI.corner(badge, 11)
 	badges[app.id] = badge
