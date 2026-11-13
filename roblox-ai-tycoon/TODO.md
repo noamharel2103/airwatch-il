@@ -4,9 +4,9 @@ One list, worked top to bottom. Nothing new jumps the queue unless Noam says it 
 [x] done and tested, [~] done but not tested in Studio yet, [ ] not started.
 
 ## Now (in progress)
-- [~] Hiring store: buy workers by job + rarity, price + monthly salary, no search (Opus agent done, not tested)
-- [~] Admin: more commands, phone ADMIN panel, event icons bottom right with tooltips, hide LUCK at 1.0 (Opus agent working)
-- [~] Settings app in the computer + 5 difficulty levels + one-time difficulty prompt and tutorial for every save (Haiku agent working)
+- [~] Hiring store: buy workers by job + rarity, price + monthly salary, no search (published to testers, page itself not clicked yet)
+- [~] Admin: 17 new commands, phone ADMIN panel, event icons bottom right with tooltips, hide LUCK at 1.0 (written d6cb262, not tested)
+- [~] Settings app in the computer + 5 difficulty levels + one-time difficulty prompt and tutorial for every save (written d6cb262, not tested)
 - [~] Tutorial with grey spotlight, bank "where your money goes" + FIX, costs /2, income x1.5, training x0.5, TAP 76%, popularity x1.6, 6s per day
 - [ ] Test all of the above in Studio, fix, commit
 
