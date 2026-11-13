@@ -28,6 +28,29 @@ UI.ICON_IMAGES = {
 	lab = 71458718634620, parts = 132000942692847, team = 138393293744051, bank = 132123388448433,
 	social = 84020529846826, mail = 71078899575319, goals = 77359789350483, company = 100186608972356,
 }
+-- POP = the Figma look (design/shop_v2.png): purple panels, gold, coloured borders,
+-- chunky Fredoka titles with dark outlines, 3D buttons with a lip, sticker icons.
+UI.POP = true
+if UI.POP then
+	UI.T = {
+		bg = Color3.fromRGB(34, 18, 92),
+		panel = Color3.fromRGB(70, 38, 168),
+		panel2 = Color3.fromRGB(96, 56, 204),
+		line = Color3.fromRGB(26, 15, 58),
+		text = Color3.fromRGB(255, 255, 255),
+		sub = Color3.fromRGB(222, 210, 255),
+		dim = Color3.fromRGB(172, 154, 232),
+		accent = Color3.fromRGB(61, 123, 255),
+		green = Color3.fromRGB(31, 203, 114),
+		red = Color3.fromRGB(255, 58, 92),
+		yellow = Color3.fromRGB(255, 194, 26),
+		purple = Color3.fromRGB(139, 92, 255),
+		orange = Color3.fromRGB(255, 122, 26),
+		teal = Color3.fromRGB(18, 184, 214),
+		pink = Color3.fromRGB(255, 79, 166),
+		gold = Color3.fromRGB(255, 194, 26),
+	}
+end
 local T = UI.T
 -- Chunky and readable: rounded blocky font for text, pixel font for titles/buttons.
 -- GLASS = the new modern look: dark see-through glass panels, soft light edges, rounded
@@ -38,11 +61,18 @@ UI.CLEAN_FONT = true
 local BUILDER = "rbxasset://fonts/families/BuilderSans.json"
 local SIZE_MULT
 if UI.CLEAN_FONT then
-	UI.FONT = Font.new(BUILDER, Enum.FontWeight.Medium)
+	UI.FONT = Font.new(BUILDER, UI.POP and Enum.FontWeight.Bold or Enum.FontWeight.Medium)
 	UI.BOLD = Font.new(BUILDER, Enum.FontWeight.Bold)
 	UI.HEAVY = Font.new(BUILDER, Enum.FontWeight.ExtraBold)
 	UI.MONO = Font.new(BUILDER, Enum.FontWeight.Medium)
 	SIZE_MULT = { [BUILDER] = 1.2 }
+	if UI.POP then
+		-- titles and buttons: round chunky cartoon font
+		local FRED = "rbxasset://fonts/families/FredokaOne.json"
+		UI.BOLD = Font.new(FRED)
+		UI.HEAVY = Font.new(FRED)
+		SIZE_MULT[FRED] = 1.15
+	end
 else
 	UI.FONT = Font.fromEnum(Enum.Font.FredokaOne)
 	UI.BOLD = Font.new("rbxasset://fonts/families/PressStart2P.json")
@@ -104,6 +134,9 @@ function UI.new(class: string, props: { [string]: any }?, children: { Instance }
 			t.TextSize = math.floor(t.TextSize * mult + 0.5)
 		end
 	end
+	if UI.POP and (class == "TextLabel" or class == "TextButton") then
+		UI.popText(inst)
+	end
 	for _, c in ipairs(children or {}) do
 		c.Parent = inst
 	end
@@ -114,10 +147,33 @@ function UI.new(class: string, props: { [string]: any }?, children: { Instance }
 end
 local new = UI.new
 
+-- chunky titles get a dark outline like every big Roblox game; a caller's own text stroke wins
+function UI.popText(t: any)
+	if t.FontFace.Family ~= UI.HEAVY.Family or t.TextSize < 14 or t:FindFirstChild("PopStroke") then
+		return
+	end
+	local st = Instance.new("UIStroke")
+	st.Name = "PopStroke"
+	st.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+	st.Color = T.line
+	st.Thickness = math.clamp(t.TextSize / 11, 1.5, 4)
+	st.LineJoinMode = Enum.LineJoinMode.Round
+	st.Parent = t
+	t.ChildAdded:Connect(function(c)
+		if c ~= st and c:IsA("UIStroke") and c.ApplyStrokeMode == Enum.ApplyStrokeMode.Contextual then
+			st:Destroy()
+		end
+	end)
+end
+
 function UI.corner(parent: Instance, r: number?)
 	-- blocky look: almost square corners (round things like avatars keep big radii)
 	local rr = r or 10
-	if rr < 40 then
+	if UI.POP then
+		if rr < 40 then
+			rr = math.clamp(rr, 10, 18)
+		end
+	elseif rr < 40 then
 		rr = math.min(rr, 2)
 	end
 	return new("UICorner", { CornerRadius = UDim.new(0, rr), Parent = parent })
@@ -197,6 +253,15 @@ function UI.skin(frame: GuiObject, color: Color3?)
 		g.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(150, 160, 190))
 		return frame
 	end
+	if UI.POP then
+		-- soft round panel, dark outline, light top fading darker (gradient multiplies the colour)
+		new("UICorner", { CornerRadius = UDim.new(0, 16), Parent = frame })
+		new("UIStroke", { Color = T.line, Thickness = 3.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = frame })
+		local g = frame:FindFirstChild("PopShade") or new("UIGradient", { Name = "PopShade", Parent = frame })
+		g.Rotation = 90
+		g.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(196, 190, 220))
+		return frame
+	end
 	new("UICorner", { CornerRadius = UDim.new(0, 2), Parent = frame })
 	new("UIStroke", { Color = T.line, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = frame })
 	if frame.AutomaticSize == Enum.AutomaticSize.None then
@@ -252,6 +317,24 @@ function UI.button(parent: Instance, text: string, onClick: (() -> ())?, kind: a
 		new("UIGradient", { Name = "GlassSheen", Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(185, 190, 210)), Parent = b })
 		b.BackgroundTransparency = 0.12
 		b.FontFace = UI.BOLD
+	elseif UI.POP then
+		-- 3D cartoon button: rounded, border in a dark shade of its own colour, light top,
+		-- a darker lip along the bottom, outlined white text
+		local edge = color:Lerp(Color3.fromRGB(20, 8, 40), 0.62)
+		new("UICorner", { CornerRadius = UDim.new(0, 14), Parent = b })
+		new("UIStroke", { Name = "Edge", Color = edge, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = b })
+		new("UIStroke", { Name = "PopStroke", Color = edge, Thickness = 2.2, LineJoinMode = Enum.LineJoinMode.Round, ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual, Parent = b })
+		new("UIGradient", { Name = "PopShade", Rotation = 90, Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(215, 215, 215)), ColorSequenceKeypoint.new(0.86, Color3.fromRGB(150, 150, 150)), ColorSequenceKeypoint.new(1, Color3.fromRGB(150, 150, 150)) }), Parent = b })
+		local shine = new("Frame", { Name = "Shine", BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.6, Position = UDim2.new(0, 8, 0, 4), Size = UDim2.new(1, -16, 0, 4), ZIndex = b.ZIndex, Parent = b })
+		new("UICorner", { CornerRadius = UDim.new(1, 0), Parent = shine })
+		b:GetPropertyChangedSignal("BackgroundColor3"):Connect(function()
+			local e = b.BackgroundColor3:Lerp(Color3.fromRGB(20, 8, 40), 0.62)
+			for _, st in ipairs(b:GetChildren()) do
+				if st:IsA("UIStroke") and (st.Name == "Edge" or st.Name == "PopStroke") then
+					st.Color = e
+				end
+			end
+		end)
 	else
 		new("UICorner", { CornerRadius = UDim.new(0, 2), Parent = b })
 		new("UIStroke", { Color = Color3.fromRGB(10, 12, 24), Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = b })
@@ -266,9 +349,9 @@ function UI.button(parent: Instance, text: string, onClick: (() -> ())?, kind: a
 		busy = true
 		local ghost = c == UI.GHOST or c == Color3.fromRGB(150, 170, 205)
 		if ghost then
-			applied = UI.GLASS and Color3.fromRGB(70, 82, 125) or Color3.fromRGB(58, 70, 120)
+			applied = UI.POP and Color3.fromRGB(110, 78, 210) or UI.GLASS and Color3.fromRGB(70, 82, 125) or Color3.fromRGB(58, 70, 120)
 			b.BackgroundColor3 = applied
-			b.TextColor3 = Color3.fromRGB(220, 228, 255)
+			b.TextColor3 = UI.POP and Color3.new(1, 1, 1) or Color3.fromRGB(220, 228, 255)
 		else
 			applied = c
 			b.BackgroundColor3 = c
@@ -378,7 +461,17 @@ function UI.scroll(parent: Instance, props: { [string]: any }?)
 end
 
 -- Icon: the drawn PNG from our art set (fallback: glyph tile below).
+local sheetIndex: { [string]: number } = {}
+for i, k in ipairs(Assets.iconOrder or {}) do
+	sheetIndex[k] = i - 1
+end
 function UI.icon(parent: Instance, kind: string, color: Color3, size: number)
+	local idx = UI.POP and Assets.iconSheet and sheetIndex[kind]
+	if idx then
+		local holder = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(size, size), Parent = parent })
+		new("ImageLabel", { Name = "Img", BackgroundTransparency = 1, Image = Assets.iconSheet, ImageRectOffset = Vector2.new((idx % 8) * 128, math.floor(idx / 8) * 128), ImageRectSize = Vector2.new(128, 128), Size = UDim2.fromScale(1, 1), Parent = holder })
+		return holder
+	end
 	local v2 = Assets.icons2 and Assets.icons2[kind]
 	if v2 and v2 ~= "" then
 		local holder = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(size, size), Parent = parent })

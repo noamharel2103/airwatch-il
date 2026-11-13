@@ -407,16 +407,24 @@ local function buildWindow(app)
 	local w = new("Frame", { Active = true, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 16), Size = UDim2.new(1, -32, 1, -96), BackgroundColor3 = T.bg, BackgroundTransparency = 0, ZIndex = 20, Parent = winLayer })
 	UI.skin(w, T.bg)
 	local bar = new("Frame", { Size = UDim2.new(1, 0, 0, 56), BackgroundColor3 = T.accent, ZIndex = 21, Parent = w })
-	UI.grad(bar, Color3.fromRGB(60, 200, 255), Color3.fromRGB(0, 120, 210), 0)
-	UI.corner(bar, 3)
-	local ic = UI.icon(bar, app.icon, app.color, 32)
-	ic.Position = UDim2.fromOffset(16, 12)
-	new("TextLabel", { Text = app.name, FontFace = UI.HEAVY, TextSize = 20, Position = UDim2.fromOffset(60, 0), Size = UDim2.new(0, 300, 1, 0), ZIndex = 21, Parent = bar })
+	if UI.POP then
+		-- every app has its own colour bar: light top, darker bottom, dark rim
+		local c = app.color or T.purple
+		UI.grad(bar, c:Lerp(Color3.new(1, 1, 1), 0.3), c:Lerp(Color3.new(0, 0, 0), 0.25), 90)
+		UI.corner(bar, 14)
+		new("UIStroke", { Color = c:Lerp(Color3.fromRGB(20, 8, 40), 0.62), Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = bar })
+	else
+		UI.grad(bar, Color3.fromRGB(60, 200, 255), Color3.fromRGB(0, 120, 210), 0)
+		UI.corner(bar, 3)
+	end
+	local ic = UI.icon(bar, app.icon, app.color, UI.POP and 44 or 32)
+	ic.Position = UI.POP and UDim2.fromOffset(10, 6) or UDim2.fromOffset(16, 12)
+	new("TextLabel", { Text = app.name, FontFace = UI.HEAVY, TextSize = UI.POP and 24 or 20, Position = UDim2.fromOffset(60, 0), Size = UDim2.new(0, 300, 1, 0), ZIndex = 21, Parent = bar })
 	local tabs = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(240, 10), Size = UDim2.new(1, -330, 0, 36), ZIndex = 21, Parent = bar })
 	UI.list(tabs, 6, true)
 	local x = UI.button(bar, "X", function()
 		Shell.closeApp()
-	end, "ghost", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 10), Size = UDim2.fromOffset(40, 36), ZIndex = 22 })
+	end, UI.POP and "danger" or "ghost", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 8), Size = UDim2.fromOffset(44, 40), ZIndex = 22 })
 	local body = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(18, 62), Size = UDim2.new(1, -36, 1, -78), ZIndex = 21, ClipsDescendants = true, Parent = w })
 	appWindow = w
 	w.Size = UDim2.new(1, -80, 1, -150)

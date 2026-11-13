@@ -62,8 +62,12 @@ end
 -- gold buy button (also used by the pop-ups)
 function App.goldButton(parent, text: string, onClick: () -> (), props: { [string]: any }?)
 	local b = UI.button(parent, text, onClick, GOLD, props)
-	b.TextColor3 = INK
-	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(255, 236, 120), GOLD_DARK), Parent = b })
+	if UI.POP then
+		b.TextColor3 = Color3.new(1, 1, 1)
+	else
+		b.TextColor3 = INK
+		new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(255, 236, 120), GOLD_DARK), Parent = b })
+	end
 	shine(b)
 	return b
 end
@@ -71,9 +75,9 @@ end
 local function card(parent, item, s, isPass: boolean, order: number)
 	local owned = isPass and s.perks and s.perks[item.key]
 	local c = new("Frame", { BackgroundColor3 = item.color, LayoutOrder = order, Parent = parent })
-	new("UICorner", { CornerRadius = UDim.new(0, 4), Parent = c })
-	new("UIStroke", { Color = item.key == focusKey and Color3.fromRGB(255, 255, 255) or GOLD, Thickness = item.key == focusKey and 6 or 4, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = c })
-	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(item.color:Lerp(Color3.new(1, 1, 1), 0.1), item.color:Lerp(Color3.new(0, 0, 0), 0.55)), Parent = c })
+	new("UICorner", { CornerRadius = UDim.new(0, UI.POP and 20 or 4), Parent = c })
+	new("UIStroke", { Color = item.key == focusKey and Color3.fromRGB(255, 255, 255) or (UI.POP and item.color:Lerp(Color3.fromRGB(20, 8, 40), 0.6) or GOLD), Thickness = item.key == focusKey and 6 or 5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = c })
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(item.color:Lerp(Color3.new(1, 1, 1), UI.POP and 0.35 or 0.1), item.color:Lerp(Color3.new(0, 0, 0), UI.POP and 0.3 or 0.55)), Parent = c })
 	-- sunburst glow behind the icon
 	local glow = new("Frame", { BackgroundColor3 = Color3.fromRGB(255, 240, 160), BackgroundTransparency = 0.6, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0, 84), Size = UDim2.fromOffset(150, 150), Parent = c })
 	new("UICorner", { CornerRadius = UDim.new(1, 0), Parent = glow })
@@ -137,8 +141,15 @@ function App.mount(ctx, s)
 	UI.clear(ctx.body)
 	-- bright gold backdrop: warm gradient, moving diagonal stripes, twinkling sparkles
 	local bg = new("Frame", { BackgroundColor3 = Color3.fromRGB(255, 170, 20), ClipsDescendants = true, Size = UDim2.fromScale(1, 1), Parent = ctx.body })
-	new("UIGradient", { Rotation = 90, Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 214, 70)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 150, 20)), ColorSequenceKeypoint.new(1, Color3.fromRGB(220, 90, 0)) }), Parent = bg })
-	new("UIStroke", { Color = INK, Thickness = 4, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = bg })
+	if UI.POP then
+		bg.BackgroundColor3 = Color3.new(1, 1, 1)
+		new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(122, 58, 232), Color3.fromRGB(70, 28, 176)), Parent = bg })
+		new("UIStroke", { Color = Color3.fromRGB(255, 190, 30), Thickness = 8, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = bg })
+		new("UICorner", { CornerRadius = UDim.new(0, 18), Parent = bg })
+	else
+		new("UIGradient", { Rotation = 90, Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 214, 70)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 150, 20)), ColorSequenceKeypoint.new(1, Color3.fromRGB(220, 90, 0)) }), Parent = bg })
+		new("UIStroke", { Color = INK, Thickness = 4, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = bg })
+	end
 	local stripes = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(2, 0, 3, 0), Rotation = 35, Parent = bg })
 	for i = 0, 40 do
 		new("Frame", { BackgroundColor3 = Color3.fromRGB(255, 255, 255), BackgroundTransparency = 0.86, Position = UDim2.new(i / 40, 0, 0, 0), Size = UDim2.new(1 / 80, 0, 1, 0), Parent = stripes })
@@ -194,7 +205,7 @@ function App.mount(ctx, s)
 			task.wait(1 / 30)
 		end
 	end)
-	new("TextLabel", { Text = "EVERYTHING HERE IS INSTANT. MOST POPULAR THIS WEEK: INSTANT FINISH AND 2X CASH", FontFace = UI.BOLD, TextSize = 12, TextColor3 = Color3.fromRGB(90, 40, 0), TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.new(1, 0, 0, 20), LayoutOrder = 2, Parent = sc })
+	new("TextLabel", { Text = "EVERYTHING HERE IS INSTANT. MOST POPULAR THIS WEEK: INSTANT FINISH AND 2X CASH", FontFace = UI.BOLD, TextSize = 12, TextColor3 = UI.POP and Color3.fromRGB(255, 226, 120) or Color3.fromRGB(90, 40, 0), TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.new(1, 0, 0, 20), LayoutOrder = 2, Parent = sc })
 	-- featured deal: the best pass, big and loud
 	local feat = ShopData.passByKey.cash2x
 	if feat and not (s.perks and s.perks.cash2x) then
