@@ -4,6 +4,11 @@ One list, worked top to bottom. Nothing new jumps the queue unless Noam says it 
 [x] done and tested, [~] done but not tested in Studio yet, [ ] not started.
 
 ## Now (in progress)
+- [x] Figma UI kit + POP theme + rendered icons + gold shop (5fe11f3) + bold Bank and app bars, gold only in shop (f80800e), Studio v60
+- [ ] NEXT (Noam 2026-11-13 end of day): everything still feels OLD. In this order:
+  1. Much better OFFICE 3D models (every stage room: desk, chairs, servers, walls, decor), real modern office look, not blocky
+  2. A new, better TUTORIAL (looks and flow), in the new bold style
+  3. Fonts and every remaining screen bold like the Bank: AI Lab, Team, GPUs, Social, Mail, Company, Website, Settings, desktop, title screen (title text not gold)
 - [~] Hiring store: buy workers by job + rarity, price + monthly salary, no search (published to testers, page itself not clicked yet)
 - [x] Admin: 17 new commands, phone ADMIN panel (tested), GIVE EVERYTHING (tested), /help, event icons, LUCK hidden at 1.0
 - [x] 5 difficulty levels + one-time pick for old saves + tutorial for everyone (tested); Settings app [~] not opened yet
