@@ -294,26 +294,26 @@ local function buildModels(body, s)
 	if m.status == "ready" then
 		UI.button(bottom, "LAUNCH", function()
 			releaseDialog(Lab.host or body, m, Net.state)
-		end, T.green, { Size = UDim2.fromOffset(340, 64), TextSize = 22 })
+		end, T.green, { Size = UDim2.new(0.42, -10, 0, 64), TextSize = 22 })
 	elseif m.status == "released" and mk.id ~= "chat" then
-		UI.button(bottom, "SELLING", function() end, mk.color, { Size = UDim2.fromOffset(300, 64), TextSize = 16 })
+		UI.button(bottom, "SELLING", function() end, mk.color, { Size = UDim2.new(0.42, -10, 0, 64), TextSize = 16 })
 	elseif m.status == "released" then
 		local inApp = s.product.activeModel == m.id
 		UI.button(bottom, inApp and "IN YOUR APP" or "PUT IN APP", function()
 			Net.act("setActive", m.id)
-		end, inApp and T.green or T.accent, { Size = UDim2.fromOffset(300, 64), TextSize = 16 })
+		end, inApp and T.green or T.accent, { Size = UDim2.new(0.42, -10, 0, 64), TextSize = 16 })
 	end
 	local n = countReviews(m.name)
 	UI.button(bottom, "REVIEWS (" .. n .. ")", function()
 		if Lab.openReviews then
 			Lab.openReviews(m.name)
 		end
-	end, n > 0 and T.orange or "ghost", { Size = UDim2.fromOffset(280, 64), TextSize = 16 })
+	end, n > 0 and T.orange or "ghost", { Size = UDim2.new(0.36, -10, 0, 64), TextSize = 16 })
 	UI.button(bottom, "CHAT", function()
 		if Playground then
 			Playground.open(Lab.host or body, m, Net.state)
 		end
-	end, "ghost", { Size = UDim2.fromOffset(150, 64), TextSize = 16 })
+	end, "ghost", { Size = UDim2.new(0.22, -10, 0, 64), TextSize = 16 })
 end
 
 local MEDAL_COLOR = { Color3.fromRGB(255, 196, 40), Color3.fromRGB(200, 210, 225), Color3.fromRGB(205, 127, 50) }

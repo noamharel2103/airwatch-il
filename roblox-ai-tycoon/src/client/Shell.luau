@@ -34,13 +34,18 @@ local function rescale()
 	-- a phone gets a smaller design canvas so text stays readable; big windows shrink
 	-- on their own with UI.fit
 	local phone = UIS.TouchEnabled and math.min(view.X, view.Y) < 600
+	-- Studio test switch: workspace attribute FakePhone = true shows the phone layout
+	if game:GetService("RunService"):IsStudio() and workspace:GetAttribute("FakePhone") then
+		phone = true
+	end
 	UI.phone = phone
 	Shell.phone = phone
 	local w, h = 1450, 820
 	if phone then
 		w, h = 960, 500
 	end
-	scale.Scale = math.clamp(math.min(v.X / w, v.Y / h), 0.3, 1.5)
+	local fake = workspace:GetAttribute("FakePhone") == true
+	scale.Scale = math.clamp(math.min(v.X / w, v.Y / h), 0.3, fake and 3 or 1.5)
 	if Shell.onRescale then
 		Shell.onRescale(phone)
 	end
@@ -48,6 +53,7 @@ end
 rescale()
 overlayScale.Scale = scale.Scale
 gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(rescale)
+workspace:GetAttributeChangedSignal("FakePhone"):Connect(rescale)
 workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
 
 -- ===== HUD =====
@@ -199,6 +205,18 @@ end)
 -- news ticker (bottom)
 local ticker = new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 14), Size = UDim2.new(1, -700, 0, 40), BackgroundColor3 = T.bg, BackgroundTransparency = 0.15, ClipsDescendants = true, Parent = hud })
 UI.corner(ticker, 12)
+-- phones: no room between the two top panels, the news goes under them in the middle
+local function layoutTicker(phone: boolean)
+	if phone then
+		ticker.Position = UDim2.new(0.5, 0, 0, 118)
+		ticker.Size = UDim2.fromOffset(470, 36)
+	else
+		ticker.Position = UDim2.new(0.5, 0, 0, 14)
+		ticker.Size = UDim2.new(1, -700, 0, 40)
+	end
+end
+layoutTicker(Shell.phone == true)
+Shell.layoutTicker = layoutTicker
 local tickTag = new("TextLabel", { Text = "NEWS", FontFace = UI.HEAVY, TextSize = 12, TextColor3 = T.bg, BackgroundTransparency = 0, BackgroundColor3 = T.yellow, Size = UDim2.fromOffset(56, 34), TextXAlignment = Enum.TextXAlignment.Center, Parent = ticker })
 local tickText = new("TextLabel", { Text = "", TextSize = 14, Position = UDim2.fromOffset(66, 0), Size = UDim2.new(1, -76, 1, 0), TextTruncate = Enum.TextTruncate.AtEnd, TextWrapped = false, Parent = ticker })
 
@@ -276,21 +294,43 @@ local notch = new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2
 UI.corner(notch, 6)
 local brand = new("TextLabel", { Text = "", FontFace = UI.BOLD, TextSize = 10, TextColor3 = Color3.fromRGB(150, 160, 190), TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -4), Size = UDim2.fromOffset(300, 14), ZIndex = 10, Parent = laptop })
 Shell.laptopBrand = brand
--- phones: the laptop takes almost the whole screen under the money bar
-local function layoutLaptop(phone: boolean)
-	if phone then
-		laptop.Size = UDim2.new(0.96, 0, 1, -142)
-		laptop.Position = UDim2.new(0.5, 0, 1, -30)
-	else
-		laptop.Size = UDim2.new(0.74, 0, 1, -196)
-		laptop.Position = UDim2.new(0.5, 0, 1, -58)
-	end
-end
-Shell.onRescale = layoutLaptop
-layoutLaptop(Shell.phone == true)
 local screen = new("Frame", { Position = UDim2.fromOffset(20, 26), Size = UDim2.new(1, -40, 1, -48), BackgroundColor3 = Color3.fromRGB(20, 28, 52), ClipsDescendants = true, ZIndex = 10, Parent = laptop })
 new("UICorner", { CornerRadius = UDim.new(0, 6), Parent = screen })
 UI.grad(screen, Color3.fromRGB(70, 120, 255), Color3.fromRGB(150, 60, 220), 135)
+-- phones: the laptop fills the whole screen (the taskbar already shows money and date)
+-- and its inside is drawn a bit smaller so the apps get room to breathe
+local PHONE_INNER = 0.8
+local screenScale = new("UIScale", { Name = "PhoneScale", Parent = screen })
+local layoutDesk: ((boolean) -> ())? = nil
+local function layoutLaptop(phone: boolean)
+	deck.Visible = not phone
+	if phone then
+		laptop.Size = UDim2.new(1, -8, 1, -6)
+		laptop.Position = UDim2.new(0.5, 0, 1, -3)
+		local k = PHONE_INNER
+		screen.Position = UDim2.fromOffset(6, 8)
+		screen.Size = UDim2.new(1 / k, -12 / k, 1 / k, -16 / k)
+		screenScale.Scale = k
+	else
+		laptop.Size = UDim2.new(0.74, 0, 1, -196)
+		laptop.Position = UDim2.new(0.5, 0, 1, -58)
+		screen.Position = UDim2.fromOffset(20, 26)
+		screen.Size = UDim2.new(1, -40, 1, -48)
+		screenScale.Scale = 1
+	end
+	if comp.Visible then
+		hud.Visible = not phone
+	end
+	if layoutDesk then
+		layoutDesk(phone)
+	end
+end
+Shell.onRescale = function(phone: boolean)
+	layoutLaptop(phone)
+	if Shell.layoutTicker then
+		Shell.layoutTicker(phone)
+	end
+end
 -- wallpaper: soft glow blobs and the company logo mark
 for i, col in ipairs({ Color3.fromRGB(0, 220, 255), Color3.fromRGB(255, 90, 200), Color3.fromRGB(255, 200, 40) }) do
 	local blob = new("Frame", { BackgroundColor3 = col, BackgroundTransparency = 0.82, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(({ 0.75, 0.9, 0.55 })[i], ({ 0.3, 0.75, 0.85 })[i]), Size = UDim2.fromOffset(({ 520, 380, 300 })[i], ({ 520, 380, 300 })[i]), ZIndex = 10, Parent = screen })
@@ -300,6 +340,10 @@ end
 -- blocky city skyline wallpaper
 
 local desk = new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(40, 40), Size = UDim2.new(0, 400, 1, -120), ZIndex = 11, Parent = screen })
+layoutDesk = function(phone: boolean)
+	desk.Size = phone and UDim2.new(1, -80, 1, -110) or UDim2.new(0, 400, 1, -120)
+end
+layoutLaptop(Shell.phone == true)
 new("UIGridLayout", { CellSize = UDim2.fromOffset(104, 112), CellPadding = UDim2.fromOffset(14, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = desk })
 -- taskbar
 local taskbar = new("Frame", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -14), Size = UDim2.new(1, -28, 0, 52), BackgroundColor3 = T.bg, BackgroundTransparency = 0.25, ZIndex = 30, Parent = screen })
@@ -471,7 +515,8 @@ end
 
 function Shell.openComputer(appId: string?)
 	comp.Visible = true
-	hud.Visible = true
+	-- on phones the laptop covers the screen, the taskbar shows money and date
+	hud.Visible = not Shell.phone
 	if Shell.laptopBrand then
 		Shell.laptopBrand.Text = ((Net.state and Net.state.company) or ""):upper()
 	end
@@ -488,6 +533,7 @@ end
 function Shell.closeComputer()
 	Shell.closeApp()
 	comp.Visible = false
+	hud.Visible = true
 	if Shell.onClose then
 		Shell.onClose()
 	end
@@ -497,7 +543,7 @@ function Shell.isOpen()
 	return comp.Visible
 end
 function Shell.showHUD(on: boolean)
-	hud.Visible = on
+	hud.Visible = on and not (Shell.phone and comp.Visible)
 end
 
 UIS.InputBegan:Connect(function(input, processed)

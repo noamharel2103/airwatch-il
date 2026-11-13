@@ -328,6 +328,11 @@ function Extras.start(gui: Instance, fx)
 	Fx = fx
 	bar = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -40, 0, 150), Size = UDim2.fromOffset(150, 680), Parent = (gui :: any).HUD or gui })
 	UI.list(bar, 8, false, Enum.HorizontalAlignment.Center)
+	-- phones: smaller and higher so the whole column stays on screen
+	if UI.phone then
+		bar.Position = UDim2.new(1, -16, 0, 118)
+		new("UIScale", { Scale = 0.55, Parent = bar })
+	end
 	sideButton("daily", "gift", Color3.fromRGB(255, 70, 90), "GIFT", function()
 		if lastInfo and not lastInfo.daily.claimed then
 			dailyPopup(lastInfo.daily)
