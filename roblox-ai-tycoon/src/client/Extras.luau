@@ -167,7 +167,7 @@ local function saveSettings()
 	end
 end
 local function settingsPopup()
-	local body = modal("SETTINGS", Color3.fromRGB(90, 100, 140), 620, 470)
+	local body = modal("SETTINGS", Color3.fromRGB(90, 100, 140), 620, 640)
 	local function render()
 		UI.clear(body)
 		UI.list(body, 12)
@@ -207,6 +207,28 @@ local function settingsPopup()
 		toggle("SOUND EFFECTS", "sfx")
 		volume("EFFECTS VOLUME", "sfxVol")
 		toggle("HOVER SOUNDS", "hover")
+		local function closeModal()
+			local o: Instance = body
+			while o.Parent and not o.Parent:IsA("LayerCollector") do
+				o = o.Parent
+			end
+			o:Destroy()
+		end
+		UI.button(body, "PLAY THE TUTORIAL AGAIN", function()
+			UI.confirm(body, "PLAY THE TUTORIAL?", "The tutorial starts again from step 1. Your company stays the same.", "YES, START", function()
+				Net.act("tutStep", 1)
+				closeModal()
+			end)
+		end, T.purple, { Size = UDim2.new(1, 0, 0, 56), TextSize = 18 })
+		UI.button(body, "BACK TO MAIN MENU (MY COMPANIES)", function()
+			UI.confirm(body, "BACK TO THE MENU?", "Your company is saved. You can pick it or another one from the menu.", "YES, GO BACK", function()
+				closeModal()
+				local sh = (Extras :: any).shell
+				if sh and sh.backToMenu then
+					sh.backToMenu()
+				end
+			end)
+		end, T.accent, { Size = UDim2.new(1, 0, 0, 56), TextSize = 18 })
 	end
 	render()
 end

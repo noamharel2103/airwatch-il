@@ -73,6 +73,8 @@ local Fx = require(Modules.Fx)
 Fx.init(Shell.gui)
 Shell.fx = Fx
 AppSettings.fx = Fx
+AppSettings.shell = Shell
+;(require(Modules.Extras) :: any).shell = Shell
 UI.sound = Fx.sound
 require(Modules.Extras).start(Shell.gui, Fx)
 -- crisis alarm, launch cheer, level up on office upgrades
@@ -556,6 +558,18 @@ local function startTutorial()
 	if not tutorialStarted then
 		tutorialStarted = true
 		require(Modules:WaitForChild("Tutorial")).start(Shell.gui, Shell)
+	end
+end
+do
+	-- Settings > BACK TO MAIN MENU: show the company picker again with the same play handler
+	local realShow = Title.show
+	Title.show = function(g, cb)
+		(Shell :: any).backToMenu = function()
+			Shell.closeApp()
+			Shell.showHUD(false)
+			realShow(g, cb)
+		end
+		return realShow(g, cb)
 	end
 end
 Title.show(Shell.overlay, function()

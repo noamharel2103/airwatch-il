@@ -6,6 +6,7 @@ local RS = game:GetService("ReplicatedStorage")
 local SoundService = game:GetService("SoundService")
 local UI = require(script.Parent.UI)
 local Extras: any = require(script.Parent.Extras)
+local Net: any = require(script.Parent.Net)
 local T = UI.T
 local new = UI.new
 
@@ -119,6 +120,25 @@ build = function(ctx: any)
 	toggle("SOUND EFFECTS", "sfx")
 	volume("SOUND VOLUME", "sfxVol")
 	toggle("HOVER SOUNDS", "hover")
+
+	local game2 = UI.card(sc)
+	UI.list(game2, 12)
+	new("TextLabel", { Text = "GAME", FontFace = UI.HEAVY, TextSize = 22, Size = UDim2.new(1, 0, 0, 30), LayoutOrder = 0, Parent = game2 })
+	UI.button(game2, "PLAY THE TUTORIAL AGAIN", function()
+		UI.confirm(ctx.body, "PLAY THE TUTORIAL?", "The tutorial starts again from step 1. Your company stays the same.", "YES, START", function()
+			Net.act("tutStep", 1)
+			if App.shell then
+				App.shell.closeApp()
+			end
+		end)
+	end, T.purple, { Size = UDim2.new(1, 0, 0, 60), TextSize = 20, LayoutOrder = 1 })
+	UI.button(game2, "BACK TO MAIN MENU (MY COMPANIES)", function()
+		UI.confirm(ctx.body, "BACK TO THE MENU?", "Your company is saved. You can pick it or another one from the menu.", "YES, GO BACK", function()
+			if App.shell and App.shell.backToMenu then
+				App.shell.backToMenu()
+			end
+		end)
+	end, T.accent, { Size = UDim2.new(1, 0, 0, 60), TextSize = 20, LayoutOrder = 2 })
 end
 
 function App.mount(ctx: any)

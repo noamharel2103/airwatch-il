@@ -414,6 +414,27 @@ function UI.button(parent: Instance, text: string, onClick: (() -> ())?, kind: a
 	return b
 end
 
+-- "Are you sure?" popup over the whole screen gui. onYes runs only on YES.
+function UI.confirm(anyChild: Instance, title: string, text: string, yesText: string, onYes: () -> ())
+	local gui = anyChild:FindFirstAncestorWhichIsA("LayerCollector") or anyChild
+	local dim = new("TextButton", { Text = "", AutoButtonColor = false, BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.45, Size = UDim2.fromScale(1, 1), ZIndex = 900, Parent = gui })
+	local box = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(520, 250), BackgroundColor3 = T.panel, ZIndex = 901, Parent = dim })
+	UI.skin(box, T.panel)
+	new("TextLabel", { Text = title, FontFace = UI.HEAVY, TextSize = 32, TextXAlignment = Enum.TextXAlignment.Center, Position = UDim2.fromOffset(0, 20), Size = UDim2.new(1, 0, 0, 40), ZIndex = 902, Parent = box })
+	new("TextLabel", { Text = text, TextSize = 18, TextXAlignment = Enum.TextXAlignment.Center, Position = UDim2.fromOffset(30, 70), Size = UDim2.new(1, -60, 0, 70), ZIndex = 902, Parent = box })
+	local function close()
+		dim:Destroy()
+	end
+	UI.button(box, "NO", close, T.green, { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 30, 1, -24), Size = UDim2.new(0.5, -45, 0, 60), TextSize = 24, ZIndex = 903 })
+	UI.button(box, yesText, function()
+		close()
+		onYes()
+	end, "danger", { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -30, 1, -24), Size = UDim2.new(0.5, -45, 0, 60), TextSize = 20, ZIndex = 903 })
+	local sc = new("UIScale", { Scale = 0.8, Parent = box })
+	UI.tween(sc, 0.25, { Scale = 1 }, Enum.EasingStyle.Back)
+	return dim
+end
+
 function UI.scroll(parent: Instance, props: { [string]: any }?)
 	local s = new("ScrollingFrame", {
 		BackgroundTransparency = 1,

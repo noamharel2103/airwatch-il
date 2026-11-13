@@ -116,7 +116,7 @@ function Tutorial.start(host: ScreenGui, sh: any)
 	local dots = new("Frame", { BackgroundTransparency = 1, Position = UDim2.new(0, 124, 1, -26), Size = UDim2.new(1, -300, 0, 12), ZIndex = 401, Parent = card })
 	UI.list(dots, 6, true)
 	local nextB = UI.button(card, "NEXT", nil, T.green, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -18, 0.5, -16), Size = UDim2.fromOffset(150, 56), TextSize = 22, ZIndex = 402 })
-	local skipB = UI.button(card, "SKIP", nil, "ghost", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -18, 0.5, 40), Size = UDim2.fromOffset(150, 34), TextSize = 14, ZIndex = 402 })
+	local skipB = UI.button(card, "END TUTORIAL", nil, "ghost", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -18, 0.5, 40), Size = UDim2.fromOffset(150, 34), TextSize = 14, ZIndex = 402 })
 	-- bouncing arrow above whatever you have to press
 	local arrow = new("TextLabel", { Text = "V", FontFace = UI.HEAVY, TextSize = 54, TextColor3 = Color3.fromRGB(255, 216, 74), TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 1), Size = UDim2.fromOffset(60, 60), Visible = false, ZIndex = 395, Parent = host })
 	new("UIStroke", { Color = Color3.fromRGB(20, 10, 50), Thickness = 5, LineJoinMode = Enum.LineJoinMode.Round, Parent = arrow })
@@ -168,7 +168,9 @@ function Tutorial.start(host: ScreenGui, sh: any)
 		end
 	end)
 	skipB.MouseButton1Click:Connect(function()
-		go(99)
+		UI.confirm(card, "END THE TUTORIAL?", "Are you sure? You can play it again any time in SETTINGS.", "YES, END IT", function()
+			go(99)
+		end)
 	end)
 	local shown = -1
 	local typing = 0
