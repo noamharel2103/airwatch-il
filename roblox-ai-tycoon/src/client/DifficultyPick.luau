@@ -46,7 +46,7 @@ end
 -- On YES the server saves the choice (setDifficulty) and onDone runs.
 function DP.ask(host: Instance, onDone: () -> ())
 	local overlay = new("TextButton", { Text = "", AutoButtonColor = false, BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.35, Size = UDim2.fromScale(1, 1), ZIndex = 300, Parent = host })
-	local d = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(700, 620), ZIndex = 301, Parent = overlay })
+	local d = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(700, 330), ZIndex = 301, Parent = overlay })
 	UI.fit(d)
 	UI.skin(d, T.bg)
 	local bar = new("Frame", { BackgroundColor3 = T.yellow, Size = UDim2.new(1, 0, 0, 60), ZIndex = 302, Parent = d })

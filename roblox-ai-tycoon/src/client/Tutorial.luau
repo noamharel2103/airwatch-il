@@ -59,7 +59,8 @@ local function laptop()
 			return d
 		end
 		if d:GetAttribute("OpenApp") == "desktop" and d:IsA("Model") then
-			return d
+			-- the desk model also holds the chair: point at the laptop screen itself
+			return d:FindFirstChild("Screen", true) or d
 		end
 	end
 	return nil
@@ -185,8 +186,9 @@ function Tutorial.start(host: ScreenGui, sh: any)
 			end
 			-- viewport point -> screen point (the top bar inset) -> our scaled layer
 			local inset = game:GetService("GuiService"):GetGuiInset()
-			center = (Vector2.new(p.X, p.Y) + inset - origin) / k
-			size = Vector2.new(150, 110)
+			-- GUI space starts under the top bar, the viewport point does not
+			center = (Vector2.new(p.X, p.Y) - inset - origin) / k
+			size = Vector2.new(170, 130)
 		else
 			local g = target :: GuiObject
 			center = (g.AbsolutePosition + g.AbsoluteSize / 2 - origin) / k
