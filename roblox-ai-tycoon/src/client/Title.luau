@@ -58,12 +58,12 @@ function Title.show(gui: ScreenGui, onPlay: () -> ())
 
 	-- logo
 	local logoHolder = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 56), Size = UDim2.fromOffset(1100, 190), Parent = o })
-	local glow = new("TextLabel", { Text = Config.GAME_TITLE, FontFace = UI.HEAVY, TextSize = 120, TextColor3 = Color3.fromRGB(255, 120, 0), TextTransparency = 0.35, TextXAlignment = Enum.TextXAlignment.Center, Position = UDim2.fromOffset(6, 8), Size = UDim2.new(1, 0, 0, 130), Parent = logoHolder })
-	local logo = new("TextLabel", { Text = Config.GAME_TITLE, FontFace = UI.HEAVY, TextSize = 120, TextColor3 = Color3.fromRGB(255, 214, 30), TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.new(1, 0, 0, 130), Parent = logoHolder })
+	local glow = new("TextLabel", { Text = Config.GAME_TITLE, FontFace = UI.HEAVY, TextSize = 120, TextScaled = true, TextColor3 = Color3.fromRGB(255, 120, 0), TextTransparency = 0.35, TextXAlignment = Enum.TextXAlignment.Center, Position = UDim2.fromOffset(6, 8), Size = UDim2.new(1, 0, 0, 130), Parent = logoHolder })
+	local logo = new("TextLabel", { Text = Config.GAME_TITLE, FontFace = UI.HEAVY, TextSize = 120, TextScaled = true, TextColor3 = Color3.fromRGB(255, 214, 30), TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.new(1, 0, 0, 130), Parent = logoHolder })
 	new("UIStroke", { Color = Color3.fromRGB(10, 12, 30), Thickness = 7, ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual, Parent = logo })
 	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(255, 240, 120), Color3.fromRGB(255, 160, 0)), Parent = logo })
 	local _ = glow
-	local tag = new("TextLabel", { Text = "AI COMPANY TYCOON", FontFace = UI.HEAVY, TextSize = 22, TextColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0, BackgroundColor3 = Color3.fromRGB(0, 170, 255), TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 136), Size = UDim2.fromOffset(470, 46), Rotation = -2, Parent = logoHolder })
+	local tag = new("TextLabel", { Text = "TYCOON", FontFace = UI.HEAVY, TextSize = 22, TextColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0, BackgroundColor3 = Color3.fromRGB(0, 170, 255), TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 136), Size = UDim2.fromOffset(470, 46), Rotation = -2, Parent = logoHolder })
 	new("UIStroke", { Color = Color3.fromRGB(10, 12, 30), Thickness = 4, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = tag })
 	local subline = new("TextLabel", { Text = "FROM ONE LAPTOP IN 2023 TO THE BIGGEST COMPANY ON EARTH", FontFace = UI.BOLD, TextSize = 15, TextColor3 = Color3.fromRGB(190, 210, 255), TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 262), Size = UDim2.fromOffset(1100, 24), Parent = o })
 
@@ -102,7 +102,7 @@ function Title.show(gui: ScreenGui, onPlay: () -> ())
 
 	local function newCompanyDialog(slot)
 		local overlay = new("TextButton", { Text = "", AutoButtonColor = false, BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.35, Size = UDim2.fromScale(1, 1), ZIndex = 230, Parent = o })
-		local d = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.52), Size = UDim2.fromOffset(900, 640), ZIndex = 231, Parent = overlay })
+		local d = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.52), Size = UDim2.fromOffset(640, 330), ZIndex = 231, Parent = overlay })
 		UI.fit(d)
 		UI.skin(d, T.bg)
 		local bar = new("Frame", { BackgroundColor3 = SLOT_COLORS[slot] or T.accent, Size = UDim2.new(1, 0, 0, 60), ZIndex = 232, Parent = d })
@@ -114,35 +114,7 @@ function Title.show(gui: ScreenGui, onPlay: () -> ())
 		UI.corner(box, 2)
 		UI.stroke(box, Color3.fromRGB(10, 12, 30), 3)
 		UI.pad(box, 0, 16)
-		UI.label(body, "WHERE DO YOU START?", 13, T.sub, { FontFace = UI.BOLD })
-		local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = body })
-		new("UIGridLayout", { CellSize = UDim2.new(1 / 3, -8, 0, 112), CellPadding = UDim2.fromOffset(12, 12), Parent = grid })
 		local chosen = Config.LOCATIONS[1].id
-		local cards = {}
-		local function paint()
-			for id, c in pairs(cards) do
-				local on = id == chosen
-				c.BackgroundColor3 = on and Color3.fromRGB(0, 150, 220) or T.panel2
-				local st = c:FindFirstChildOfClass("UIStroke")
-				if st then
-					st.Color = on and Color3.fromRGB(255, 214, 30) or Color3.fromRGB(10, 12, 30)
-					st.Thickness = on and 4 or 3
-				end
-			end
-		end
-		for _, l in ipairs(Config.LOCATIONS) do
-			local b = new("TextButton", { Text = "", BackgroundColor3 = T.panel2, Parent = grid })
-			UI.corner(b, 2)
-			UI.stroke(b, Color3.fromRGB(10, 12, 30), 3)
-			new("TextLabel", { Text = l.city:upper(), FontFace = UI.BOLD, TextSize = 14, TextColor3 = Color3.fromRGB(255, 214, 30), Position = UDim2.fromOffset(12, 10), Size = UDim2.new(1, -24, 0, 18), Parent = b })
-			new("TextLabel", { Text = l.desc, TextSize = 13, TextColor3 = Color3.fromRGB(215, 225, 250), Position = UDim2.fromOffset(12, 34), Size = UDim2.new(1, -24, 0, 70), TextYAlignment = Enum.TextYAlignment.Top, Parent = b })
-			cards[l.id] = b
-			b.MouseButton1Click:Connect(function()
-				chosen = l.id
-				paint()
-			end)
-		end
-		paint()
 		UI.label(body, "You start with $150K and a gaming laptop. The bank will lend you a bit more.", 15, T.yellow)
 		local btns = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 62), Parent = body })
 		UI.list(btns, 14, true)

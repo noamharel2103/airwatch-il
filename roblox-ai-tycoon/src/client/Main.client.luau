@@ -162,7 +162,7 @@ UIS.InputChanged:Connect(function(input, processed)
 		return
 	end
 	if input.UserInputType == Enum.UserInputType.MouseWheel then
-		orbit.zoomT = math.clamp(orbit.zoomT - input.Position.Z * 0.08, 0.45, 1.25)
+		orbit.zoomT = math.clamp(orbit.zoomT - input.Position.Z * 0.08, 0.35, 1.4)
 		orbit.idle = os.clock()
 	end
 end)
@@ -171,8 +171,8 @@ UIS.TouchPan:Connect(function(_touches, delta, state, processed)
 	if processed or Shell.isOpen() or state ~= Enum.UserInputState.Change then
 		return
 	end
-	orbit.yawT = math.clamp(orbit.yawT - delta.X * 0.15, -45, 45)
-	orbit.pitchT = math.clamp(orbit.pitchT - delta.Y * 0.12, -12, 22)
+	orbit.yawT = math.clamp(orbit.yawT - delta.X * 0.15, -65, 65)
+	orbit.pitchT = math.clamp(orbit.pitchT - delta.Y * 0.12, -15, 30)
 	orbit.idle = os.clock()
 end)
 UIS.TouchPinch:Connect(function(_touches, pinchScale, _velocity, state, processed)
@@ -182,8 +182,13 @@ UIS.TouchPinch:Connect(function(_touches, pinchScale, _velocity, state, processe
 	if state == Enum.UserInputState.Begin then
 		orbit.pinchStart = orbit.zoomT
 	elseif state == Enum.UserInputState.Change then
-		orbit.zoomT = math.clamp((orbit.pinchStart or orbit.zoomT) / math.max(pinchScale, 0.2), 0.45, 1.25)
+		orbit.zoomT = math.clamp((orbit.pinchStart or orbit.zoomT) / math.max(pinchScale, 0.2), 0.35, 1.4)
 		orbit.idle = os.clock()
+	end
+end)
+UIS.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		orbit.leftDrag = false
 	end
 end)
 UIS.InputBegan:Connect(function(input, processed)
@@ -191,10 +196,10 @@ UIS.InputBegan:Connect(function(input, processed)
 		return
 	end
 	if input.KeyCode == Enum.KeyCode.Q then
-		orbit.yawT = math.clamp(orbit.yawT + 20, -45, 45)
+		orbit.yawT = math.clamp(orbit.yawT + 20, -65, 65)
 		orbit.idle = os.clock()
 	elseif input.KeyCode == Enum.KeyCode.E then
-		orbit.yawT = math.clamp(orbit.yawT - 20, -45, 45)
+		orbit.yawT = math.clamp(orbit.yawT - 20, -65, 65)
 		orbit.idle = os.clock()
 	end
 end)
@@ -229,15 +234,16 @@ RunService.RenderStepped:Connect(function(dt)
 		if Shell.viewBar then
 			Shell.viewBar.Visible = roomOpen
 		end
-		local dragging = roomOpen and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+		-- look around: drag with the right mouse, or with the left mouse on empty space
+		local dragging = roomOpen and (UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) or (orbit.leftDrag == true and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)))
 		local wantLock = dragging and Enum.MouseBehavior.LockCurrentPosition or Enum.MouseBehavior.Default
 		if UIS.MouseBehavior ~= wantLock then
 			UIS.MouseBehavior = wantLock
 		end
 		if dragging then
 			local d = UIS:GetMouseDelta()
-			orbit.yawT = math.clamp(orbit.yawT - d.X * 0.25, -45, 45)
-			orbit.pitchT = math.clamp(orbit.pitchT - d.Y * 0.2, -12, 22)
+			orbit.yawT = math.clamp(orbit.yawT - d.X * 0.25, -65, 65)
+			orbit.pitchT = math.clamp(orbit.pitchT - d.Y * 0.2, -15, 30)
 			orbit.idle = os.clock()
 		end
 		local k = math.min(1, dt * 6)
@@ -350,6 +356,8 @@ UIS.InputBegan:Connect(function(input, processed)
 	end
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 		local inst, app = pick()
+		-- pressed on nothing clickable: the left mouse drags the view instead
+		orbit.leftDrag = inst == nil and input.UserInputType == Enum.UserInputType.MouseButton1
 		if inst and app == "openbox" then
 			local ok, items = Net.act("openBoxes")
 			if ok and type(items) == "table" then

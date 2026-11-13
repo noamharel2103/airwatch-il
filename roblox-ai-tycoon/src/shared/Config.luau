@@ -2,7 +2,7 @@
 -- Global tuning knobs. Everything time/economy related lives here.
 local Config = {}
 
-Config.GAME_TITLE = "FRONTIER" -- working title, not final
+Config.GAME_TITLE = "MAKE AN AI COMPANY"
 Config.START_YEAR = 2023
 Config.START_MONTH = 1
 
