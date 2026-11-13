@@ -32,10 +32,12 @@ local T = UI.T
 -- Chunky and readable: rounded blocky font for text, pixel font for titles/buttons.
 -- GLASS = the new modern look: dark see-through glass panels, soft light edges, rounded
 -- corners, clean sans font. false = the old blocky pixel look.
-UI.GLASS = true
+UI.GLASS = false
+-- the clean sans font stays either way (the pixel font was hard to read)
+UI.CLEAN_FONT = true
 local BUILDER = "rbxasset://fonts/families/BuilderSans.json"
 local SIZE_MULT
-if UI.GLASS then
+if UI.CLEAN_FONT then
 	UI.FONT = Font.new(BUILDER, Enum.FontWeight.Medium)
 	UI.BOLD = Font.new(BUILDER, Enum.FontWeight.Bold)
 	UI.HEAVY = Font.new(BUILDER, Enum.FontWeight.ExtraBold)
@@ -156,6 +158,20 @@ function UI.label(parent: Instance, text: string, size: number?, color: Color3?,
 	if props and props.FontFace then
 		local mult = SIZE_MULT[props.FontFace.Family]
 		l.TextSize = math.floor((size or 16) * (mult or 1) + 0.5)
+	end
+	-- Roblox sometimes measures AutomaticSize before the label knows its width and keeps
+	-- one line, cutting long text: size the height from the real text bounds instead
+	if l.TextWrapped and l.AutomaticSize == Enum.AutomaticSize.Y and l.Size.Y.Scale == 0 then
+		l.AutomaticSize = Enum.AutomaticSize.None
+		local minH = l.Size.Y.Offset
+		local function fit()
+			local h = math.max(minH, math.ceil(l.TextBounds.Y) + 4)
+			if l.Size.Y.Offset ~= h then
+				l.Size = UDim2.new(l.Size.X.Scale, l.Size.X.Offset, 0, h)
+			end
+		end
+		l:GetPropertyChangedSignal("TextBounds"):Connect(fit)
+		fit()
 	end
 	return l
 end

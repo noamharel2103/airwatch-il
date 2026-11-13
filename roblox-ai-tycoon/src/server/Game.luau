@@ -3412,6 +3412,8 @@ function Game.tickDay(state)
 	-- friends playing in the same server: +10% each (max +50%)
 	revenue *= 1 + (state.friendBonus or 0)
 	revenue *= Game.eventFx().cash
+	-- easier game: people pay a bit more so you are not broke all the time
+	revenue *= Config.INCOME_BOOST or 1
 	state.cash += revenue
 	state.month.revenue += revenue
 	-- easier game: every running cost is cut so money does not melt away so fast

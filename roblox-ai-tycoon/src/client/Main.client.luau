@@ -337,6 +337,10 @@ local function pick(): (Instance?, string?, string?)
 	params.FilterDescendantsInstances = { rooms }
 	local hit = workspace:Raycast(ray.Origin, ray.Direction * 400, params)
 	local inst = hit and hit.Instance
+	-- every screen or keyboard in the office (your staff's desks too) opens your computer
+	if inst and (inst.Name == "Screen" or inst.Name == "Keyboard" or inst.Name == "Monitor") then
+		return inst.Parent or inst, "desktop", "Computer"
+	end
 	while inst and inst ~= rooms do
 		local app = inst:GetAttribute("OpenApp")
 		if app then

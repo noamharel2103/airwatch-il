@@ -5,11 +5,13 @@ local Config = {}
 Config.GAME_TITLE = "MAKE AN AI COMPANY"
 -- every running cost (salaries, GPU rent, power, office) is multiplied by this
 Config.COST_EASE = 0.5
+-- all income is multiplied by this
+Config.INCOME_BOOST = 1.5
 Config.START_YEAR = 2023
 Config.START_MONTH = 1
 
 -- Pacing: ~2 real minutes per in-game month at x1 (owner's target).
-Config.SECONDS_PER_DAY = 4
+Config.SECONDS_PER_DAY = 6
 Config.SPEEDS = { 0, 1, 2, 4 } -- x8 comes with the TIME WARP pass
 
 -- Risk multiplier per speed: faster = more can go wrong while you aren't watching.

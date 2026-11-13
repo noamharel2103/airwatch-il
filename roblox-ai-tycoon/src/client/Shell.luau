@@ -590,6 +590,26 @@ Net.onState(function(s)
 	cashL.TextColor3 = s.cash >= 0 and T.green or T.red
 	local lm = s.lastMonth
 	subL.Text = string.format("%s users   |   last month %s", Format.count(s.users), lm and ((lm.revenue - lm.costs >= 0 and "+" or "") .. Format.money(lm.revenue - lm.costs)) or "-")
+	-- every new month: a short, clear money report (and a warning before the money runs out)
+	local _, curMonth = Format.dateFromDay(s.day)
+	if lm and Shell.lastReportDay ~= nil and Shell.lastReportDay ~= curMonth then
+		local net = lm.revenue - lm.costs
+		local parts = { { "PEOPLE", lm.salaries or 0 }, { "GPUS", lm.compute or 0 }, { "OFFICE", lm.office or 0 }, { "SERVERS", lm.inference or 0 } }
+		table.sort(parts, function(a, b)
+			return a[2] > b[2]
+		end)
+		local text = string.format("LAST MONTH: earned %s, spent %s. Biggest cost: %s", Format.money(lm.revenue), Format.money(lm.costs), parts[1][1])
+		Shell.toast(text, net >= 0 and "good" or "warn")
+		if net < 0 and s.cash > 0 then
+			local months = math.floor(s.cash / -net)
+			if months <= 3 then
+				task.delay(1.5, function()
+					Shell.toast(string.format("Careful: at this rate your money runs out in %d %s. Launch a better AI, let some people go, or take a loan in BANK.", months, months == 1 and "month" or "months"), "error")
+				end)
+			end
+		end
+	end
+	Shell.lastReportDay = curMonth
 	for sp, b in pairs(speedBtns) do
 		local on = s.speed == sp
 		b.BackgroundColor3 = on and T.accent or Color3.fromRGB(150, 170, 205)
