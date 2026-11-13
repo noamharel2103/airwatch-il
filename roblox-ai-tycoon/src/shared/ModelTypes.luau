@@ -7,7 +7,6 @@ local MT = {}
 
 MT.list = {
 	{ id = "chat", name = "CHAT AI", short = "CHAT", from = "2023-01", cost = 1, time = 1, market = 0, color = Color3.fromRGB(0, 190, 255), icon = "chat", desc = "Your main app. Brings users and subscriptions." },
-	{ id = "code", name = "CODE AI", short = "CODE", from = "2023-01", cost = 1.2, time = 1.3, market = 3e6, color = Color3.fromRGB(0, 205, 95), icon = "code", desc = "Writes code for developers. Companies pay a lot." },
 	{ id = "image", name = "IMAGE AI", short = "IMAGE", from = "2023-01", cost = 0.8, time = 1.5, market = 2e6, color = Color3.fromRGB(255, 70, 160), icon = "image", desc = "Draws pictures from text." },
 	{ id = "voice", name = "VOICE AI", short = "VOICE", from = "2023-06", cost = 0.9, time = 2.5, market = 1.6e6, color = Color3.fromRGB(255, 150, 0), icon = "voice", desc = "Talks with any voice, in any language." },
 	{ id = "music", name = "MUSIC AI", short = "MUSIC", from = "2024-01", cost = 1.1, time = 3, market = 2.2e6, color = Color3.fromRGB(150, 80, 255), icon = "music", desc = "Makes full songs with singing." },

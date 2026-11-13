@@ -6,8 +6,9 @@ One list, worked top to bottom. Nothing new jumps the queue unless Noam says it 
 ## Now (in progress)
 - [x] Figma UI kit + POP theme + rendered icons + gold shop (5fe11f3) + bold Bank and app bars, gold only in shop (f80800e), Studio v60
 - [ ] NEXT (Noam 2026-11-13 end of day): everything still feels OLD. In this order:
-  1. Much better OFFICE 3D models (every stage room: desk, chairs, servers, walls, decor), real modern office look, not blocky
-  2. A new, better TUTORIAL (looks and flow), in the new bold style
+  0. [x] Lighting softer (less bright, warmer, more contrast) in place v61
+  1. Much better OFFICE 3D models (he says low poly and ugly; candidate: PBR Office Chair 131726966724793, check every pack for scripts first) (every stage room: desk, chairs, servers, walls, decor), real modern office look, not blocky
+  2. [~] New TUTORIAL look: robot guide, typed text, dots, bouncing arrow, short texts (not seen on screen yet: his saves already finished it)
   3. Fonts and every remaining screen bold like the Bank: AI Lab, Team, GPUs, Social, Mail, Company, Website, Settings, desktop, title screen (title text not gold)
 - [~] Hiring store: buy workers by job + rarity, price + monthly salary, no search (published to testers, page itself not clicked yet)
 - [x] Admin: 17 new commands, phone ADMIN panel (tested), GIVE EVERYTHING (tested), /help, event icons, LUCK hidden at 1.0
@@ -38,7 +39,7 @@ One list, worked top to bottom. Nothing new jumps the queue unless Noam says it 
 - [ ] New modern look (not 2019, not glass, nicer colors): WAITING for Noam's reference pictures
 - [ ] Title screen background nicer than the buildings
 - [ ] Model creation + all pay to win feel normal (SUPER BOOST and the offers are bad): redesign, show first
-- [ ] Wire the 660 per-type reactions (TypeReactions) into launches
+- [~] Wire the 660 per-type reactions (TypeReactions) into launches (done in Launch.luau, not launched a non-chat model yet)
 - [ ] Leaderboard per model type
 - [ ] Unlocking a type years early (pay to win) shocks the world; open sourcing spreads it
 - [ ] Learning from open source really improves models and costs a normal amount
@@ -46,7 +47,7 @@ One list, worked top to bottom. Nothing new jumps the queue unless Noam says it 
 - [ ] Company posts videos and talks on Social
 - [ ] Leaks and rumors about new models
 - [ ] About 80 more benchmarks, including benchmarks for non-chat models
-- [ ] Delete the CODE AI type
+- [x] Delete the CODE AI type (old code models fall back to chat)
 - [ ] Easier switching between AI types
 - [ ] Start much earlier (about 2014), every company starts with very bad models, being first early pays less
 - [ ] A model about 2000x better than number 2 makes the whole world go crazy

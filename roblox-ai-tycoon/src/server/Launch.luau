@@ -7,6 +7,12 @@ local Shared = RS:WaitForChild("Shared")
 local Labs = require(Shared.Labs)
 local B = require(Shared.Benchmarks)
 local RT = require(Shared.ReactionTemplates)
+local TR = require(Shared.TypeReactions)
+-- per model type banks (image, voice, music, video, world3d, robot); chat uses the big persona banks
+local typeBank = {}
+for kind, block in pairs(TR.lines) do
+	typeBank[kind] = RT.parse(block)
+end
 local IT = require(Shared.IncidentTemplates)
 local Format = require(Shared.Format)
 
@@ -457,6 +463,42 @@ function Launch.run(state, model, opts)
 	feedPosts(MIX, volume)
 	if chaos > 0 then
 		feedPosts(CHAOS_MIX, chaos == 2 and 2.2 or 1.2)
+	end
+	-- non-chat models: reviews written for that kind of model, and they feel good when the model is good
+	local kindBank = typeBank[model.kind or "chat"]
+	if kindBank then
+		local tt = {} :: { [string]: number }
+		local tierTag = { flop = "FLOP", meh = "MEH", ok = "GOOD", great = "GREAT", insane = "SOTA" }
+		tt[tierTag[tier] or "MEH"] = 3
+		if tier == "insane" then
+			tt.GREAT = 2
+		elseif tier == "ok" then
+			tt.MEH = 1
+		end
+		if opts.open then
+			tt.OPEN = 1.5
+		end
+		if tags.VALUE_KING then
+			tt.CHEAP = 1.5
+		end
+		if gap < -2 then
+			tt.RIVAL_BETTER = 1.2
+		end
+		if tags.NEWCOMER then
+			tt.EARLY = 1
+		end
+		tt.MEME = 0.6
+		tt.SAFETY = (tags.UNSAFE_EDGY and 1.2 or 0.3)
+		local who = { FLOP = "skeptic", MEH = "dev", GOOD = "dev", GREAT = "hype", SOTA = "hype", OPEN = "tinkerer", CHEAP = "vc", RIVAL_BETTER = "skeptic", SAFETY = "safety", MEME = "memer", EARLY = "researcher" }
+		local n = math.clamp(math.floor(6 * reach * volume + 0.5), 3, 16)
+		for _, l in ipairs(pickMany(kindBank, tt, n)) do
+			local persona = "dev"
+			for t in pairs(l.tags) do
+				persona = who[t] or persona
+			end
+			local h = (hourByPersona[persona] or 6) * rng:NextNumber(0.3, 3)
+			table.insert(posts, makePost(persona, fill(l.text, vars), h, persona == "skeptic" and 1.6 - mood * 0.5 or mood))
+		end
 	end
 
 	-- Press headlines
