@@ -23,6 +23,7 @@ local Website = require(Shared.Website)
 local Events = require(Shared.Events)
 local rng = Random.new()
 
+local spend: (any, number, string?) -> ()
 local function year(state)
 	return (Format.dateFromDay(state.day))
 end
@@ -670,6 +671,80 @@ function TeamActions.recruit(state, key)
 	return true, "hired"
 end
 
+-- hire everyone on the list you can pay for and fit, best first
+function TeamActions.recruitAll(state)
+	local hired, said_no = 0, 0
+	local list = table.clone(state.search or {})
+	table.sort(list, function(a, b)
+		return (a.rarity or 1) > (b.rarity or 1)
+	end)
+	local why
+	for _, c in ipairs(list) do
+		local ok, res = TeamActions.recruit(state, c.key)
+		if ok and res == "hired" then
+			hired += 1
+		elseif ok and res == "declined" then
+			said_no += 1
+		elseif not ok then
+			why = res
+			if type(res) == "string" and res:find("full") then
+				break
+			end
+		end
+	end
+	if hired == 0 and said_no == 0 then
+		return false, why or "Nobody to hire"
+	end
+	return true, string.format("Hired %d%s", hired, said_no > 0 and (", " .. said_no .. " said no") or "")
+end
+
+-- the recruiter: every month fills empty desks by himself with the best place you can afford
+function TeamActions.setAutoHire(state, on)
+	state.autoHire = on == true
+	return true
+end
+
+function Game.autoHire(state)
+	if not state.autoHire then
+		return
+	end
+	local stage = Catalog.officeStages[state.office]
+	local free = stage.maxStaff - Game.headcount(state)
+	if free <= 0 then
+		return
+	end
+	-- never spend more than a fifth of the cash on one month of hiring
+	local budget = math.max(0, state.cash) * 0.2
+	local place
+	for _, pl in ipairs(Staff.PLACES) do
+		if state.office >= pl.office and Staff.searchCost(pl, year(state), 1, false) <= budget * 0.25 then
+			place = pl
+		end
+	end
+	if not place then
+		return
+	end
+	local cost = Staff.searchCost(place, year(state), 1, false)
+	spend(state, cost, "salaries")
+	local startCash = state.cash
+	local keep = state.search
+	state.search = Game.rollCandidates(state, place, 1, nil, place.n)
+	local hired = 0
+	for _, c in ipairs(table.clone(state.search)) do
+		if hired >= free or startCash - state.cash > budget then
+			break
+		end
+		local ok, res = TeamActions.recruit(state, c.key)
+		if ok and res == "hired" then
+			hired += 1
+		end
+	end
+	state.search = keep
+	if hired > 0 then
+		Game.chatMsg(state, "general", "Recruiter", string.format("I hired %d new %s from the %s this month.", hired, hired == 1 and "person" or "people", place.name))
+	end
+end
+
 -- daily: moods drift, tired people quit, people ask for things
 function Game.tickTeam(state)
 	ensurePeople(state)
@@ -749,7 +824,7 @@ function Game.trainCtx(state)
 	}
 end
 
-local function spend(state, amount, bucket)
+spend = function(state, amount, bucket)
 	state.cash -= amount
 	state.month.costs += amount
 	if bucket then
@@ -3376,6 +3451,7 @@ end
 
 function Game.monthly(state, y)
 	local mon = state.month
+	Game.autoHire(state)
 	local arr = mon.revenue * 12
 	local F = state.world.frontier
 	local best = Game.bestModel(state)
@@ -3565,7 +3641,7 @@ function Game.snapshot(state)
 			return out
 		end)(),
 		taps = state.taps or 0, tapKey = state.tapKey, trendyNext = state.trendyNext,
-		searchPlace = state.searchPlace, earlyKinds = state.earlyKinds or {}, turboUntil = state.turboUntil or 0, website = state.website or { parts = {} }, websiteBonus = Game.websiteBonus(state),
+		searchPlace = state.searchPlace, autoHire = state.autoHire == true, earlyKinds = state.earlyKinds or {}, turboUntil = state.turboUntil or 0, website = state.website or { parts = {} }, websiteBonus = Game.websiteBonus(state),
 		friendBonus = state.friendBonus or 0, luck = Game.luck(state), events = (function()
 			local out = {}
 			local now = os.time()

@@ -277,6 +277,35 @@ function UI.scroll(parent: Instance, props: { [string]: any }?)
 	for k, v in pairs(props or {}) do
 		(s :: any)[k] = v
 	end
+	-- Roblox's automatic canvas often stops short (grids with AutomaticSize, padding),
+	-- so the last row could not be reached: size the canvas from the layout ourselves
+	local function track(layout: Instance)
+		if not layout:IsA("UIListLayout") then
+			return
+		end
+		s.AutomaticCanvasSize = Enum.AutomaticSize.None
+		local function fit()
+			local pad = s:FindFirstChildOfClass("UIPadding")
+			local extra = 40
+			if pad then
+				extra += pad.PaddingTop.Offset + pad.PaddingBottom.Offset
+			end
+			-- AbsoluteContentSize is in screen pixels; undo every UIScale above us
+			local k = 1
+			local p: Instance? = s
+			while p do
+				local u = p:FindFirstChildOfClass("UIScale")
+				if u then
+					k *= u.Scale
+				end
+				p = p.Parent
+			end
+			s.CanvasSize = UDim2.fromOffset(0, (layout :: UIListLayout).AbsoluteContentSize.Y / math.max(k, 0.01) + extra)
+		end
+		layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(fit)
+		fit()
+	end
+	s.ChildAdded:Connect(track)
 	return s
 end
 

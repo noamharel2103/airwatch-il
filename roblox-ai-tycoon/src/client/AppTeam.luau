@@ -183,22 +183,36 @@ function App.mount(ctx, s)
 	UI.skin(head, T.panel2)
 	new("TextLabel", { Text = string.format("%d / %d DESKS USED", s.headcount, stage.maxStaff), FontFace = UI.HEAVY, TextSize = 18, TextColor3 = s.headcount >= stage.maxStaff and T.red or T.green, Position = UDim2.fromOffset(16, 10), Size = UDim2.new(0.5, 0, 0, 24), Parent = head })
 	new("TextLabel", { Text = "Bigger office = more desks. Rare people do the work of many.", TextSize = 14, TextColor3 = T.sub, Position = UDim2.fromOffset(16, 38), Size = UDim2.new(0.6, 0, 0, 20), Parent = head })
-	-- advanced search filters
-	local roleName = searchRole == "any" and "ANY JOB" or Staff.byId[searchRole].name:upper()
-	UI.button(head, "JOB: " .. roleName .. "  >", function()
-		local ids = { "any" }
-		for _, r in ipairs(Staff.roles) do
-			table.insert(ids, r.id)
-		end
-		local idx = table.find(ids, searchRole) or 1
-		searchRole = ids[idx % #ids + 1]
-		App.mount(ctx, Net.state)
-	end, T.accent, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -270, 0.5, 0), Size = UDim2.fromOffset(300, 48), TextSize = 12 })
-	local rar = Staff.RARITIES[minRarity]
-	UI.button(head, "MIN: " .. rar.name .. "  >", function()
-		minRarity = minRarity % #Staff.RARITIES + 1
-		App.mount(ctx, Net.state)
-	end, rar.color, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), Size = UDim2.fromOffset(250, 48), TextSize = 12 })
+	-- the recruiter: fills empty desks by himself every month
+	local auto = s.autoHire == true
+	UI.button(head, auto and "RECRUITER: ON" or "RECRUITER: OFF", function()
+		Net.act("setAutoHire", not auto)
+	end, auto and T.green or "ghost", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), Size = UDim2.fromOffset(220, 48), TextSize = 12 })
+	UI.label(sc, "RECRUITER ON = every month he hires the best people you can afford into your empty desks.", 13, T.dim)
+	-- filters: job chips (tap one) + min rarity
+	local chips = new("ScrollingFrame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 46), CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.X, ScrollingDirection = Enum.ScrollingDirection.X, ScrollBarThickness = 3, Parent = sc })
+	UI.list(chips, 6, true)
+	local jobIds = { "any" }
+	for _, r in ipairs(Staff.roles) do
+		table.insert(jobIds, r.id)
+	end
+	for _, id in ipairs(jobIds) do
+		local label = id == "any" and "ANY JOB" or Staff.byId[id].name:upper()
+		local on = searchRole == id
+		UI.button(chips, label, function()
+			searchRole = id
+			App.mount(ctx, Net.state)
+		end, on and T.accent or "ghost", { Size = UDim2.fromOffset(#label * 9 + 40, 40), TextSize = 11 })
+	end
+	local rarRow = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 40), Parent = sc })
+	UI.list(rarRow, 6, true)
+	for i, r in ipairs(Staff.RARITIES) do
+		local on = minRarity == i
+		UI.button(rarRow, r.name .. "+", function()
+			minRarity = i
+			App.mount(ctx, Net.state)
+		end, on and r.color or "ghost", { Size = UDim2.new(1 / #Staff.RARITIES, -6, 0, 38), TextSize = 10 })
+	end
 
 	-- the places
 	local places = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 210), Parent = sc })
@@ -239,7 +253,14 @@ function App.mount(ctx, s)
 	local results = s.search or {}
 	if #results > 0 then
 		local placeName = s.searchPlace and Staff.placeById[s.searchPlace] and Staff.placeById[s.searchPlace].name or "SEARCH"
-		UI.label(sc, placeName .. " FOUND THESE PEOPLE", 16, T.yellow, { FontFace = UI.HEAVY })
+		local rrow = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 48), Parent = sc })
+		new("TextLabel", { Text = placeName .. " FOUND " .. #results .. " PEOPLE", FontFace = UI.HEAVY, TextSize = 16, TextColor3 = T.yellow, Size = UDim2.new(0.6, 0, 1, 0), Parent = rrow })
+		UI.button(rrow, "HIRE ALL", function()
+			local ok, res = Net.act("recruitAll")
+			if ok and type(res) == "string" then
+				Net.toast(res, "good")
+			end
+		end, T.green, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0), Size = UDim2.fromOffset(200, 46), TextSize = 14 })
 		local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = sc })
 		new("UIGridLayout", { CellSize = UDim2.new(1 / 3, -8, 0, 250), CellPadding = UDim2.fromOffset(12, 12), Parent = grid })
 		for _, c in ipairs(results) do
@@ -290,7 +311,7 @@ function App.mount(ctx, s)
 end
 
 function App.key(s)
-	local k = page .. channel .. #s.chat .. s.headcount .. s.year .. #(s.requests or {}) .. tostring((s.partyReady or 0) <= s.day) .. searchRole .. minRarity .. s.office
+	local k = page .. channel .. #s.chat .. s.headcount .. s.year .. #(s.requests or {}) .. tostring((s.partyReady or 0) <= s.day) .. searchRole .. minRarity .. s.office .. tostring(s.autoHire)
 	if page == "people" then
 		for _, p in ipairs(s.people or {}) do
 			k ..= tostring(p.id) .. math.floor((p.morale or 0) / 5) .. (p.rank or 1) .. (p.pc or 0) .. tostring(p.offUntil and p.offUntil > s.day)

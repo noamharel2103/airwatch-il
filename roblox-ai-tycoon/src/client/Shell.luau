@@ -40,9 +40,10 @@ local function rescale()
 	end
 	UI.phone = phone
 	Shell.phone = phone
-	local w, h = 1450, 820
+	-- bigger canvas = everything a bit smaller on screen (it used to feel huge)
+	local w, h = 1700, 960
 	if phone then
-		w, h = 960, 500
+		w, h = 1060, 550
 	end
 	local fake = workspace:GetAttribute("FakePhone") == true
 	scale.Scale = math.clamp(math.min(v.X / w, v.Y / h), 0.3, fake and 3 or 1.5)
