@@ -50,11 +50,42 @@ local function saveSession(player: Player)
 	if s then
 		Saves.save(player.UserId, s.slot, s.state, summary(s.state))
 		Saves.postScore(player.UserId, player.DisplayName, s.state.company or "?", s.state.valuation or 0)
+		local best = Game.bestModel(s.state)
+		if best then
+			Saves.postModel(player.UserId, player.DisplayName, s.state.company or "?", best.name or "?", best.cap or 0)
+		end
 	end
 end
 
+-- Only send the parts of the state that changed since the last push (the full state is
+-- ~20KB+ and used to go out 4 times a second: that was most of the lag).
+local HttpService = game:GetService("HttpService")
 local function push(player: Player, s: Session)
-	StateRE:FireClient(player, Game.snapshot(s.state))
+	local snap = Game.snapshot(s.state)
+	local sent = (s :: any).sent
+	local full = sent == nil
+	if full then
+		sent = {}
+		(s :: any).sent = sent
+	end
+	local diff = {}
+	local gone = {}
+	for k, v in pairs(snap) do
+		local ok, enc = pcall(HttpService.JSONEncode, HttpService, v)
+		if not ok then
+			diff[k] = v
+		elseif sent[k] ~= enc then
+			sent[k] = enc
+			diff[k] = v
+		end
+	end
+	for k in pairs(sent) do
+		if snap[k] == nil then
+			sent[k] = nil
+			table.insert(gone, k)
+		end
+	end
+	StateRE:FireClient(player, diff, full, gone)
 	-- seat avatars when the team or the office changes
 	local st = s.state
 	local key = tostring(st.office)
@@ -69,7 +100,7 @@ local function push(player: Player, s: Session)
 	end
 	if (s :: any).avatarKey ~= key then
 		(s :: any).avatarKey = key
-		task.spawn(Avatars.sync, st)
+		task.spawn(Avatars.sync, st, player.UserId)
 	end
 	s.lastPush = os.clock()
 	s.dirty = false
@@ -376,7 +407,8 @@ task.spawn(function()
 	end)
 end)
 
-local topCache, topAt = {}, -1e9
+local topCache: { [string]: any } = {}
+local topAt: { [string]: number } = {}
 MetaRF.OnServerInvoke = function(player: Player, action: string, arg: any)
 	local s = sessions[player]
 	local st = s and s.state
@@ -422,11 +454,33 @@ MetaRF.OnServerInvoke = function(player: Player, action: string, arg: any)
 		end
 		return { ok = true }
 	elseif action == "top" then
-		if os.clock() - topAt > 60 then
-			topAt = os.clock()
-			topCache = Saves.topScores(25)
+		-- arg = { board = "money" | "models", scope = "server" | "world" }
+		local board = type(arg) == "table" and arg.board == "models" and "models" or "money"
+		local scope = type(arg) == "table" and arg.scope == "server" and "server" or "world"
+		if scope == "server" then
+			local list = {}
+			for p, ses in pairs(sessions) do
+				local st = ses.state
+				if board == "money" then
+					table.insert(list, { userId = p.UserId, name = p.DisplayName, company = st.company or "?", valuation = st.valuation or 0 })
+				else
+					local best = Game.bestModel(st)
+					if best then
+						table.insert(list, { userId = p.UserId, name = p.DisplayName, company = st.company or "?", model = best.name or "?", quality = best.cap or 0 })
+					end
+				end
+			end
+			table.sort(list, function(a, b)
+				return (a.valuation or a.quality or 0) > (b.valuation or b.quality or 0)
+			end)
+			return { ok = true, list = list }
 		end
-		return { ok = true, list = topCache }
+		local key = board
+		if os.clock() - (topAt[key] or -1e9) > 60 then
+			topAt[key] = os.clock()
+			topCache[key] = board == "models" and Saves.topModels(25) or Saves.topScores(25)
+		end
+		return { ok = true, list = topCache[key] }
 	end
 	return { ok = false }
 end
@@ -551,7 +605,7 @@ RunService.Heartbeat:Connect(function(dt)
 				end
 			end
 		end
-		if s.dirty and os.clock() - s.lastPush > 0.25 then
+		if s.dirty and os.clock() - s.lastPush > 0.35 then
 			push(player, s)
 		end
 		-- in Studio, save every 15 seconds so stopping a test never loses progress
@@ -563,6 +617,7 @@ RunService.Heartbeat:Connect(function(dt)
 end)
 
 Players.PlayerRemoving:Connect(function(player)
+	Avatars.remove(player.UserId)
 	saveSession(player)
 	sessions[player] = nil
 	ownedPasses[player] = nil

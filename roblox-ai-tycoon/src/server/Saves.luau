@@ -218,6 +218,62 @@ function Saves.postScore(userId: number, name: string, company: string, valuatio
 	end)
 end
 
+-- second world board: the best AI model (score = model quality)
+local modelBoard: OrderedDataStore? = nil
+local modelNames = nil :: DataStore?
+pcall(function()
+	modelBoard = DataStoreService:GetOrderedDataStore(RunService:IsStudio() and "TopModels_Studio_v1" or "TopModels_v1")
+	modelNames = DataStoreService:GetDataStore(RunService:IsStudio() and "TopModelNames_Studio_v1" or "TopModelNames_v1")
+end)
+local localModels: { [string]: { score: number, name: string, company: string, model: string } } = {}
+
+function Saves.postModel(userId: number, name: string, company: string, model: string, quality: number)
+	local score = math.floor(math.max(0, quality) * 100)
+	local key = tostring(userId)
+	if localModels[key] and localModels[key].score >= score then
+		return
+	end
+	localModels[key] = { score = score, name = name, company = company, model = model }
+	if not Saves.available or not modelBoard then
+		return
+	end
+	pcall(function()
+		(modelBoard :: OrderedDataStore):UpdateAsync(key, function(old)
+			return math.max(tonumber(old) or 0, score)
+		end)
+	end)
+	pcall(function()
+		(modelNames :: DataStore):SetAsync(key, { name = name, company = company, model = model })
+	end)
+end
+
+-- returns { { userId, name, company, model, quality } } best first
+function Saves.topModels(n: number)
+	local out = {}
+	if Saves.available and modelBoard then
+		local ok, pages = pcall(function()
+			return (modelBoard :: OrderedDataStore):GetSortedAsync(false, n)
+		end)
+		if ok and pages then
+			for _, e in ipairs(pages:GetCurrentPage()) do
+				local info = nil
+				pcall(function()
+					info = (modelNames :: DataStore):GetAsync(e.key)
+				end)
+				table.insert(out, { userId = tonumber(e.key), name = info and info.name or "Player", company = info and info.company or "?", model = info and info.model or "?", quality = e.value / 100 })
+			end
+			return out
+		end
+	end
+	for id, e in pairs(localModels) do
+		table.insert(out, { userId = tonumber(id), name = e.name, company = e.company, model = e.model, quality = e.score / 100 })
+	end
+	table.sort(out, function(a, b)
+		return a.quality > b.quality
+	end)
+	return out
+end
+
 -- returns { { userId, name, company, valuation } } best first
 function Saves.topScores(n: number)
 	local out = {}

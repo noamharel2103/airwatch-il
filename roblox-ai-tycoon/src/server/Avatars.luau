@@ -5,7 +5,7 @@ local Players = game:GetService("Players")
 
 local Avatars = {}
 local descCache: { [number]: HumanoidDescription } = {}
-local building = false
+local building: { [number]: boolean } = {}
 
 local SKINS = { Color3.fromRGB(255, 220, 180), Color3.fromRGB(234, 184, 146), Color3.fromRGB(198, 140, 100), Color3.fromRGB(140, 95, 65) }
 local SHIRTS = { Color3.fromRGB(230, 70, 80), Color3.fromRGB(40, 140, 240), Color3.fromRGB(255, 190, 40), Color3.fromRGB(40, 190, 110), Color3.fromRGB(160, 100, 240), Color3.fromRGB(255, 120, 40), Color3.fromRGB(40, 42, 50) }
@@ -136,19 +136,28 @@ local function make(person, slot: number, anchor: BasePart): Model?
 end
 
 -- state: the company; keeps workspace.Avatars in sync with the people at visible desks
-function Avatars.sync(state)
-	if building then
+-- every player has their own folder (workspace.Avatars.P<userId>); each client only shows its own
+function Avatars.sync(state, ownerId: number)
+	if building[ownerId] then
 		return
 	end
-	building = true
+	building[ownerId] = true
 	local rooms = workspace:FindFirstChild("Rooms")
 	local room = rooms and rooms:FindFirstChild("Stage" .. tostring(state.office))
-	local folder = workspace:FindFirstChild("Avatars")
+	local root = workspace:FindFirstChild("Avatars")
+	if not root then
+		root = Instance.new("Folder")
+		root.Name = "Avatars"
+		root.Parent = workspace
+	end
+	local folder = root:FindFirstChild("P" .. ownerId)
 	if not folder then
 		folder = Instance.new("Folder")
-		folder.Name = "Avatars"
-		folder.Parent = workspace
+		folder.Name = "P" .. ownerId
+		folder.Parent = root
 	end
+	-- full servers: fewer desk avatars each so 50 players stay smooth
+	local cap = #game:GetService("Players"):GetPlayers() > 8 and 12 or 40
 	local want: { [number]: { key: string, person: any, anchor: BasePart } } = {}
 	if room then
 		local head = 0
@@ -158,7 +167,7 @@ function Avatars.sync(state)
 		for _, w in ipairs(room:GetDescendants()) do
 			if w:IsA("BasePart") and w.Name == "Torso" then
 				local slot = w:GetAttribute("WorkerSlot")
-				if typeof(slot) == "number" and slot <= head and slot <= 40 then
+				if typeof(slot) == "number" and slot <= head and slot <= cap then
 					local person = state.people and state.people[slot]
 					local key = (person and person.userId and ("u" .. person.userId)) or (person and ("p" .. tostring(person.id))) or ("x" .. slot)
 					want[slot] = { key = state.office .. key, person = person, anchor = w }
@@ -183,7 +192,15 @@ function Avatars.sync(state)
 		end
 		task.wait()
 	end
-	building = false
+	building[ownerId] = nil
+end
+
+function Avatars.remove(ownerId: number)
+	local root = workspace:FindFirstChild("Avatars")
+	local f = root and root:FindFirstChild("P" .. ownerId)
+	if f then
+		f:Destroy()
+	end
 end
 
 return Avatars

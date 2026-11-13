@@ -132,6 +132,23 @@ Net.onEvent(function(kind, data)
 end)
 
 -- ===== room view =====
+-- other players' desk avatars stand in the same rooms: hide them, only show my own team
+task.spawn(function()
+	local root = workspace:WaitForChild("Avatars", 60)
+	if not root then
+		return
+	end
+	local mine = "P" .. Players.LocalPlayer.UserId
+	local function check(f: Instance)
+		if f.Name ~= mine then
+			f.Parent = nil
+		end
+	end
+	for _, f in ipairs(root:GetChildren()) do
+		check(f)
+	end
+	root.ChildAdded:Connect(check)
+end)
 local rooms = workspace:WaitForChild("Rooms", 30)
 local currentStage = 0
 local orbit: any

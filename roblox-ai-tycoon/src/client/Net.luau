@@ -32,7 +32,20 @@ function Net.toast(text: string, kind: string?)
 	end
 end
 
-StateRE.OnClientEvent:Connect(function(s)
+-- the server sends only what changed: merge it into a fresh copy of the last state
+StateRE.OnClientEvent:Connect(function(diff, full, gone)
+	local s
+	if full or not Net.state then
+		s = diff
+	else
+		s = table.clone(Net.state)
+		for k, v in pairs(diff) do
+			s[k] = v
+		end
+		for _, k in ipairs(gone or {}) do
+			s[k] = nil
+		end
+	end
 	Net.state = s
 	for _, fn in ipairs(listeners) do
 		task.spawn(fn, s)

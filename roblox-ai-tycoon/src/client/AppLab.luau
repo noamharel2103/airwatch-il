@@ -485,7 +485,7 @@ function Lab.key(s)
 	end
 	local k = "m" .. (s.training and "t" or "") .. tostring(s.product.activeModel) .. tostring(s.day // 30)
 	for _, m in ipairs(s.models) do
-		k ..= m.status .. (m.boosting and "b" or "") .. (m.lastGain or "") .. math.floor((m.users or 0) / 1000)
+		k ..= m.status .. (m.boosting and "b" or "") .. (m.lastGain or "") .. math.floor(math.log10((m.users or 0) + 1) * 2)
 	end
 	return k
 end

@@ -211,35 +211,66 @@ local function settingsPopup()
 	render()
 end
 
--- ===== world leaderboard =====
+-- ===== leaderboards: money or models, this server or the whole world =====
+local topBoard, topScope = "money", "server"
 local function topPopup()
-	local body = modal("WORLD TOP COMPANIES", Color3.fromRGB(150, 80, 255), 760, 600)
-	local sc = UI.scroll(body)
-	UI.list(sc, 8)
-	UI.label(sc, "LOADING...", 14, T.sub)
-	task.spawn(function()
-		local r = meta("top")
+	local body = modal("LEADERBOARDS", Color3.fromRGB(150, 80, 255), 820, 640)
+	local tabs = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 46), Parent = body })
+	UI.list(tabs, 8, true)
+	local sc = UI.scroll(body, { Position = UDim2.fromOffset(0, 58), Size = UDim2.new(1, 0, 1, -58) })
+	local fill
+	local tabBtns = {}
+	local TABS = { { "server", "money", "SERVER MONEY" }, { "world", "money", "WORLD MONEY" }, { "server", "models", "SERVER MODELS" }, { "world", "models", "WORLD MODELS" } }
+	local function paint()
+		for i, t in ipairs(TABS) do
+			local on = t[1] == topScope and t[2] == topBoard
+			tabBtns[i].BackgroundColor3 = on and Color3.fromRGB(150, 80, 255) or Color3.fromRGB(58, 70, 120)
+		end
+	end
+	for i, t in ipairs(TABS) do
+		tabBtns[i] = UI.button(tabs, t[3], function()
+			topScope, topBoard = t[1], t[2]
+			paint()
+			fill()
+		end, "ghost", { Size = UDim2.new(0.25, -6, 1, 0), TextSize = 13 })
+	end
+	fill = function()
 		UI.clear(sc)
 		UI.list(sc, 8)
-		local list = r and r.list or {}
-		if #list == 0 then
-			UI.label(sc, "No companies yet. Be the first!", 16, T.sub)
-		end
-		local me = Players.LocalPlayer.UserId
-		for i, e in ipairs(list) do
-			local mine = e.userId == me
-			local medal = ({ Color3.fromRGB(255, 200, 40), Color3.fromRGB(200, 210, 225), Color3.fromRGB(215, 130, 60) })[i]
-			local row = new("Frame", { BackgroundColor3 = mine and Color3.fromRGB(20, 110, 70) or T.panel2, Size = UDim2.new(1, -10, 0, 64), Parent = sc })
-			UI.corner(row, 2)
-			new("UIStroke", { Color = medal or T.line, Thickness = medal and 3 or 2, Parent = row })
-			new("TextLabel", { Text = "#" .. i, FontFace = UI.HEAVY, TextSize = 18, TextColor3 = medal or T.sub, Position = UDim2.fromOffset(14, 0), Size = UDim2.fromOffset(60, 64), Parent = row })
-			local face = new("ImageLabel", { BackgroundColor3 = T.bg, Image = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(e.userId) .. "&w=150&h=150", Position = UDim2.fromOffset(74, 8), Size = UDim2.fromOffset(48, 48), Parent = row })
-			UI.corner(face, 99)
-			new("TextLabel", { Text = tostring(e.company), FontFace = UI.HEAVY, TextSize = 14, Position = UDim2.fromOffset(134, 10), Size = UDim2.new(1, -360, 0, 22), Parent = row })
-			new("TextLabel", { Text = tostring(e.name), TextSize = 14, TextColor3 = T.sub, Position = UDim2.fromOffset(134, 34), Size = UDim2.new(1, -360, 0, 20), Parent = row })
-			new("TextLabel", { Text = Format.money(e.valuation or 0), FontFace = UI.HEAVY, TextSize = 16, TextColor3 = T.green, TextXAlignment = Enum.TextXAlignment.Right, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, 0), Size = UDim2.fromOffset(220, 64), Parent = row })
-		end
-	end)
+		UI.label(sc, "LOADING...", 14, T.sub)
+		local want = topScope .. topBoard
+		task.spawn(function()
+			local r = meta("top", { board = topBoard, scope = topScope })
+			if want ~= topScope .. topBoard or not sc.Parent then
+				return
+			end
+			UI.clear(sc)
+			UI.list(sc, 8)
+			local list = r and r.list or {}
+			if #list == 0 then
+				UI.label(sc, topBoard == "models" and "Nobody launched a chat model yet. Be the first!" or "No companies yet. Be the first!", 16, T.sub)
+			end
+			local me = Players.LocalPlayer.UserId
+			for i, e in ipairs(list) do
+				local mine = e.userId == me
+				local medal = ({ Color3.fromRGB(255, 200, 40), Color3.fromRGB(200, 210, 225), Color3.fromRGB(215, 130, 60) })[i]
+				local row = new("Frame", { BackgroundColor3 = mine and Color3.fromRGB(20, 110, 70) or T.panel2, Size = UDim2.new(1, -10, 0, 64), Parent = sc })
+				UI.corner(row, 2)
+				new("UIStroke", { Color = medal or T.line, Thickness = medal and 3 or 2, Parent = row })
+				new("TextLabel", { Text = "#" .. i, FontFace = UI.HEAVY, TextSize = 18, TextColor3 = medal or T.sub, Position = UDim2.fromOffset(14, 0), Size = UDim2.fromOffset(60, 64), Parent = row })
+				local face = new("ImageLabel", { BackgroundColor3 = T.bg, Image = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(e.userId) .. "&w=150&h=150", Position = UDim2.fromOffset(74, 8), Size = UDim2.fromOffset(48, 48), Parent = row })
+				UI.corner(face, 99)
+				local top = topBoard == "models" and tostring(e.model) or tostring(e.company)
+				local sub = topBoard == "models" and (tostring(e.company) .. "  |  " .. tostring(e.name)) or tostring(e.name)
+				new("TextLabel", { Text = top, FontFace = UI.HEAVY, TextSize = 15, TextTruncate = Enum.TextTruncate.AtEnd, TextWrapped = false, Position = UDim2.fromOffset(134, 10), Size = UDim2.new(1, -380, 0, 22), Parent = row })
+				new("TextLabel", { Text = sub, TextSize = 14, TextColor3 = T.sub, TextTruncate = Enum.TextTruncate.AtEnd, TextWrapped = false, Position = UDim2.fromOffset(134, 34), Size = UDim2.new(1, -380, 0, 20), Parent = row })
+				local value = topBoard == "models" and ("SCORE " .. Format.count(math.floor(e.quality or 0))) or Format.money(e.valuation or 0)
+				new("TextLabel", { Text = value, FontFace = UI.HEAVY, TextSize = 16, TextColor3 = T.green, TextXAlignment = Enum.TextXAlignment.Right, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, 0), Size = UDim2.fromOffset(230, 64), Parent = row })
+			end
+		end)
+	end
+	paint()
+	fill()
 end
 
 -- clear message in the middle of the screen when something is not ready yet
@@ -365,7 +396,7 @@ function Extras.start(gui: Instance, fx)
 			notice("+10% MONEY FOR EVERY FRIEND IN YOUR SERVER")
 		end
 	end)
-	sideButton("top", "trophy", Color3.fromRGB(150, 80, 255), "WORLD TOP", topPopup)
+	sideButton("top", "trophy", Color3.fromRGB(150, 80, 255), "RANKS", topPopup)
 	sideButton("settings", "gear", Color3.fromRGB(90, 100, 140), "SETTINGS", settingsPopup)
 
 	-- load settings, start music, show the daily gift once a company is open
