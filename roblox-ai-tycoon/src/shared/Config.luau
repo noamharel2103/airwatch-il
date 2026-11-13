@@ -7,6 +7,14 @@ Config.GAME_TITLE = "MAKE AN AI COMPANY"
 Config.COST_EASE = 0.5
 -- all income is multiplied by this
 Config.INCOME_BOOST = 1.5
+-- training (new models and stat training) takes this much of the normal time
+Config.TRAIN_TIME = 0.5
+-- every new model gets this much extra quality (log scale, 4 = clearly better)
+Config.MODEL_BONUS = 4
+-- how strongly people pick your app (more = easier to get popular)
+Config.POPULARITY = 1.6
+-- each TAP takes this much off a training run (40 taps = 76%)
+Config.TAP_POWER = 0.019
 Config.START_YEAR = 2023
 Config.START_MONTH = 1
 

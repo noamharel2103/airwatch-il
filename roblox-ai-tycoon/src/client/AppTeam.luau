@@ -5,6 +5,7 @@ local Shared = RS:WaitForChild("Shared")
 local Format = require(Shared.Format)
 local Staff = require(Shared.Staff)
 local Catalog = require(Shared.Catalog)
+local Config = require(Shared.Config)
 local UI = require(script.Parent.UI)
 local Net = require(script.Parent.Net)
 local T = UI.T
@@ -13,8 +14,47 @@ local new = UI.new
 local App = { id = "team", name = "Team", icon = "team", color = Color3.fromRGB(150, 90, 240) }
 local page = "chat"
 local channel = "general"
-local searchRole = "any"
-local minRarity = 1
+local buyRarity = 1
+local buyQty = 1
+local QTYS = { 1, 5, 10 }
+-- plain one line explanation of what each job does for your company (no dashes)
+local PLAIN = {
+	junior = "Runs AI experiments. Your research goes faster.",
+	senior = "Knows which experiments matter. Research goes much faster.",
+	star = "Famous AI researcher. A huge research boost.",
+	infra = "Keeps your GPUs busy. Fewer failed training runs.",
+	data = "Finds and cleans data. Your models learn better.",
+	safety = "Tests your AI for danger. Fewer scandals.",
+	product = "Builds app features. More users stay.",
+	designer = "Makes your app look and feel great.",
+	sales = "Closes big business deals. More API money.",
+	marketing = "Builds hype for launches. More people hear about you.",
+}
+local HELPS = { research = "RESEARCH", infra = "TRAINING", data = "DATA", safety = "SAFETY", product = "APP USERS", sales = "SALES", hype = "HYPE" }
+
+-- salary multiplier of the city you picked
+local function locSalary(s): number
+	for _, l in ipairs(Config.LOCATIONS) do
+		if l.id == s.location then
+			return l.salary
+		end
+	end
+	return Config.LOCATIONS[1].salary
+end
+-- what one worker costs every month (pay plus their desk), same as the server charges
+local function salaryOf(s, roleId: string, ls: number): number
+	return Staff.monthlyCash(roleId, s.year) * ls + Config.SEAT_COST_MONTH
+end
+local function rarityUnlocked(s, i: number): boolean
+	return s.office >= (Staff.RARITY_OFFICE[i] or 1)
+end
+local function officeName(i: number): string
+	local st = Catalog.officeStages[i]
+	return st and (st.name:gsub("%-", " ")) or "a bigger office"
+end
+local function multText(m: number): string
+	return m == math.floor(m) and tostring(m) or string.format("%.1f", m)
+end
 
 function App.mount(ctx, s)
 	if not s then
@@ -117,7 +157,7 @@ function App.mount(ctx, s)
 		-- everyone
 		UI.label(sc, "Your people", 18, T.text, { FontFace = UI.HEAVY })
 		if n == 0 then
-			UI.label(sc, "Nobody yet. Find people in the Hire tab.", 14, T.dim)
+			UI.label(sc, "Nobody yet. Buy workers in the Hire tab.", 14, T.dim)
 		end
 		for _, p in ipairs(s.people or {}) do
 			-- one tidy card per person: face, name, job, mood bar, and three buttons on the right
@@ -174,151 +214,160 @@ function App.mount(ctx, s)
 		end
 		return
 	end
-	-- hire: pay a place to search, filter by role and rarity, then pick people
+	-- hire: a simple worker store. Pick a rarity and how many, then BUY the job you want.
 	local sc = UI.scroll(ctx.body)
 	UI.list(sc, 12)
 	UI.pad(sc, 0, 0, 10, 8)
 	local stage = Catalog.officeStages[s.office]
-	local head = new("Frame", { BackgroundColor3 = T.panel2, Size = UDim2.new(1, -8, 0, 70), Parent = sc })
-	UI.skin(head, T.panel2)
-	new("TextLabel", { Text = string.format("%d / %d DESKS USED", s.headcount, stage.maxStaff), FontFace = UI.HEAVY, TextSize = 18, TextColor3 = s.headcount >= stage.maxStaff and T.red or T.green, Position = UDim2.fromOffset(16, 10), Size = UDim2.new(0.5, 0, 0, 24), Parent = head })
-	new("TextLabel", { Text = "Bigger office = more desks. Rare people do the work of many.", TextSize = 14, TextColor3 = T.sub, Position = UDim2.fromOffset(16, 38), Size = UDim2.new(0.6, 0, 0, 20), Parent = head })
+	local maxStaff = stage and stage.maxStaff or 0
+	local free = math.max(0, maxStaff - s.headcount)
+	local ls = locSalary(s)
+	if not rarityUnlocked(s, buyRarity) then
+		buyRarity = 1
+		for i = 1, #Staff.RARITIES do
+			if rarityUnlocked(s, i) then
+				buyRarity = i
+			end
+		end
+	end
+	local rar = Staff.RARITIES[buyRarity]
+	local narrow = UI.phone or (ctx.body.AbsoluteSize.X > 0 and ctx.body.AbsoluteSize.X < 640)
+
+	-- top: desks, team salary, what this buy adds
+	local teamSalary = 0
+	for roleId, n in pairs(s.staff or {}) do
+		if Staff.byId[roleId] then
+			teamSalary += salaryOf(s, roleId, ls) * n
+		end
+	end
+	local lo, hi = math.huge, 0
+	for _, r in ipairs(Staff.roles) do
+		local m = salaryOf(s, r.id, ls) * buyQty
+		lo = math.min(lo, m)
+		hi = math.max(hi, m)
+	end
+	local head = UI.card(sc, { Size = UDim2.new(1, -8, 0, 0) })
+	UI.list(head, 6)
+	UI.label(head, string.format("%d / %d DESKS USED", s.headcount, maxStaff), 22, free <= 0 and T.red or T.green, { FontFace = UI.HEAVY })
+	UI.label(head, "YOUR TEAM COSTS " .. Format.money(teamSalary) .. " A MONTH", 17, T.text, { FontFace = UI.BOLD })
+	UI.label(head, string.format("BUYING %d ADDS %s TO %s A MONTH (DEPENDS ON THE JOB)", buyQty, Format.money(lo), Format.money(hi)), 15, T.yellow, { FontFace = UI.BOLD })
+	UI.label(head, free > 0 and string.format("%d free %s. Bigger office in Company = more desks.", free, free == 1 and "desk" or "desks") or "Office is full. Upgrade your office in Company to get more desks.", 14, T.sub)
 	-- the recruiter: fills empty desks by himself every month
 	local auto = s.autoHire == true
 	UI.button(head, auto and "RECRUITER: ON" or "RECRUITER: OFF", function()
 		Net.act("setAutoHire", not auto)
-	end, auto and T.green or "ghost", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), Size = UDim2.fromOffset(220, 48), TextSize = 12 })
-	UI.label(sc, "RECRUITER ON = every month he hires the best people you can afford into your empty desks.", 13, T.dim)
-	-- filters: job chips (tap one) + min rarity
-	local chips = new("ScrollingFrame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 46), CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.X, ScrollingDirection = Enum.ScrollingDirection.X, ScrollBarThickness = 3, Parent = sc })
-	UI.list(chips, 6, true)
-	local jobIds = { "any" }
-	for _, r in ipairs(Staff.roles) do
-		table.insert(jobIds, r.id)
-	end
-	for _, id in ipairs(jobIds) do
-		local label = id == "any" and "ANY JOB" or Staff.byId[id].name:upper()
-		local on = searchRole == id
-		UI.button(chips, label, function()
-			searchRole = id
-			App.mount(ctx, Net.state)
-		end, on and T.accent or "ghost", { Size = UDim2.fromOffset(#label * 9 + 40, 40), TextSize = 11 })
-	end
-	local rarRow = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 40), Parent = sc })
-	UI.list(rarRow, 6, true)
+	end, auto and T.green or "ghost", { Size = UDim2.new(narrow and 1 or 0.5, 0, 0, 48), TextSize = 14 })
+	UI.label(head, "RECRUITER ON: every month he fills your empty desks with people you can afford.", 13, T.dim)
+
+	-- rarity tabs: higher rarity works like more people and costs more
+	local rarRow = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = sc })
+	local rCols = narrow and 3 or #Staff.RARITIES
+	new("UIGridLayout", { CellSize = UDim2.new(1 / rCols, -6, 0, 58), CellPadding = UDim2.fromOffset(6, 6), SortOrder = Enum.SortOrder.LayoutOrder, Parent = rarRow })
 	for i, r in ipairs(Staff.RARITIES) do
-		local on = minRarity == i
-		UI.button(rarRow, r.name .. "+", function()
-			minRarity = i
+		local unlocked = rarityUnlocked(s, i)
+		local on = buyRarity == i
+		local needName = officeName(Staff.RARITY_OFFICE[i] or 1)
+		local b = UI.button(rarRow, "", function()
+			if not unlocked then
+				Net.toast(r.name .. " workers unlock with " .. needName .. ". Upgrade in Company.", "error")
+				return
+			end
+			buyRarity = i
 			App.mount(ctx, Net.state)
-		end, on and r.color or "ghost", { Size = UDim2.new(1 / #Staff.RARITIES, -6, 0, 38), TextSize = 10 })
+		end, on and r.color or "ghost", { LayoutOrder = i })
+		new("TextLabel", { Text = r.name, FontFace = UI.HEAVY, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Center, TextColor3 = (on or not unlocked) and Color3.new(1, 1, 1) or r.color:Lerp(Color3.new(1, 1, 1), 0.25), Position = UDim2.fromOffset(4, 7), Size = UDim2.new(1, -8, 0, 20), TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, Parent = b })
+		local sub = new("TextLabel", { Text = unlocked and ("WORKS LIKE " .. multText(r.mult)) or ("NEEDS " .. needName:upper()), FontFace = UI.BOLD, TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, TextColor3 = unlocked and Color3.fromRGB(255, 240, 160) or T.sub, Position = UDim2.fromOffset(4, 30), Size = UDim2.new(1, -8, 0, 18), Parent = b })
+		new("UITextSizeConstraint", { MaxTextSize = 12, Parent = sub })
 	end
 
-	-- the places
-	local places = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 210), Parent = sc })
-	new("UIGridLayout", { CellSize = UDim2.new(0.25, -9, 1, 0), CellPadding = UDim2.fromOffset(12, 0), Parent = places })
-	for _, pl in ipairs(Staff.PLACES) do
-		local locked = s.office < pl.office
-		local c = new("Frame", { BackgroundColor3 = locked and Color3.fromRGB(50, 56, 80) or pl.color, Parent = places })
-		UI.corner(c, 2)
-		UI.stroke(c, T.line, 3)
-		new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(150, 150, 150)), Parent = c })
-		new("TextLabel", { Text = pl.name, FontFace = UI.HEAVY, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Center, Position = UDim2.fromOffset(8, 12), Size = UDim2.new(1, -16, 0, 20), Parent = c })
-		new("TextLabel", { Text = pl.desc, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Center, Position = UDim2.fromOffset(10, 38), Size = UDim2.new(1, -20, 0, 40), Parent = c })
-		-- odds strip
-		local odds = new("Frame", { BackgroundColor3 = T.line, Position = UDim2.fromOffset(12, 88), Size = UDim2.new(1, -24, 0, 14), Parent = c })
-		local total = 0
-		for i, w in ipairs(pl.weights) do
-			if i >= minRarity then
-				total += w
-			end
-		end
-		local x = 0
-		for i, w in ipairs(pl.weights) do
-			if i >= minRarity and w > 0 and total > 0 then
-				new("Frame", { BackgroundColor3 = Staff.RARITIES[i].color, Position = UDim2.fromScale(x, 0), Size = UDim2.fromScale(w / total, 1), Parent = odds })
-				x += w / total
-			end
-		end
-		local cost = Staff.searchCost(pl, s.year, minRarity, searchRole ~= "any")
-		local pid = pl.id
-		UI.button(c, locked and ("NEEDS " .. Catalog.officeStages[pl.office].name:upper()) or ("SEARCH  " .. Format.money(cost)), function()
-			if not locked then
-				Net.act("recruitSearch", pid, { role = searchRole, minRarity = minRarity })
-			end
-		end, locked and "ghost" or T.green, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -12), Size = UDim2.new(1, -24, 0, 52), TextSize = 12 })
+	-- how many at once
+	local qRow = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 46), Parent = sc })
+	UI.list(qRow, 8, true)
+	new("TextLabel", { Text = "HOW MANY", FontFace = UI.HEAVY, TextSize = 15, TextColor3 = T.sub, Size = UDim2.fromOffset(100, 46), Parent = qRow })
+	for _, q in ipairs(QTYS) do
+		UI.button(qRow, "x" .. q, function()
+			buyQty = q
+			App.mount(ctx, Net.state)
+		end, buyQty == q and T.accent or "ghost", { Size = UDim2.fromOffset(84, 44), TextSize = 16 })
 	end
 
-	-- results
-	local results = s.search or {}
-	if #results > 0 then
-		local placeName = s.searchPlace and Staff.placeById[s.searchPlace] and Staff.placeById[s.searchPlace].name or "SEARCH"
-		local rrow = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 48), Parent = sc })
-		new("TextLabel", { Text = placeName .. " FOUND " .. #results .. " PEOPLE", FontFace = UI.HEAVY, TextSize = 16, TextColor3 = T.yellow, Size = UDim2.new(0.6, 0, 1, 0), Parent = rrow })
-		UI.button(rrow, "HIRE ALL", function()
-			local ok, res = Net.act("recruitAll")
+	-- the store: one card per job
+	local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = sc })
+	local cols = narrow and 2 or 3
+	new("UIGridLayout", { CellSize = UDim2.new(1 / cols, -8, 0, 262), CellPadding = UDim2.fromOffset(10, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = grid })
+	for i, role in ipairs(Staff.roles) do
+		local each = Staff.signing(role.id, s.year, buyRarity, ls)
+		local total = each * buyQty
+		local monthly = salaryOf(s, role.id, ls)
+		local f = new("Frame", { BackgroundColor3 = T.panel2, LayoutOrder = i, Parent = grid })
+		UI.corner(f, 2)
+		new("UIStroke", { Color = buyRarity >= 4 and rar.color or T.line, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = f })
+		new("UIGradient", { Rotation = 90, Color = ColorSequence.new(rar.color:Lerp(T.panel2, 0.55), T.panel2), Parent = f })
+		new("TextLabel", { Text = role.name:upper(), FontFace = UI.HEAVY, TextSize = 16, Position = UDim2.fromOffset(12, 10), Size = UDim2.new(1, -24, 0, 24), TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, Parent = f })
+		new("TextLabel", { Text = rar.name .. "  |  WORKS LIKE " .. multText(rar.mult) .. (rar.mult == 1 and " PERSON" or " PEOPLE"), FontFace = UI.BOLD, TextSize = 11, TextColor3 = rar.color:Lerp(Color3.new(1, 1, 1), 0.35), Position = UDim2.fromOffset(12, 36), Size = UDim2.new(1, -24, 0, 18), TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, Parent = f })
+		new("TextLabel", { Text = PLAIN[role.id] or (role.blurb:gsub("%-", " ")), TextSize = 13, TextColor3 = T.text, TextYAlignment = Enum.TextYAlignment.Top, Position = UDim2.fromOffset(12, 60), Size = UDim2.new(1, -24, 0, 52), Parent = f })
+		new("TextLabel", { Text = "HELPS: " .. (HELPS[role.effect] or role.effect:upper()), FontFace = UI.BOLD, TextSize = 11, TextColor3 = T.accent, Position = UDim2.fromOffset(12, 114), Size = UDim2.new(1, -24, 0, 18), TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, Parent = f })
+		-- price box: buy price once, salary every month
+		local box = new("Frame", { BackgroundColor3 = Color3.fromRGB(20, 24, 46), BackgroundTransparency = 0.25, Position = UDim2.fromOffset(10, 138), Size = UDim2.new(1, -20, 0, 54), Parent = f })
+		UI.corner(box, 2)
+		new("TextLabel", { Text = "BUY PRICE", FontFace = UI.BOLD, TextSize = 11, TextColor3 = T.sub, Position = UDim2.fromOffset(8, 4), Size = UDim2.new(0.45, -8, 0, 22), Parent = box })
+		new("TextLabel", { Text = Format.money(each), FontFace = UI.HEAVY, TextSize = 14, TextColor3 = T.yellow, TextXAlignment = Enum.TextXAlignment.Right, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -8, 0, 4), Size = UDim2.new(0.55, 0, 0, 22), TextWrapped = false, Parent = box })
+		new("TextLabel", { Text = "SALARY", FontFace = UI.BOLD, TextSize = 11, TextColor3 = T.sub, Position = UDim2.fromOffset(8, 28), Size = UDim2.new(0.45, -8, 0, 22), Parent = box })
+		new("TextLabel", { Text = Format.money(monthly) .. " / MONTH", FontFace = UI.HEAVY, TextSize = 14, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Right, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -8, 0, 28), Size = UDim2.new(0.55, 0, 0, 22), TextWrapped = false, Parent = box })
+		-- buy button: says why when you cannot
+		local why
+		if free <= 0 then
+			why = "OFFICE FULL"
+		elseif buyQty > free then
+			why = string.format("ONLY %d %s FREE", free, free == 1 and "DESK" or "DESKS")
+		elseif s.cash < total then
+			why = "NEED " .. Format.money(total)
+		end
+		local rid, r, q = role.id, buyRarity, buyQty
+		UI.button(f, why or (string.format("BUY x%d  %s", q, Format.money(total))), function()
+			if why then
+				Net.toast(why == "OFFICE FULL" and "Office is full. Upgrade your office in Company." or (why:sub(1, 4) == "NEED" and ("You need " .. Format.money(total) .. " for this.") or "Not enough free desks. Pick a smaller amount or upgrade your office."), "error")
+				return
+			end
+			local ok, res = Net.act("buyWorker", rid, r, q)
 			if ok and type(res) == "string" then
 				Net.toast(res, "good")
 			end
-		end, T.green, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0), Size = UDim2.fromOffset(200, 46), TextSize = 14 })
-		local grid = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = sc })
-		new("UIGridLayout", { CellSize = UDim2.new(1 / 3, -8, 0, 250), CellPadding = UDim2.fromOffset(12, 12), Parent = grid })
-		for _, c in ipairs(results) do
-			local r = Staff.RARITIES[c.rarity or 1]
-			local role = Staff.byId[c.role]
-			local f = new("Frame", { BackgroundColor3 = r.color, Parent = grid })
-			UI.corner(f, 2)
-			new("UIStroke", { Color = c.rarity >= 5 and Color3.fromRGB(255, 240, 150) or T.line, Thickness = c.rarity >= 5 and 5 or 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = f })
-			new("UIGradient", { Rotation = 90, Color = ColorSequence.new(r.color:Lerp(Color3.new(1, 1, 1), 0.1), r.color:Lerp(Color3.new(0, 0, 0), 0.6)), Parent = f })
-			local tag = new("TextLabel", { Text = r.name, FontFace = UI.HEAVY, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Center, BackgroundTransparency = 0, BackgroundColor3 = T.line, Position = UDim2.fromOffset(10, 10), Size = UDim2.fromOffset(150, 26), Parent = f })
-			tag.TextColor3 = r.color:Lerp(Color3.new(1, 1, 1), 0.3)
-			-- face: real avatar for friends, a coloured block for everyone else
-			local face = new("ImageLabel", { BackgroundColor3 = Color3.fromRGB(30, 34, 60), Image = c.userId and ("rbxthumb://type=AvatarHeadShot&id=" .. c.userId .. "&w=150&h=150") or "", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -10, 0, 10), Size = UDim2.fromOffset(72, 72), Parent = f })
-			UI.stroke(face, T.line, 3)
-			if not c.userId then
-				new("TextLabel", { Text = c.name:sub(1, 1), FontFace = UI.HEAVY, TextSize = 30, TextXAlignment = Enum.TextXAlignment.Center, Size = UDim2.fromScale(1, 1), Parent = face })
-			end
-			if c.userId then
-				local fr = new("TextLabel", { Text = "FRIEND", FontFace = UI.HEAVY, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Center, BackgroundTransparency = 0, BackgroundColor3 = Color3.fromRGB(0, 200, 255), Position = UDim2.fromOffset(10, 42), Size = UDim2.fromOffset(90, 22), Parent = f })
-				local _ = fr
-			end
-			new("TextLabel", { Text = c.name, FontFace = UI.HEAVY, TextSize = 16, Position = UDim2.fromOffset(12, 90), Size = UDim2.new(1, -24, 0, 24), TextTruncate = Enum.TextTruncate.AtEnd, TextWrapped = false, Parent = f })
-			new("TextLabel", { Text = (role and role.name or c.role) .. "  |  " .. (c.from or ""), TextSize = 14, Position = UDim2.fromOffset(12, 118), Size = UDim2.new(1, -24, 0, 36), TextYAlignment = Enum.TextYAlignment.Top, Parent = f })
-			new("TextLabel", { Text = string.format("WORKS LIKE %s PEOPLE", r.mult == math.floor(r.mult) and tostring(r.mult) or string.format("%.1f", r.mult)), FontFace = UI.BOLD, TextSize = 12, TextColor3 = Color3.fromRGB(255, 240, 160), Position = UDim2.fromOffset(12, 156), Size = UDim2.new(1, -24, 0, 18), Parent = f })
-			local signing = Staff.monthlyCash(c.role, s.year) * 1.5 * r.mult
-			local key = c.key
-			UI.button(f, "HIRE  " .. Format.money(signing), function()
-				Net.act("recruit", key)
-			end, T.green, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -12), Size = UDim2.new(1, -24, 0, 50), TextSize = 13 })
-		end
-	else
-		UI.label(sc, "Pick a place and press SEARCH. Rarer people cost more but do the work of a whole team. Your Roblox friends show up too!", 15, T.sub)
+		end, why and "ghost" or T.green, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -10), Size = UDim2.new(1, -20, 0, 50), TextSize = 14 })
 	end
-	-- Robux: better people right now
+
+	-- Robux: legend people right now
 	local rb = new("Frame", { BackgroundColor3 = Color3.fromRGB(255, 185, 0), Size = UDim2.new(1, -8, 0, 96), Parent = sc })
 	UI.corner(rb, 2)
 	UI.stroke(rb, T.line, 4)
 	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(255, 230, 110), Color3.fromRGB(220, 120, 0)), Parent = rb })
-	local ic = UI.icon(rb, "crown", Color3.fromRGB(255, 185, 0), 70)
-	ic.Position = UDim2.fromOffset(14, 13)
-	new("TextLabel", { Text = "LEGEND RECRUIT", FontFace = UI.HEAVY, TextSize = 18, TextColor3 = Color3.fromRGB(50, 26, 0), Position = UDim2.fromOffset(100, 16), Size = UDim2.new(1, -380, 0, 24), Parent = rb })
-	new("TextLabel", { Text = "4 LEGENDARY or MYTHIC people who all say yes.", TextSize = 16, TextColor3 = Color3.fromRGB(70, 40, 0), Position = UDim2.fromOffset(100, 48), Size = UDim2.new(1, -380, 0, 30), Parent = rb })
+	local ic = UI.icon(rb, "crown", Color3.fromRGB(255, 185, 0), 64)
+	ic.Position = UDim2.fromOffset(12, 16)
+	new("TextLabel", { Text = "LEGEND RECRUIT", FontFace = UI.HEAVY, TextSize = 18, TextColor3 = Color3.fromRGB(50, 26, 0), Position = UDim2.fromOffset(88, 14), Size = UDim2.new(0.68, -96, 0, 24), TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, Parent = rb })
+	new("TextLabel", { Text = "4 LEGENDARY or MYTHIC people who all say yes.", TextSize = 15, TextColor3 = Color3.fromRGB(70, 40, 0), Position = UDim2.fromOffset(88, 42), Size = UDim2.new(0.68, -96, 0, 44), TextYAlignment = Enum.TextYAlignment.Top, Parent = rb })
 	UI.button(rb, "R$ 99", function()
 		if App.buyProduct then
 			App.buyProduct("legendhire")
 		end
-	end, Color3.fromRGB(0, 200, 90), { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -16, 0.5, 0), Size = UDim2.fromOffset(240, 62), TextSize = 18 })
+	end, Color3.fromRGB(0, 200, 90), { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0), Size = UDim2.new(0.32, -14, 0, 62), TextSize = 18 })
 end
 
 function App.key(s)
-	local k = page .. channel .. #s.chat .. s.headcount .. s.year .. #(s.requests or {}) .. tostring((s.partyReady or 0) <= s.day) .. searchRole .. minRarity .. s.office .. tostring(s.autoHire)
+	local k = page .. channel .. #s.chat .. s.headcount .. s.year .. #(s.requests or {}) .. tostring((s.partyReady or 0) <= s.day) .. s.office .. tostring(s.autoHire)
 	if page == "people" then
 		for _, p in ipairs(s.people or {}) do
 			k ..= tostring(p.id) .. math.floor((p.morale or 0) / 5) .. (p.rank or 1) .. (p.pc or 0) .. tostring(p.offUntil and p.offUntil > s.day)
 		end
-	end
-	for _, c in ipairs(s.search or {}) do
-		k ..= c.key or ""
+	elseif page == "hire" then
+		-- only what the store shows: rarity, amount, location, team mix, and which BUY buttons you can afford
+		k ..= "|" .. buyRarity .. "|" .. buyQty .. "|" .. tostring(s.location) .. "|"
+		for _, r in ipairs(Staff.roles) do
+			k ..= (s.staff and s.staff[r.id] or 0) .. ","
+		end
+		local ls = locSalary(s)
+		for _, r in ipairs(Staff.roles) do
+			k ..= (s.cash >= Staff.signing(r.id, s.year, buyRarity, ls) * buyQty) and "1" or "0"
+		end
 	end
 	return k
 end

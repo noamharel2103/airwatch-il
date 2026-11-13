@@ -111,6 +111,15 @@ Staff.RARITIES = {
 	{ id = "mythic", name = "MYTHIC", mult = 12, color = Color3.fromRGB(255, 50, 110) },
 }
 
+-- Worker store: the office level (Catalog.officeStages index) each rarity needs before you can buy it.
+Staff.RARITY_OFFICE = { 1, 1, 2, 3, 4, 5 }
+
+-- One time price to buy (sign) one worker. Same formula the old recruit flow used.
+function Staff.signing(roleId: string, year: number, rarity: number, locSalary: number?): number
+	local rar = Staff.RARITIES[rarity] or Staff.RARITIES[1]
+	return Staff.monthlyCash(roleId, year) * 1.5 * rar.mult * (locSalary or 1)
+end
+
 -- Places you pay to find people. weights = chance per rarity (common..mythic).
 Staff.PLACES = {
 	{ id = "board", name = "JOB BOARD", cost = 2e3, n = 12, office = 1, weights = { 62, 27, 9, 2, 0, 0 }, color = Color3.fromRGB(40, 160, 255), desc = "Cheap. Mostly regular people." },

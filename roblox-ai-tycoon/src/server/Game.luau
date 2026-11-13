@@ -699,6 +699,85 @@ function TeamActions.recruitAll(state)
 	return true, string.format("Hired %d%s", hired, said_no > 0 and (", " .. said_no .. " said no") or "")
 end
 
+-- Worker store: buy count workers of one role and rarity. Always says yes if you have the cash and desks.
+function TeamActions.buyWorker(state, roleId, rarity, count)
+	local role = type(roleId) == "string" and Staff.byId[roleId] or nil
+	if not role then
+		return false, "Unknown worker"
+	end
+	local r = math.floor(tonumber(rarity) or 1)
+	local rar = Staff.RARITIES[r]
+	if r ~= r or not rar then
+		return false, "Unknown rarity"
+	end
+	local need = Staff.RARITY_OFFICE[r] or 1
+	if state.office < need then
+		local st = Catalog.officeStages[need]
+		return false, rar.name .. " workers unlock with " .. (st and (st.name:gsub("%-", " ")) or "a bigger office") .. ". Upgrade in Company."
+	end
+	local n = math.floor(tonumber(count) or 1)
+	if n ~= n or n < 1 or n > 50 then
+		return false, "You can buy 1 to 50 at once"
+	end
+	local stage = Catalog.officeStages[state.office]
+	local free = stage.maxStaff - Game.headcount(state)
+	if free <= 0 then
+		return false, "Office is full. Upgrade in Company (max " .. stage.maxStaff .. ")."
+	end
+	if n > free then
+		return false, "Only " .. free .. " free " .. (free == 1 and "desk" or "desks") .. ". Upgrade your office in Company."
+	end
+	local each = Staff.signing(role.id, year(state), r, locationOf(state).salary)
+	local total = each * n
+	if state.cash < total then
+		return false, "You need " .. Format.money(total)
+	end
+	spend(state, total, "salaries")
+	ensurePeople(state)
+	-- Roblox friends already on the team cannot be bought twice
+	local taken = {}
+	for _, p in ipairs(state.people) do
+		if p.userId then
+			taken[p.userId] = true
+		end
+	end
+	local pool = state.friendPool or {}
+	local first: any = nil
+	for _ = 1, n do
+		local c = Staff.randomCandidate(rng, role.id)
+		if #pool > 0 and rng:NextNumber() < 0.3 then
+			local freeFriends = {}
+			for _, f in ipairs(pool) do
+				if not taken[f.id] then
+					table.insert(freeFriends, f)
+				end
+			end
+			if #freeFriends > 0 then
+				local f = freeFriends[rng:NextInteger(1, #freeFriends)]
+				c.name, c.userId, c.from = f.name, f.id, "Your Roblox friend"
+				taken[f.id] = true
+			end
+		end
+		c.rarity = r
+		c.skill = math.floor((0.85 + r * 0.08 + rng:NextNumber(0, 0.1)) * 100) / 100
+		c.id = state.nextPersonId
+		state.nextPersonId += 1
+		c.morale, c.rank, c.pc = 80, math.clamp(r - 1, 1, 4), 0
+		table.insert(state.people, c)
+		first = first or c
+	end
+	state.staff[role.id] = (state.staff[role.id] or 0) + n
+	state.stats.hired += n
+	Game._goalProgress(state, "hire", n)
+	if first then
+		Game.chatMsg(state, "general", first.name, "Hi everyone! I just joined as " .. role.name .. ". Let's build something big.")
+	end
+	if n > 1 then
+		Game.chatMsg(state, "general", "HR", string.format("%d new %s people joined today. Say hi!", n, role.name))
+	end
+	return true, string.format("Hired %d %s %s", n, rar.name, role.name)
+end
+
 -- the recruiter: every month fills empty desks by himself with the best place you can afford
 function TeamActions.setAutoHire(state, on)
 	state.autoHire = on == true
@@ -1430,6 +1509,7 @@ function Game.boostDays(state, m)
 		d /= 3
 	end
 	d /= Game.eventFx().train
+	d *= Config.TRAIN_TIME or 1
 	return math.clamp(math.ceil(d), 1, 30)
 end
 
@@ -2431,12 +2511,12 @@ function Actions.trainTap(state)
 	local key
 	if state.training then
 		key = "t" .. state.training.name
-		state.training.progress = math.min(0.999, state.training.progress + 0.004)
+		state.training.progress = math.min(0.999, state.training.progress + (Config.TAP_POWER or 0.004))
 	else
 		for _, m in ipairs(state.models) do
 			if m.boosting then
 				key = "b" .. m.id .. "_" .. m.boosting.startDay
-				m.boosting.tapCredit = (m.boosting.tapCredit or 0) + 0.004 * math.max(1, m.boosting.doneDay - m.boosting.startDay)
+				m.boosting.tapCredit = (m.boosting.tapCredit or 0) + (Config.TAP_POWER or 0.004) * math.max(1, m.boosting.doneDay - m.boosting.startDay)
 				if m.boosting.tapCredit >= 1 and m.boosting.doneDay > state.day + 1 then
 					m.boosting.tapCredit -= 1
 					m.boosting.doneDay -= 1
@@ -3342,11 +3422,12 @@ function Game.tickDay(state)
 		local priceF = (20 / math.max(state.product.subPrice, 1)) ^ 0.25
 		local attr = (state.brand + state.users / 5e8) * math.exp(math.clamp(active.cap - F, -60, 30) / 6) * quality * priceF * (1 + state.reputation / 200)
 		attr /= math.sqrt(Config.DIFFICULTY)
+		attr *= Config.POPULARITY or 1
 		local share = attr / (attr + rivalAttr)
 		local web = Website.bonus(state.website)
 		local target = math.min(state.world.marketUsers * 1e6, state.world.marketUsers * 1e6 * share * (perk(state, "vip") and 1.5 or 1) * (1 + web.users))
 		state.brand += web.brand / 30
-		local rate = target > state.users and math.min(0.3, 0.03 * Game.eventFx().users) or 0.012
+		local rate = target > state.users and math.min(0.3, 0.045 * Game.eventFx().users) or 0.012
 		state.users = math.max(0, state.users + (target - state.users) * rate)
 		state.brand += fx.hype * 0.00002 + 0.00001
 		-- revenue

@@ -32,6 +32,10 @@ local ShopApp = require(Modules.AppShop)
 local WebsiteApp = require(Modules.AppWebsite)
 local Promo = require(Modules.Promo)
 local _ = LinkedIn
+-- Bank FIX buttons jump straight to the app where you can cut that cost
+Bank.openApp = function(id: string)
+	Shell.open(id)
+end
 for _, app in ipairs({ ShopApp, Lab, Parts, Team, WebsiteApp, Bank, Social, MailGoals.Mail, MailGoals.Goals, Company, Cameras }) do
 	Shell.register(app)
 end
@@ -105,12 +109,12 @@ Net.onEvent(function(kind, data)
 	end
 end)
 -- every in-game buy: coins burst out of the button you pressed
-local BUYS = { buy = true, rent = true, buyStorage = true, buyPcPart = true, autoSupply = true, recruit = true, buildSite = true, buyDecor = true, hire = true, upgradeOffice = true, boost = true, party = true, givePc = true, recruitSearch = true, createModel = true, acquire = true }
+local BUYS = { buy = true, rent = true, buyStorage = true, buyPcPart = true, autoSupply = true, recruit = true, buildSite = true, buyDecor = true, hire = true, upgradeOffice = true, boost = true, party = true, givePc = true, recruitSearch = true, buyWorker = true, createModel = true, acquire = true }
 table.insert(Net.actListeners, function(name, data)
 	if BUYS[name] then
 		Fx.sound("Coin")
 		Fx.burst(nil, 12, false)
-		Fx.float(name == "recruit" and "HIRED!" or (name == "createModel" and "TRAINING!" or "BOUGHT!"))
+		Fx.float((name == "recruit" or name == "buyWorker") and "HIRED!" or (name == "createModel" and "TRAINING!" or "BOUGHT!"))
 	end
 end)
 Lab.setPlayground(Playground)

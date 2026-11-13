@@ -34,6 +34,42 @@ function App.mount(ctx, s)
 	bigStat(top, "Your stake", string.format("%.1f%%  (%s)", s.equity * 100, Format.money(s.valuation * s.equity)), T.purple)
 	local lm = s.lastMonth
 	bigStat(top, "Last month", lm and ((lm.revenue - lm.costs >= 0 and "+" or "") .. Format.money(lm.revenue - lm.costs)) or "-", lm and (lm.revenue >= lm.costs and T.green or T.red) or T.text)
+	-- where the money goes: every cost of last month as a bar, biggest first, each with a
+	-- FIX button that opens the place where you can lower it
+	if lm and (lm.costs or 0) > 0 then
+		local box = UI.card(sc)
+		UI.list(box, 8)
+		UI.label(box, "WHERE YOUR MONEY GOES  (last month)", 16, T.yellow, { FontFace = UI.HEAVY })
+		UI.label(box, string.format("You earned %s and spent %s.", Format.money(lm.revenue or 0), Format.money(lm.costs or 0)), 15, T.text)
+		local rows = {
+			{ "PEOPLE (salaries)", lm.salaries or 0, "Too many people? Let some go in TEAM, or hire cheaper ones.", "team" },
+			{ "GPUS (rent and power)", lm.compute or 0, "Renting too many GPUs? Return some in GPUS, or buy your own.", "parts" },
+			{ "OFFICE (rent)", lm.office or 0, "Big offices cost a lot. Only move up when you need the desks.", "company" },
+			{ "SERVERS (running your AI)", lm.inference or 0, "Lots of users cost server money. Raise your prices in COMPANY.", "company" },
+		}
+		table.sort(rows, function(a, b)
+			return a[2] > b[2]
+		end)
+		local total = math.max(lm.costs or 0, 1)
+		for i, r in ipairs(rows) do
+			if r[2] > 0 then
+				local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 58), Parent = box })
+				new("TextLabel", { Text = r[1], FontFace = UI.BOLD, TextSize = 15, TextColor3 = i == 1 and T.red or T.text, Size = UDim2.new(0.4, 0, 0, 22), Parent = row })
+				new("TextLabel", { Text = string.format("%s  (%d%%)", Format.money(r[2]), math.floor(r[2] / total * 100 + 0.5)), FontFace = UI.BOLD, TextSize = 15, TextColor3 = T.sub, TextXAlignment = Enum.TextXAlignment.Right, Position = UDim2.new(0.4, 0, 0, 0), Size = UDim2.new(0.35, -12, 0, 22), Parent = row })
+				local track = new("Frame", { BackgroundColor3 = Color3.fromRGB(18, 22, 40), Position = UDim2.fromOffset(0, 26), Size = UDim2.new(0.75, -12, 0, 12), Parent = row })
+				UI.corner(track, 6)
+				local fill = new("Frame", { BackgroundColor3 = i == 1 and T.red or T.orange, Size = UDim2.fromScale(math.clamp(r[2] / total, 0.02, 1), 1), Parent = track })
+				UI.corner(fill, 6)
+				new("TextLabel", { Text = r[3], TextSize = 12, TextColor3 = T.dim, Position = UDim2.fromOffset(0, 40), Size = UDim2.new(0.75, -12, 0, 16), Parent = row })
+				local appId = r[4]
+				UI.button(row, "FIX", function()
+					if App.openApp then
+						App.openApp(appId)
+					end
+				end, i == 1 and T.red or "ghost", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0), Size = UDim2.new(0.22, 0, 0, 44), TextSize = 14 })
+			end
+		end
+	end
 	-- charts
 	local charts = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 200), Parent = sc })
 	new("UIGridLayout", { CellSize = UDim2.new(0.5, -6, 1, 0), CellPadding = UDim2.fromOffset(12, 0), Parent = charts })
@@ -134,7 +170,7 @@ function App.mount(ctx, s)
 end
 
 function App.key(s)
-	return #s.history .. #s.investors .. #s.loans .. math.floor(math.log10(math.max(10, math.abs(s.cash)))) .. math.floor(s.loanLimit / 1e4)
+	return tostring(s.lastMonth and s.lastMonth.costs) .. #s.history .. #s.investors .. #s.loans .. math.floor(math.log10(math.max(10, math.abs(s.cash)))) .. math.floor(s.loanLimit / 1e4)
 end
 
 return App

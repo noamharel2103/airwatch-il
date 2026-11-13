@@ -139,7 +139,7 @@ function M.evaluate(recipe, ctx)
 	local staffComp = (1 + 0.12 * math.log(1 + (staff.research or 0))) * (1 + 0.08 * math.log(1 + (staff.data or 0)))
 	local eff = flop * comp * (ctx.algo or 1) * staffComp
 	local baseCap = 10 * math.log10(eff) - Config.CAP_OFFSET
-	local finalCap = baseCap + cap
+	local finalCap = baseCap + cap + (Config.MODEL_BONUS or 0)
 	if distilled and ctx.bestCap then
 		finalCap = math.max(finalCap, ctx.bestCap - 6 - math.max(0, 3 - math.log10(recipe.size)) * 2)
 	end
@@ -149,7 +149,7 @@ function M.evaluate(recipe, ctx)
 	local infraEff = 1 + 0.1 * math.log(1 + (staff.infra or 0))
 	local days = flop / (Hardware.H100_FLOP_PER_DAY * power * infraEff) * time
 	-- Post-training takes a minimum of a few days.
-	days = math.max(days, 3) * (MT.get(recipe.kind).time or 1)
+	days = math.max(days, 3) * (MT.get(recipe.kind).time or 1) * (Config.TRAIN_TIME or 1)
 
 	f.safety += 15 + 3 * math.log(1 + (staff.safety or 0)) * 3
 	local agentsLevel = dom.agents
