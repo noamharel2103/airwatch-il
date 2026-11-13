@@ -7,6 +7,8 @@ One list, worked top to bottom. Nothing new jumps the queue unless Noam says it 
 - [x] Figma UI kit + POP theme + rendered icons + gold shop (5fe11f3) + bold Bank and app bars, gold only in shop (f80800e), Studio v60
 - [ ] NEXT (Noam 2026-11-13 end of day): everything still feels OLD. In this order:
   0. [x] Lighting softer (less bright, warmer, more contrast) in place v61
+  1a. [x] Real 3D chairs, racks, desks, monitors + closed rooms + warm light (b6fc691, v66)
+  1b. [ ] NEXT: decor (pouf, stool, bin, lamp, plant in DecorVisuals) + bedroom bed/door as real models: make them with Studio generate_mesh, store in ReplicatedStorage.Props (client needs them)
   1. Much better OFFICE 3D models (he says low poly and ugly; candidate: PBR Office Chair 131726966724793, check every pack for scripts first) (every stage room: desk, chairs, servers, walls, decor), real modern office look, not blocky
   2. [~] New TUTORIAL look: robot guide, typed text, dots, bouncing arrow, short texts (not seen on screen yet: his saves already finished it)
   3. Fonts and every remaining screen bold like the Bank: AI Lab, Team, GPUs, Social, Mail, Company, Website, Settings, desktop, title screen (title text not gold)
