@@ -8,6 +8,7 @@ local Config = require(Shared.Config)
 local Format = require(Shared.Format)
 local Catalog = require(Shared.Catalog)
 local Shop = require(Shared.Shop)
+local Difficulty = require(Shared.Difficulty)
 local MarketplaceService = game:GetService("MarketplaceService")
 local Modules = script.Parent:WaitForChild("Modules")
 local Game = require(Modules.Game)
@@ -491,6 +492,11 @@ local function reconcile(state)
 	if state.tut == nil and (state.day or 0) > 30 then
 		state.tut = 99
 	end
+	-- one-time tutorial for every existing company (version 2): it runs again once, then never
+	if (state.tutV or 0) < 2 then
+		state.tut = 1
+		state.tutV = 2
+	end
 	local fresh = Game.new(state.company or "Company")
 	for k, v in pairs(fresh) do
 		if state[k] == nil then
@@ -506,7 +512,8 @@ local function reconcile(state)
 	return state
 end
 
-SlotsRF.OnServerInvoke = function(player: Player, action: string, slot: number?, name: string?, location: string?)
+-- difficulty (6th argument) is only sent by the new company dialog; old calls still work
+SlotsRF.OnServerInvoke = function(player: Player, action: string, slot: number?, name: string?, location: string?, difficulty: string?)
 	if action == "list" then
 		return { slots = Saves.listSlots(player.UserId), persistent = Saves.available or RunService:IsStudio() }
 	elseif action == "play" then
@@ -533,7 +540,10 @@ SlotsRF.OnServerInvoke = function(player: Player, action: string, slot: number?,
 					loc = l.id
 				end
 			end
-			state = Game.new(n, loc)
+			-- a valid difficulty from the new company dialog is final; without one the company asks later
+			local diffOk = Difficulty.isValid(difficulty)
+			state = Game.new(n, loc, diffOk and difficulty or nil)
+			state.diffChosen = diffOk
 			Saves.save(player.UserId, slot :: number, state, summary(state))
 		end
 		sessions[player] = { state = state, slot = slot :: number, acc = 0, lastPush = 0, dirty = true, lastSaveMonth = -1 }

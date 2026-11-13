@@ -337,6 +337,20 @@ local function sideButton(id: string, icon: string, color: Color3, label: string
 end
 
 local lastInfo: any = nil
+-- the Settings app in the computer changes the same values: keep both in sync
+function Extras.setValues(v)
+	if type(v) ~= "table" then
+		return
+	end
+	for k, x in pairs(v) do
+		settings[k] = x
+	end
+	applyMusic()
+end
+function Extras.getValues()
+	return table.clone(settings)
+end
+
 function Extras.refresh()
 	task.spawn(function()
 		local info = meta("info")
@@ -426,62 +440,219 @@ function Extras.start(gui: Instance, fx)
 			end)
 		end
 	end)
-	-- luck + live world events, next to the SHOP button
+	-- luck + live world events + personal admin boosts
 	local EventsDef = require(RS.Shared.Events)
-	-- events: centered at the top, under the news line (never on the laptop)
-	local strip = new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 72), Size = UDim2.fromOffset(900, 46), Parent = (gui :: any).HUD or gui })
-	UI.list(strip, 8, true, Enum.HorizontalAlignment.Center)
-	-- luck: a small tag tucked under the money panel
-	local luckChip = new("TextLabel", { Text = "LUCK x1.00", FontFace = UI.FONT, TextSize = 14, TextColor3 = Color3.fromRGB(120, 255, 170), TextXAlignment = Enum.TextXAlignment.Center, BackgroundTransparency = 0.1, BackgroundColor3 = T.bg, Position = UDim2.fromOffset(16, 114), Size = UDim2.fromOffset(140, 24), Parent = (gui :: any).HUD or gui })
+	local hudRoot = (gui :: any).HUD or gui
+	-- luck: a small tag tucked under the money panel, only when you have extra luck
+	local luckChip = new("TextLabel", { Text = "LUCK x1.00", Visible = false, FontFace = UI.FONT, TextSize = 14, TextColor3 = Color3.fromRGB(120, 255, 170), TextXAlignment = Enum.TextXAlignment.Center, BackgroundTransparency = 0.1, BackgroundColor3 = T.bg, Position = UDim2.fromOffset(16, 114), Size = UDim2.fromOffset(140, 24), Parent = hudRoot })
 	new("UICorner", { CornerRadius = UDim.new(0, 6), Parent = luckChip })
 	new("UIStroke", { Color = Color3.fromRGB(0, 200, 110), Thickness = 1.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = luckChip })
-	local chips: { [string]: TextLabel } = {}
+
+	-- events and boosts: a row of round icons at the bottom right with a timer under each.
+	-- Hover (PC) or tap (phone) shows a card that says what it does.
+	local EVENT_ICON = { lucky = "trophy", money = "cash", hyper = "brain", peace = "shield", viral = "fire", gpusale = "gpu", legends = "team", gifts = "gift", abuse = "crown" }
+	local ICON = 66
+	local row = new("Frame", { Name = "EventIcons", BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -24, 1, -18), Size = UDim2.fromOffset(760, ICON + 30), Parent = hudRoot })
+	local rowList = UI.list(row, 12, true, Enum.HorizontalAlignment.Right)
+	rowList.VerticalAlignment = Enum.VerticalAlignment.Bottom
+	local tip = new("Frame", { Name = "EventTip", Visible = false, BackgroundColor3 = T.bg, AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -24, 1, -(18 + ICON + 40)), Size = UDim2.fromOffset(330, 0), AutomaticSize = Enum.AutomaticSize.Y, ZIndex = 70, Parent = hudRoot })
+	new("UICorner", { CornerRadius = UDim.new(0, 10), Parent = tip })
+	local tipStroke = new("UIStroke", { Color = T.accent, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = tip })
+	UI.pad(tip, 12, 14)
+	UI.list(tip, 4)
+	local tipName = new("TextLabel", { Text = "", FontFace = UI.HEAVY, TextSize = 18, Size = UDim2.new(1, 0, 0, 24), LayoutOrder = 1, ZIndex = 71, Parent = tip })
+	local tipDesc = new("TextLabel", { Text = "", FontFace = UI.FONT, TextSize = 15, TextColor3 = T.text, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, ZIndex = 71, Parent = tip })
+	local tipLeft = new("TextLabel", { Text = "", FontFace = UI.BOLD, TextSize = 14, TextColor3 = T.yellow, Size = UDim2.new(1, 0, 0, 20), LayoutOrder = 3, ZIndex = 71, Parent = tip })
+	local function layoutIcons(phone: boolean)
+		-- phones: keep clear of the side buttons on the right edge
+		row.Position = phone and UDim2.new(1, -112, 1, -10) or UDim2.new(1, -24, 1, -18)
+		tip.Position = phone and UDim2.new(1, -112, 1, -(10 + ICON + 40)) or UDim2.new(1, -24, 1, -(18 + ICON + 40))
+	end
+	layoutIcons(UI.phone)
+
+	-- an entry = { id, btn, timer, ends (os.clock), name, desc, color }
+	local entries: { [string]: any } = {}
+	local shownTip: any = nil
+	local pinned: any = nil
+	local hovering: any = nil
+
+	local function left(e: any): number
+		return math.max(0, e.ends - os.clock())
+	end
+	local function showTip(e: any)
+		shownTip = e
+		if not e then
+			tip.Visible = false
+			return
+		end
+		tipName.Text = e.name
+		tipName.TextColor3 = e.color:Lerp(Color3.new(1, 1, 1), 0.35)
+		tipDesc.Text = e.desc
+		tipLeft.Text = "Ends in " .. clock(left(e))
+		tipStroke.Color = e.color
+		tip.Visible = true
+	end
+
+	local function makeEntry(id: string, name: string, desc: string, icon: string, color: Color3, order: number)
+		local btn = new("TextButton", { Text = "", AutoButtonColor = false, BackgroundTransparency = 1, Size = UDim2.fromOffset(ICON, ICON + 26), LayoutOrder = order, Parent = row })
+		local disc = new("Frame", { BackgroundColor3 = color, Size = UDim2.fromOffset(ICON, ICON), Parent = btn })
+		new("UICorner", { CornerRadius = UDim.new(1, 0), Parent = disc })
+		new("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = disc })
+		new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(170, 170, 170)), Parent = disc })
+		local ic = UI.icon(disc, icon, color, math.floor(ICON * 0.66))
+		ic.AnchorPoint = Vector2.new(0.5, 0.5)
+		ic.Position = UDim2.fromScale(0.5, 0.5)
+		local timer = new("TextLabel", { Text = "", FontFace = UI.HEAVY, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Center, BackgroundColor3 = T.bg, BackgroundTransparency = 0.1, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 0), Size = UDim2.fromOffset(ICON + 6, 22), Parent = btn })
+		new("UICorner", { CornerRadius = UDim.new(0, 6), Parent = timer })
+		local sc = new("UIScale", { Parent = disc })
+		local e = { id = id, btn = btn, timer = timer, ends = os.clock(), name = name, desc = desc, color = color }
+		btn.MouseEnter:Connect(function()
+			hovering = e
+			UI.tween(sc, 0.15, { Scale = 1.1 }, Enum.EasingStyle.Back)
+			showTip(e)
+		end)
+		btn.MouseLeave:Connect(function()
+			if hovering == e then
+				hovering = nil
+			end
+			UI.tween(sc, 0.12, { Scale = 1 })
+			if pinned ~= e then
+				showTip(pinned)
+			end
+		end)
+		btn.Activated:Connect(function()
+			if pinned == e then
+				pinned = nil
+				showTip(hovering)
+			else
+				pinned = e
+				showTip(e)
+				if Fx then
+					Fx.sound("Click")
+				end
+				-- a tapped card goes away by itself on phones (no mouse to leave)
+				task.delay(5, function()
+					if pinned == e then
+						pinned = nil
+						showTip(hovering)
+					end
+				end)
+			end
+		end)
+		entries[id] = e
+		return e
+	end
+
+	local function removeEntry(id: string)
+		local e = entries[id]
+		if not e then
+			return
+		end
+		entries[id] = nil
+		if pinned == e then
+			pinned = nil
+		end
+		if hovering == e then
+			hovering = nil
+		end
+		if shownTip == e then
+			showTip(pinned)
+		end
+		e.btn:Destroy()
+	end
+
+	-- wanted = { { id, name, desc, icon, color, left } }; prefix keeps world events and boosts apart
+	local function sync(prefix: string, wanted: { any }, order: number)
+		local live = {}
+		for i, w in ipairs(wanted) do
+			local id = prefix .. tostring(w.id)
+			live[id] = true
+			local e = entries[id] or makeEntry(id, tostring(w.name), tostring(w.desc or ""), w.icon or "gift", typeof(w.color) == "Color3" and w.color or T.accent, order + i)
+			e.ends = os.clock() + (tonumber(w.left) or 0)
+		end
+		for id in pairs(entries) do
+			if id:sub(1, #prefix) == prefix and not live[id] then
+				removeEntry(id)
+			end
+		end
+	end
+
 	local seen: { [string]: boolean } = {}
-	local lastEvents: { any } = {}
 	Net.onState(function(st)
 		if not st then
 			return
 		end
-		luckChip.Text = string.format("LUCK x%.2f", st.luck or 1)
-		lastEvents = st.events or {}
+		local luck = st.luck or 1
+		luckChip.Text = string.format("LUCK x%.2f", luck)
+		luckChip.Visible = luck > 1.004
+		local wanted = {}
 		local live = {}
-		for _, ev in ipairs(lastEvents) do
-			live[ev.id] = true
+		for _, ev in ipairs(st.events or {}) do
 			local def = EventsDef.byId[ev.id]
-			if def and not chips[ev.id] then
-				local c = new("TextLabel", { Text = def.name, FontFace = UI.HEAVY, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Center, BackgroundTransparency = 0, BackgroundColor3 = def.color, Size = UDim2.fromOffset(230, 42), Parent = strip })
-				UI.corner(c, 2)
-				UI.stroke(c, T.line, 3)
-				new("UIStroke", { Color = T.line, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual, Parent = c })
-				c:SetAttribute("left", ev.left)
-				chips[ev.id] = c
+			if def then
+				live[ev.id] = true
+				table.insert(wanted, { id = ev.id, name = def.name, desc = def.desc, icon = EVENT_ICON[ev.id] or "bolt", color = def.color, left = ev.left })
 				if not seen[ev.id] and Fx then
 					seen[ev.id] = true
 					Fx.sound("Cheer")
 					Fx.banner(def.name, def.color, def.desc)
 					Fx.rain(50)
 				end
-			elseif chips[ev.id] then
-				chips[ev.id]:SetAttribute("left", ev.left)
 			end
 		end
-		for id, c in pairs(chips) do
+		for id in pairs(seen) do
 			if not live[id] then
-				c:Destroy()
-				chips[id] = nil
 				seen[id] = nil
 			end
 		end
+		sync("ev:", wanted, 0)
 	end)
+
+	-- personal boosts from the admin (luck boost, timed passes)
 	task.spawn(function()
+		local fxRemote = RS:WaitForChild("AdminFx", 60) :: RemoteEvent?
+		if fxRemote then
+			fxRemote.OnClientEvent:Connect(function(kind: string, data)
+				if kind == "boosts" and type(data) == "table" then
+					sync("me:", data, 100)
+				end
+			end)
+		end
+		-- ask once for boosts that were sent before this listener existed
+		local rf = RS:WaitForChild("AdminPanel", 60) :: RemoteFunction?
+		if rf then
+			for _ = 1, 10 do
+				if Net.state and Net.state.company then
+					break
+				end
+				task.wait(3)
+			end
+			local ok, list = pcall(function()
+				return (rf :: RemoteFunction):InvokeServer("__myBoosts")
+			end)
+			if ok and type(list) == "table" then
+				sync("me:", list, 100)
+			end
+		end
+	end)
+
+	task.spawn(function()
+		local wasPhone = UI.phone
 		while true do
-			task.wait(1)
-			for id, c in pairs(chips) do
-				local left = math.max(0, (c:GetAttribute("left") or 0) - 1)
-				c:SetAttribute("left", left)
-				local def = EventsDef.byId[id]
-				c.Text = (def and def.name or id) .. string.format("  %d:%02d", left // 60, left % 60)
-				c.Rotation = math.sin(os.clock() * 3) * 1.5
+			task.wait(0.5)
+			if UI.phone ~= wasPhone then
+				wasPhone = UI.phone
+				layoutIcons(wasPhone)
+			end
+			for id, e in pairs(entries) do
+				local l = left(e)
+				e.timer.Text = clock(l)
+				if l <= 0 then
+					removeEntry(id)
+				end
+			end
+			if shownTip then
+				tipLeft.Text = "Ends in " .. clock(left(shownTip))
 			end
 		end
 	end)

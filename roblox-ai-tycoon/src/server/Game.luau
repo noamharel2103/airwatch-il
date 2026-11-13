@@ -21,6 +21,7 @@ local MT = require(Shared.ModelTypes)
 local Shop = require(Shared.Shop)
 local Website = require(Shared.Website)
 local Events = require(Shared.Events)
+local Difficulty = require(Shared.Difficulty)
 local rng = Random.new()
 
 local spend: (any, number, string?) -> ()
@@ -45,16 +46,20 @@ local function locationOf(state)
 end
 Game.locationOf = locationOf
 
-function Game.new(companyName: string, locationId: string?)
+function Game.new(companyName: string, locationId: string?, difficultyId: string?)
+	local diffId = Difficulty.normalize(difficultyId)
 	local state = {
 		version = 1,
 		company = companyName,
 		location = locationId or "paloalto",
+		difficulty = diffId,
+		diffChosen = false, -- true once the player picked it (it can not change after that)
 		loans = {},
 		tut = 1,
+		tutV = 2, -- tutorial migration version (see reconcile in Main.server)
 		day = 0,
 		speed = 1,
-		cash = Config.START_CASH,
+		cash = Config.START_CASH * Difficulty.get(diffId).startCash,
 		credits = Config.START_CLOUD_CREDITS,
 		valuation = Config.START_VALUATION,
 		equity = Config.START_FOUNDER_EQUITY,
@@ -175,7 +180,9 @@ function Game.advanceWorld(state)
 			if names and alive and not (state.acquired and state.acquired[lab.id]) then
 				local nextDay = w.future[lab.id]
 				if not nextDay then
-					w.future[lab.id] = state.day + rng:NextInteger(20, math.floor(lab.cadence * 30))
+					-- difficulty: rivals ship faster on harder levels (cadence divided by the rival multiplier)
+					local rivalX = Difficulty.get(state.difficulty).rival
+					w.future[lab.id] = state.day + rng:NextInteger(20, math.max(20, math.floor(lab.cadence * 30 / rivalX)))
 				elseif state.day >= nextDay then
 					local n = (w.futureCount or {})[lab.id] or 0
 					w.futureCount = w.futureCount or {}
@@ -188,7 +195,7 @@ function Game.advanceWorld(state)
 					local r = { day = state.day, lab = lab.id, model = name, cap = cap, open = lab.open >= 7, priceOut = lab.open >= 7 and 2 or 20, note = "Rumoured to be trained on a gigawatt cluster", future = true }
 					addRelease(state, r)
 					Game.newsItem(state, Labs.displayName(lab.id) .. " releases " .. name, "rival")
-					w.future[lab.id] = state.day + math.floor(lab.cadence * 30 * rng:NextNumber(0.7, 1.4))
+					w.future[lab.id] = state.day + math.max(1, math.floor(lab.cadence * 30 * rng:NextNumber(0.7, 1.4) / Difficulty.get(state.difficulty).rival))
 				end
 			end
 		end
@@ -1099,6 +1106,19 @@ function Actions.tutStep(state, n)
 	return true
 end
 Game.Actions = Actions
+
+-- pick the difficulty once (only before the company has a diffChosen flag set)
+function Actions.setDifficulty(state, id)
+	if state.diffChosen then
+		return false, "Your difficulty is set and can not change"
+	end
+	if not Difficulty.isValid(id) then
+		return false, "Unknown difficulty"
+	end
+	state.difficulty = id
+	state.diffChosen = true
+	return true
+end
 
 function Actions.setSpeed(state, s)
 	if table.find(Config.SPEEDS, s) or (s == 8 and perk(state, "speed8")) then
@@ -3026,6 +3046,8 @@ local function tickProblems(state, fx)
 		risk *= 0.25
 	end
 	risk /= Game.luck(state)
+	-- difficulty: harder levels have more crises
+	risk *= Difficulty.get(state.difficulty).events
 	if Game.eventFx().noCrisis then
 		risk = 0
 	end
@@ -3422,7 +3444,7 @@ function Game.tickDay(state)
 		local priceF = (20 / math.max(state.product.subPrice, 1)) ^ 0.25
 		local attr = (state.brand + state.users / 5e8) * math.exp(math.clamp(active.cap - F, -60, 30) / 6) * quality * priceF * (1 + state.reputation / 200)
 		attr /= math.sqrt(Config.DIFFICULTY)
-		attr *= Config.POPULARITY or 1
+		attr *= (Config.POPULARITY or 1) * Difficulty.get(state.difficulty).popularity
 		local share = attr / (attr + rivalAttr)
 		local web = Website.bonus(state.website)
 		local target = math.min(state.world.marketUsers * 1e6, state.world.marketUsers * 1e6 * share * (perk(state, "vip") and 1.5 or 1) * (1 + web.users))
@@ -3494,15 +3516,16 @@ function Game.tickDay(state)
 	revenue *= 1 + (state.friendBonus or 0)
 	revenue *= Game.eventFx().cash
 	-- easier game: people pay a bit more so you are not broke all the time
-	revenue *= Config.INCOME_BOOST or 1
+	revenue *= (Config.INCOME_BOOST or 1) * Difficulty.get(state.difficulty).income
 	state.cash += revenue
 	state.month.revenue += revenue
 	-- easier game: every running cost is cut so money does not melt away so fast
-	local ease = Config.COST_EASE or 1
+	local costX = Difficulty.get(state.difficulty).cost
+	local ease = (Config.COST_EASE or 1) * costX
 	spend(state, salaries * ease, "salaries")
 	spend(state, (rent - fromCredits + power) * ease, "compute")
 	spend(state, office * ease, "office")
-	spend(state, inference, "inference")
+	spend(state, inference * costX, "inference")
 
 	tickProblems(state, fx)
 	Game.tickTeamChatter(state)
@@ -3684,7 +3707,7 @@ function Game.snapshot(state)
 	end)
 	local t = state.training
 	return {
-		company = state.company, day = state.day, speed = state.speed, cash = state.cash, credits = state.credits,
+		company = state.company, difficulty = state.difficulty, diffChosen = state.diffChosen == true, day = state.day, speed = state.speed, cash = state.cash, credits = state.credits,
 		valuation = state.valuation, equity = state.equity, users = state.users, brand = state.brand, hype = state.hype,
 		reputation = state.reputation, regulator = state.regulator, office = state.office, staff = state.staff,
 		people = state.people, candidates = state.candidates, requests = state.requests or {}, search = state.search or {}, partyReady = state.partyReady or 0, teamFactor = Game.teamFactor(state), gpus = state.gpus, research = state.research,

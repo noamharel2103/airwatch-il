@@ -7,6 +7,7 @@ local Config = require(Shared.Config)
 local Format = require(Shared.Format)
 local UI = require(script.Parent.UI)
 local Net = require(script.Parent.Net)
+local DifficultyPick = require(script.Parent.DifficultyPick)
 local T = UI.T
 local new = UI.new
 
@@ -102,7 +103,7 @@ function Title.show(gui: ScreenGui, onPlay: () -> ())
 
 	local function newCompanyDialog(slot)
 		local overlay = new("TextButton", { Text = "", AutoButtonColor = false, BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.35, Size = UDim2.fromScale(1, 1), ZIndex = 230, Parent = o })
-		local d = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.52), Size = UDim2.fromOffset(640, 330), ZIndex = 231, Parent = overlay })
+		local d = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.52), Size = UDim2.fromOffset(680, 500), ZIndex = 231, Parent = overlay })
 		UI.fit(d)
 		UI.skin(d, T.bg)
 		local bar = new("Frame", { BackgroundColor3 = SLOT_COLORS[slot] or T.accent, Size = UDim2.new(1, 0, 0, 60), ZIndex = 232, Parent = d })
@@ -115,15 +116,21 @@ function Title.show(gui: ScreenGui, onPlay: () -> ())
 		UI.stroke(box, Color3.fromRGB(10, 12, 30), 3)
 		UI.pad(box, 0, 16)
 		local chosen = Config.LOCATIONS[1].id
+			local diffId = "medium"
 		UI.label(body, "You start with $150K and a gaming laptop. The bank will lend you a bit more.", 15, T.yellow)
-		local btns = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 62), Parent = body })
+		-- difficulty: 5 levels, the description shows under the row. Chosen here it can not change later.
+			UI.label(body, "DIFFICULTY (CAN NOT CHANGE LATER)", 13, T.sub, { FontFace = UI.BOLD })
+			DifficultyPick.row(body, diffId, function(id: string)
+				diffId = id
+			end)
+			local btns = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 62), Parent = body })
 		UI.list(btns, 14, true)
 		UI.button(btns, "BACK", function()
 			overlay:Destroy()
 		end, "ghost", { Size = UDim2.fromOffset(180, 60), TextSize = 16 })
 		UI.button(btns, "START COMPANY", function()
 			status.Text = "SETTING UP..."
-			local res = Net.slots("play", slot, box.Text, chosen)
+			local res = Net.slots("play", slot, box.Text, chosen, diffId)
 			if res and res.ok then
 				o:Destroy()
 				onPlay()

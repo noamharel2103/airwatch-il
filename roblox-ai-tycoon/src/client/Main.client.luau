@@ -30,13 +30,15 @@ local LinkedIn = require(Modules.AppLinkedIn)
 local Cameras = require(Modules.AppCameras)
 local ShopApp = require(Modules.AppShop)
 local WebsiteApp = require(Modules.AppWebsite)
+local AppSettings = require(Modules.AppSettings)
+local DifficultyPick = require(Modules.DifficultyPick)
 local Promo = require(Modules.Promo)
 local _ = LinkedIn
 -- Bank FIX buttons jump straight to the app where you can cut that cost
 Bank.openApp = function(id: string)
 	Shell.open(id)
 end
-for _, app in ipairs({ ShopApp, Lab, Parts, Team, WebsiteApp, Bank, Social, MailGoals.Mail, MailGoals.Goals, Company, Cameras }) do
+for _, app in ipairs({ ShopApp, Lab, Parts, Team, WebsiteApp, Bank, Social, MailGoals.Mail, MailGoals.Goals, Company, Cameras, AppSettings }) do
 	Shell.register(app)
 end
 Promo.start(Shell.gui, ShopApp)
@@ -70,6 +72,7 @@ end
 local Fx = require(Modules.Fx)
 Fx.init(Shell.gui)
 Shell.fx = Fx
+AppSettings.fx = Fx
 UI.sound = Fx.sound
 require(Modules.Extras).start(Shell.gui, Fx)
 -- crisis alarm, launch cheer, level up on office upgrades
@@ -549,16 +552,34 @@ end)
 -- ===== start =====
 Shell.showHUD(false)
 local tutorialStarted = false
-Title.show(Shell.overlay, function()
-	blocked = false
+local function startTutorial()
 	if not tutorialStarted then
 		tutorialStarted = true
 		require(Modules:WaitForChild("Tutorial")).start(Shell.gui, Shell)
 	end
+end
+Title.show(Shell.overlay, function()
+	blocked = false
 	Shell.showHUD(true)
 	if Net.state then
 		setRoom(Net.state.office)
 	end
+	-- companies made before difficulty levels pick one now (once); the tutorial starts after that
+	task.spawn(function()
+		local s: any = nil
+		for _ = 1, 100 do
+			s = Net.state
+			if s and s.company then
+				break
+			end
+			task.wait(0.1)
+		end
+		if s and s.company and s.diffChosen ~= true then
+			DifficultyPick.ask(Shell.overlay, startTutorial)
+		else
+			startTutorial()
+		end
+	end)
 end)
 
 -- when avatars sit down (or leave), hide or show the block worker at that desk right away
