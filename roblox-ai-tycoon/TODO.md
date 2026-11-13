@@ -5,17 +5,17 @@ One list, worked top to bottom. Nothing new jumps the queue unless Noam says it 
 
 ## Now (in progress)
 - [~] Hiring store: buy workers by job + rarity, price + monthly salary, no search (published to testers, page itself not clicked yet)
-- [~] Admin: 17 new commands, phone ADMIN panel, event icons bottom right with tooltips, hide LUCK at 1.0 (written d6cb262, not tested)
-- [~] Settings app in the computer + 5 difficulty levels + one-time difficulty prompt and tutorial for every save (written d6cb262, not tested)
+- [x] Admin: 17 new commands, phone ADMIN panel (tested), GIVE EVERYTHING (tested), /help, event icons, LUCK hidden at 1.0
+- [x] 5 difficulty levels + one-time pick for old saves + tutorial for everyone (tested); Settings app [~] not opened yet
 - [~] Tutorial with grey spotlight, bank "where your money goes" + FIX, costs /2, income x1.5, training x0.5, TAP 76%, popularity x1.6, 6s per day
-- [ ] Test all of the above in Studio, fix, commit
+- [x] Tested in Studio, saved as place version 57 (1aafa4f)
 
 ## 1. Yesterday's list (2026-11-12), still open
 - [ ] Insert real sounds (Click, Hover, LevelUp, Alarm, Cheer, Key, Notify) into SoundService.Sfx and music into SoundService.Music
 - [ ] Test the untested round: events/luck, music, daily + playtime gifts, friend bonus, new GPUs/companies, open models tab, labs/launch/reactions
 - [ ] Remove the right side bar; gifts, friends, ranks, settings move into the computer as apps
 - [ ] Gifts arrive as packages in the room (click to open, unbox animation)
-- [ ] Delivery boxes appear in the right place in every room
+- [ ] Delivery boxes appear in the right place in every room (seen: a package box lands right in front of the camera)
 - [ ] Maps are broken (servers on tables etc): fix every room
 - [ ] CEO office as the main room + good security cameras
 - [ ] Designer: hire designers to build your app (looks like a chat AI app, many features)
